@@ -746,11 +746,34 @@ var CardAutoFiller = {
                 if (a.badgeNumber > 0 && b.badgeNumber > 0) return a.badgeNumber - b.badgeNumber;
                 var bTop = b.bounds[1];
                 var aTop = a.bounds[1];
-                if (Math.abs(bTop - aTop) > 35) return bTop - aTop;
+                if (Math.abs(bTop - aTop) > 25) return bTop - aTop;
                 return a.bounds[0] - b.bounds[0];
             });
             return cards;
         }
+
+        if (order === "column") {
+            // Sort by Artboard -> Column (Left to Right across 2, 3, 4, or N columns) -> Row (Top to Bottom)
+            cards.sort(function(a, b) {
+                if (numABs > 1 && a.artboardIndex !== b.artboardIndex) return a.artboardIndex - b.artboardIndex;
+                var aLeft = a.bounds[0];
+                var bLeft = b.bounds[0];
+                if (Math.abs(aLeft - bLeft) > 50) return aLeft - bLeft; // Col 1 before Col 2, Col 3, Col 4...
+                return b.bounds[1] - a.bounds[1]; // Top to bottom within that column
+            });
+            return cards;
+        }
+
+        // Row by Row (Row 1 [Col 1, 2, 3, 4...], then Row 2 [Col 1, 2, 3, 4...]...)
+        cards.sort(function(a, b) {
+            if (numABs > 1 && a.artboardIndex !== b.artboardIndex) return a.artboardIndex - b.artboardIndex;
+            var bTop = b.bounds[1];
+            var aTop = a.bounds[1];
+            if (Math.abs(bTop - aTop) > 25) return bTop - aTop; // Row 1 before Row 2
+            return a.bounds[0] - b.bounds[0]; // Left to right within row (Col 1, Col 2, Col 3, Col 4...)
+        });
+        return cards;
+    }
 
         if (order === "column") {
             cards.sort(function(a, b) {
