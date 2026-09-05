@@ -182,30 +182,64 @@
             csInterface.evalScript(loadScript);
         } catch(e) {}
 
-        // Tab switching
-        tabBtns.forEach(function(btn) {
-            btn.addEventListener('click', function() {
-                var targetTab = this.getAttribute('data-tab');
-                tabBtns.forEach(function(b) { b.classList.remove('active'); });
-                tabPanes.forEach(function(p) { p.classList.remove('active'); });
-                this.classList.add('active');
-                var pane = document.getElementById(targetTab);
-                if (pane) pane.classList.add('active');
+        // Re-query Tab Buttons & Panes inside init()
+        tabBtns = document.querySelectorAll('.tab-btn');
+        tabPanes = document.querySelectorAll('.tab-pane');
 
-                // Re-sync and re-parse on tab change
-                if (targetTab === 'tab-keyring') {
-                    if (rawTextInputDiary.value && !rawTextInputKeyring.value) {
-                        rawTextInputKeyring.value = rawTextInputDiary.value;
-                    }
-                    parseKeyringInput();
-                } else if (targetTab === 'tab-diary') {
-                    if (rawTextInputKeyring.value && !rawTextInputDiary.value) {
-                        rawTextInputDiary.value = rawTextInputKeyring.value;
-                    }
-                    parseDiaryInput();
+        // Robust Tab Switching
+        function switchTab(targetTabId) {
+            if (!targetTabId) return;
+            var allBtns = document.querySelectorAll('.tab-btn');
+            var allPanes = document.querySelectorAll('.tab-pane');
+            
+            allBtns.forEach(function(b) {
+                if (b.getAttribute('data-tab') === targetTabId) {
+                    b.classList.add('active');
+                } else if (b.getAttribute('data-tab')) {
+                    b.classList.remove('active');
+                }
+            });
+
+            allPanes.forEach(function(p) {
+                if (p.id === targetTabId) {
+                    p.classList.add('active');
+                } else {
+                    p.classList.remove('active');
+                }
+            });
+
+            if (targetTabId === 'tab-keyring') {
+                if (rawTextInputDiary && rawTextInputKeyring && rawTextInputDiary.value && !rawTextInputKeyring.value) {
+                    rawTextInputKeyring.value = rawTextInputDiary.value;
+                }
+                parseKeyringInput();
+            } else if (targetTabId === 'tab-diary') {
+                if (rawTextInputKeyring && rawTextInputDiary && rawTextInputKeyring.value && !rawTextInputDiary.value) {
+                    rawTextInputDiary.value = rawTextInputKeyring.value;
+                }
+                parseDiaryInput();
+            }
+        }
+
+        tabBtns.forEach(function(btn) {
+            btn.addEventListener('click', function(e) {
+                var targetTab = this.getAttribute('data-tab');
+                if (targetTab) {
+                    switchTab(targetTab);
                 }
             });
         });
+
+        // Tab Bar Event Delegation Backup
+        var tabBar = document.querySelector('.tab-bar');
+        if (tabBar) {
+            tabBar.addEventListener('click', function(e) {
+                var btn = e.target.closest('.tab-btn');
+                if (btn && btn.getAttribute('data-tab')) {
+                    switchTab(btn.getAttribute('data-tab'));
+                }
+            });
+        }
 
         // Sliders
         if (sliderOffsetX && valOffsetX) {
@@ -1316,5 +1350,9 @@
         }, 3200);
     }
 
-    document.addEventListener('DOMContentLoaded', init);
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
 })();
