@@ -433,6 +433,57 @@ var CardAutoFiller = {
             }
         }
 
+        // Attach exact Serial & Form frames to each card by spatial proximity
+        var allDocTFs = [];
+        this.collectTextFrames(candidateItems, allDocTFs);
+        for (var cu = 0; cu < cardUnits.length; cu++) {
+            var cCard = cardUnits[cu];
+            if (!cCard.nameFrame) continue;
+            var cgb = cCard.nameFrame.geometricBounds;
+            var cLeft = cgb[0];
+            var cTop = cgb[1];
+
+            var bestSerial = null;
+            var bestForm = null;
+            var minSerialDist = 9999;
+            var minFormDist = 9999;
+
+            for (var dt = 0; dt < allDocTFs.length; dt++) {
+                var dtf = allDocTFs[dt];
+                if (dtf === cCard.nameFrame || this.isItemHidden(dtf)) continue;
+                var dtgb = dtf.geometricBounds;
+                var dx = dtgb[0] - cLeft;
+                var dy = cTop - dtgb[1]; // positive downwards
+
+                // 1. Top-Right Serial frame: target dx ~ 70 (50..92), dy ~ 5 (-8..22)
+                if (dx >= 45 && dx <= 92 && dy >= -8 && dy <= 22) {
+                    var dRawS = dtf.contents.replace(/^\s+|\s+$/g, '');
+                    if (/^[০-৯0-9]+$/.test(dRawS.replace(/\s+/g, '')) || dtf.lines.length === 1 || /^[০-৯0-9\-]+$/.test(dRawS)) {
+                        var sDist = Math.abs(dx - 70) + Math.abs(dy - 5);
+                        if (sDist < minSerialDist) {
+                            minSerialDist = sDist;
+                            bestSerial = dtf;
+                        }
+                    }
+                }
+
+                // 2. Bottom-Right Form box: target dx ~ 60 (45..78), dy ~ 45 (32..58)
+                if (dx >= 45 && dx <= 78 && dy >= 32 && dy <= 58) {
+                    var dRawF = dtf.contents.replace(/^\s+|\s+$/g, '');
+                    if (/(?:ফরম|দাখেলা|রোল|Form|Roll)/i.test(dRawF) || dtf.lines.length <= 2) {
+                        var fDist = Math.abs(dx - 60) + Math.abs(dy - 45);
+                        if (fDist < minFormDist) {
+                            minFormDist = fDist;
+                            bestForm = dtf;
+                        }
+                    }
+                }
+            }
+
+            if (bestSerial) cCard.serialFrame = bestSerial;
+            if (bestForm) cCard.formFrame = bestForm;
+        }
+
         return cardUnits;
     },
 
