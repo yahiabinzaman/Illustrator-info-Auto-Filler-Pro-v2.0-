@@ -351,33 +351,46 @@ Example:
                 </div>
             </div>
 
-            <!-- Typography Scale Controls -->
+            <!-- Typography Scale Controls (Per-Line Controls) -->
             <div class="grid-2" style="margin-top: 6px;">
                 <div class="control-group">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <label for="inputDetailsHScaleDiary">হরাইজন্টাল স্কেল (Details Scale)</label>
-                        <span style="font-size: 10px; color: #5cdbb5; font-weight: bold;">Default: 85%</span>
+                        <label for="inputAddressHScaleDiary">ঠিকানার স্কেল (Address Scale)</label>
+                        <span style="font-size: 10px; color: #5cdbb5; font-weight: bold;">Default: 80%</span>
                     </div>
                     <div style="display: flex; gap: 4px; align-items: center;">
-                        <input type="number" id="inputDetailsHScaleDiary" min="30" max="200" value="85" style="width: 60px; text-align: center; font-weight: bold;">
+                        <input type="number" id="inputAddressHScaleDiary" min="30" max="200" value="80" style="width: 55px; text-align: center; font-weight: bold;">
                         <span style="font-size: 11px; color: #aaa;">%</span>
-                        <button type="button" class="btn btn-sm btn-scale-preset" data-target="inputDetailsHScaleDiary" data-val="85" title="Default 85%">85%</button>
-                        <button type="button" class="btn btn-sm btn-scale-preset" data-target="inputDetailsHScaleDiary" data-val="90">90%</button>
-                        <button type="button" class="btn btn-sm btn-scale-preset" data-target="inputDetailsHScaleDiary" data-val="100">100%</button>
+                        <button type="button" class="btn btn-sm btn-scale-preset active" data-target="inputAddressHScaleDiary" data-val="80">80%</button>
+                        <button type="button" class="btn btn-sm btn-scale-preset" data-target="inputAddressHScaleDiary" data-val="75">75%</button>
+                        <button type="button" class="btn btn-sm btn-scale-preset" data-target="inputAddressHScaleDiary" data-val="85">85%</button>
                     </div>
                 </div>
                 <div class="control-group">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
                         <label for="inputNameHScaleDiary">নামের স্কেল (Name Scale)</label>
-                        <span style="font-size: 10px; color: #888;">100%</span>
+                        <span style="font-size: 10px; color: #888;">80%</span>
                     </div>
                     <div style="display: flex; gap: 4px; align-items: center;">
-                        <input type="number" id="inputNameHScaleDiary" min="30" max="200" value="100" style="width: 60px; text-align: center; font-weight: bold;">
+                        <input type="number" id="inputNameHScaleDiary" min="30" max="200" value="80" style="width: 55px; text-align: center; font-weight: bold;">
                         <span style="font-size: 11px; color: #aaa;">%</span>
-                        <button type="button" class="btn btn-sm btn-scale-preset" data-target="inputNameHScaleDiary" data-val="100">100%</button>
+                        <button type="button" class="btn btn-sm btn-scale-preset active" data-target="inputNameHScaleDiary" data-val="80">80%</button>
                         <button type="button" class="btn btn-sm btn-scale-preset" data-target="inputNameHScaleDiary" data-val="85">85%</button>
-                        <button type="button" class="btn btn-sm btn-scale-preset" data-target="inputNameHScaleDiary" data-val="75">75%</button>
+                        <button type="button" class="btn btn-sm btn-scale-preset" data-target="inputNameHScaleDiary" data-val="100">100%</button>
                     </div>
+                </div>
+            </div>
+            <div class="control-group" style="margin-top: 5px;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <label for="inputDetailsHScaleDiary">অন্যান্য তথ্যের স্কেল (Phone & Info Scale)</label>
+                    <span style="font-size: 10px; color: #aaa;">Default: 96%</span>
+                </div>
+                <div style="display: flex; gap: 4px; align-items: center;">
+                    <input type="number" id="inputDetailsHScaleDiary" min="30" max="200" value="96" style="width: 55px; text-align: center; font-weight: bold;">
+                    <span style="font-size: 11px; color: #aaa;">%</span>
+                    <button type="button" class="btn btn-sm btn-scale-preset active" data-target="inputDetailsHScaleDiary" data-val="96">96%</button>
+                    <button type="button" class="btn btn-sm btn-scale-preset" data-target="inputDetailsHScaleDiary" data-val="90">90%</button>
+                    <button type="button" class="btn btn-sm btn-scale-preset" data-target="inputDetailsHScaleDiary" data-val="100">100%</button>
                 </div>
             </div>
 

@@ -767,8 +767,9 @@
                     curLines = [];
                 }
             } else {
-                // If a new block starts with a standalone serial number e.g. "169", "১১৯", "১০" and curLines already has items
-                if (curLines.length >= 2 && serialLineRegex.test(line)) {
+                // If a new block starts with a standalone serial number (1-4 digits, NOT a phone number) and curLines already has items
+                var isSerial = serialLineRegex.test(line) && line.replace(/\D/g, '').length < 6;
+                if (curLines.length >= 2 && isSerial) {
                     blocks.push(curLines);
                     curLines = [line];
                 } else {
@@ -822,9 +823,9 @@
                     continue;
                 }
 
-                // Check if line 0 is standalone serial number e.g. "169", "১১৯", "১", "১০"
+                // Check if line 0 is standalone serial number (1-4 digits, NOT a phone number)
                 var slm = lText.match(serialLineRegex);
-                if (l === 0 && slm) {
+                if (l === 0 && slm && lText.replace(/\D/g, '').length < 6) {
                     item.serial = slm[1];
                     continue;
                 }
@@ -1204,10 +1205,12 @@
             var skipFilled = chkSkipFilledD ? chkSkipFilledD.checked : true;
             var autoRemove = chkAutoRemoveD ? chkAutoRemoveD.checked : true;
 
+            var inputAddrHScaleD = document.getElementById('inputAddressHScaleDiary');
             var inputDetHScaleD = document.getElementById('inputDetailsHScaleDiary');
             var inputNmHScaleD = document.getElementById('inputNameHScaleDiary');
-            var detHScaleD = inputDetHScaleD ? (parseFloat(inputDetHScaleD.value) || 85) : 85;
-            var nmHScaleD = inputNmHScaleD ? (parseFloat(inputNmHScaleD.value) || 100) : 100;
+            var addrHScaleD = inputAddrHScaleD ? (parseFloat(inputAddrHScaleD.value) || 80) : 80;
+            var detHScaleD = inputDetHScaleD ? (parseFloat(inputDetHScaleD.value) || 96) : 96;
+            var nmHScaleD = inputNmHScaleD ? (parseFloat(inputNmHScaleD.value) || 80) : 80;
 
             var inputDetLeadD = document.getElementById('inputDetailsLeadingDiary');
             var inputNmLeadD = document.getElementById('inputNameLeadingDiary');
@@ -1226,6 +1229,7 @@
                 nameColor: currentDiaryColor,
                 startIndex: currentDiaryStartIndex,
                 skipFilledCards: skipFilled,
+                addressHScale: addrHScaleD,
                 detailsHScale: detHScaleD,
                 nameHScale: nmHScaleD,
                 detailsLeading: detLeadD,

@@ -1380,31 +1380,13 @@ var CardAutoFiller = {
         cards = this.sortCards(cards, order);
 
         var targetCards = [];
-        if (!skipFilledCards || scope === "selection") {
+        // If starting from index 0 or in selection scope, populate all detected cards sequentially
+        if (!skipFilledCards || scope === "selection" || startIndex === 0) {
             targetCards = cards;
         } else {
-            var nameFreq = {};
-            for (var c = 0; c < cards.length; c++) {
-                var cName = cards[c].nameFrame ? cards[c].nameFrame.contents.split(/\r|\n/)[0].replace(/\s+/g, '') : "";
-                if (cName) nameFreq[cName] = (nameFreq[cName] || 0) + 1;
-            }
-            var maxFreq = 0;
-            var templateName = "";
-            for (var nm in nameFreq) {
-                if (nameFreq[nm] > maxFreq) {
-                    maxFreq = nameFreq[nm];
-                    templateName = nm;
-                }
-            }
-
             for (var c = 0; c < cards.length; c++) {
                 var card = cards[c];
                 var cardNm = card.nameFrame ? card.nameFrame.contents.split(/\r|\n/)[0].replace(/\s+/g, '') : "";
-
-                if (maxFreq >= 2 && cardNm === templateName) {
-                    targetCards.push(card);
-                    continue;
-                }
 
                 var isPriorEntry = false;
                 for (var p = 0; p < startIndex && p < entries.length; p++) {
@@ -1640,11 +1622,23 @@ var CardAutoFiller = {
                 } catch(serErr) {}
             }
 
-            // --- STEP 3: POPULATE FORM NUMBER (Bottom-Right Box) ---
+            // --- STEP 3: POPULATE FORM NUMBER (Bottom-Right Box - Strictly 2 Lines) ---
             var formHandled = false;
             if (card.formFrame && entry.formNumber) {
                 try {
-                    card.formFrame.contents = entry.formNumber;
+                    var rawForm = (entry.formNumber || "").replace(/^\s+|\s+$/g, '');
+                    var mDigits = rawForm.match(/([০-৯0-9]+)/);
+                    var formDigits = mDigits ? mDigits[1] : rawForm;
+                    formDigits = this.toBengaliDigits(formDigits);
+
+                    var formLabel = "ফরম";
+                    if (/^(দাখেলা|রোল|Roll|Form)/i.test(rawForm)) {
+                        var mLabel = rawForm.match(/^([^\:\d]+)/);
+                        if (mLabel) formLabel = mLabel[1].replace(/[:\s]+$/, '');
+                    }
+
+                    // Write 2 lines strictly: Label on Line 1, Number on Line 2
+                    card.formFrame.contents = formLabel + "\r" + formDigits;
                     try {
                         var fAttr = card.formFrame.textRange.characterAttributes;
                         if (finalDetailsFont) fAttr.textFont = finalDetailsFont;
@@ -1656,6 +1650,20 @@ var CardAutoFiller = {
                         if (tplForm.just !== null) card.formFrame.textRange.paragraphAttributes.justification = tplForm.just;
                         card.formFrame.textRange.paragraphAttributes.spaceBefore = 0;
                         card.formFrame.textRange.paragraphAttributes.spaceAfter = 0;
+
+                        // Ensure both lines have identical leading and font size
+                        for (var fPi = 0; fPi < card.formFrame.paragraphs.length; fPi++) {
+                            try {
+                                var fp = card.formFrame.paragraphs[fPi];
+                                fp.characterAttributes.size = tplForm.size;
+                                fp.characterAttributes.leading = tplForm.leading;
+                                fp.characterAttributes.tracking = tplForm.tracking;
+                                fp.characterAttributes.horizontalScale = tplForm.hScale;
+                                fp.characterAttributes.fillColor = solidBlackCMYK;
+                                fp.paragraphAttributes.spaceBefore = 0;
+                                fp.paragraphAttributes.spaceAfter = 0;
+                            } catch(fpe) {}
+                        }
                     } catch(fStyErr) {}
                     formHandled = true;
                 } catch(ffErr) {}
@@ -1753,10 +1761,10 @@ var CardAutoFiller = {
                                 if (!para || para.characters.length === 0) continue;
                                 var paraTxt = para.contents.replace(/^\s+|\s+$/g, '');
                                 
-                                // Base scale from template paragraph if present, else baseDetailsHScale
-                                var paraBaseHs = (tplDetails.hScaleArray[p] > 0) ? tplDetails.hScaleArray[p] : baseDetailsHScale;
-                                // Adaptively condense only if line is long (e.g. Village/Post/Thana/District)
-                                var paraAdaptiveHs = this.getAdaptiveHScale(paraTxt, paraBaseHs, 22);
+                                var isAddressLine = /^(গ্রাম|পোস্ট|থানা|জেলা)/.test(paraTxt) || p === 2 || p === 3;
+                                var userAddrScale = parseFloat(payload.addressHScale) || 80.0;
+                                var userDetScale = parseFloat(payload.detailsHScale) || 96.0;
+                                var paraAdaptiveHs = isAddressLine ? userAddrScale : userDetScale;
 
                                 var paraAttr = para.characterAttributes;
                                 if (finalDetailsFont) paraAttr.textFont = finalDetailsFont;
