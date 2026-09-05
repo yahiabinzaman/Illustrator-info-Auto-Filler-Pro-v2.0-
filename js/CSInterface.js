@@ -48,3 +48,23 @@ CSInterface.prototype.removeEventListener = function(type, listener, obj) {
         window.__adobe_cep__.removeEventListener(type, listener, obj);
     }
 };
+
+var SystemPath = {
+    USER_DATA: "userData",
+    COMMON_FILES: "commonFiles",
+    MY_DOCUMENTS: "myDocuments",
+    APPLICATION: "application",
+    EXTENSION: "extension",
+    HOST_APPLICATION: "hostApplication"
+};
+
+CSInterface.prototype.getSystemPath = function(pathType) {
+    var path = decodeURI(window.__adobe_cep__ ? window.__adobe_cep__.getSystemPath(pathType) : "");
+    var OSVersion = this.hostEnvironment ? this.hostEnvironment.OSVersion : "";
+    if (OSVersion.indexOf("Windows") >= 0) {
+        path = path.replace("file:///", "");
+    } else if (OSVersion.indexOf("Mac") >= 0) {
+        path = path.replace("file://", "");
+    }
+    return path;
+};

@@ -791,7 +791,7 @@
                 formNumber: "",
                 qty: "",
                 bani: "",
-                rawText: blk.join('\n')
+                rawText: blk.join('\n\n')
             };
 
             var nonMeta = [];
@@ -966,91 +966,91 @@
     }
 
     function executeAutoFillKeyring() {
-        if (currentKeyringStartIndex >= parsedKeyringEntries.length) {
-            currentKeyringStartIndex = 0;
-            if (inputStartIndexKeyring) inputStartIndexKeyring.value = 1;
-        }
-        if (!parsedKeyringEntries.length) {
-            showToast('Please enter biodata list first', 'error');
-            return;
-        }
+        try {
+            if (!parsedKeyringEntries.length) {
+                showToast('Please enter data list first', 'error');
+                return;
+            }
 
-        var autoRemove = chkAutoRemoveFilledKeyring ? chkAutoRemoveFilledKeyring.checked : true;
-        var skipFilled = chkSkipFilledKeyring ? chkSkipFilledKeyring.checked : true;
+            var skipFilled = chkSkipFilledKeyring ? chkSkipFilledKeyring.checked : true;
+            var autoRemove = chkAutoRemoveFilledKeyring ? chkAutoRemoveFilledKeyring.checked : true;
 
-        var inputDetHScale = document.getElementById('inputDetailsHScaleKeyring');
-        var inputNmHScale = document.getElementById('inputNameHScaleKeyring');
-        var detHScale = inputDetHScale ? (parseFloat(inputDetHScale.value) || 85) : 85;
-        var nmHScale = inputNmHScale ? (parseFloat(inputNmHScale.value) || 100) : 100;
+            var inputDetHScale = document.getElementById('inputDetailsHScaleKeyring');
+            var inputNmHScale = document.getElementById('inputNameHScaleKeyring');
+            var detHScale = inputDetHScale ? (parseFloat(inputDetHScale.value) || 85) : 85;
+            var nmHScale = inputNmHScale ? (parseFloat(inputNmHScale.value) || 100) : 100;
 
-        var inputDetLead = document.getElementById('inputDetailsLeadingKeyring');
-        var inputNmLead = document.getElementById('inputNameLeadingKeyring');
-        var detLead = inputDetLead ? inputDetLead.value.trim() : "Auto";
-        var nmLead = inputNmLead ? inputNmLead.value.trim() : "Auto";
+            var inputDetLead = document.getElementById('inputDetailsLeadingKeyring');
+            var inputNmLead = document.getElementById('inputNameLeadingKeyring');
+            var detLead = inputDetLead ? inputDetLead.value.trim() : "Auto";
+            var nmLead = inputNmLead ? inputNmLead.value.trim() : "Auto";
 
-        var payload = {
-            entries: parsedKeyringEntries,
-            order: selectFillOrderKeyring ? selectFillOrderKeyring.value : "column",
-            scope: selectScopeKeyring ? selectScopeKeyring.value : "artboard",
-            makeBold: chkMakeBoldKeyring ? chkMakeBoldKeyring.checked : true,
-            stripNumber: chkStripNumberKeyring ? chkStripNumberKeyring.checked : true,
-            fillBani: chkFillBaniKeyring ? chkFillBaniKeyring.checked : true,
-            fillQty: chkFillQtyKeyring ? chkFillQtyKeyring.checked : true,
-            qtyFormat: selectQtyFormatKeyring ? selectQtyFormatKeyring.value : "auto",
-            nameColor: currentKeyringColor,
-            startIndex: currentKeyringStartIndex,
-            skipFilledCards: skipFilled,
-            detailsHScale: detHScale,
-            nameHScale: nmHScale,
-            detailsLeading: detLead,
-            nameLeading: nmLead
-        };
+            var payload = {
+                entries: parsedKeyringEntries,
+                order: selectFillOrderKeyring ? selectFillOrderKeyring.value : "column",
+                scope: selectScopeKeyring ? selectScopeKeyring.value : "artboard",
+                makeBold: chkMakeBoldKeyring ? chkMakeBoldKeyring.checked : true,
+                stripNumber: chkStripNumberKeyring ? chkStripNumberKeyring.checked : true,
+                fillBani: chkFillBaniKeyring ? chkFillBaniKeyring.checked : true,
+                fillQty: chkFillQtyKeyring ? chkFillQtyKeyring.checked : true,
+                qtyFormat: selectQtyFormatKeyring ? selectQtyFormatKeyring.value : "auto",
+                nameColor: currentKeyringColor,
+                startIndex: currentKeyringStartIndex,
+                skipFilledCards: skipFilled,
+                detailsHScale: detHScale,
+                nameHScale: nmHScale,
+                detailsLeading: detLead,
+                nameLeading: nmLead
+            };
 
-        btnAutoFillKeyring.disabled = true;
-        btnAutoFillKeyring.textContent = 'Populating Keyring Cards...';
+            btnAutoFillKeyring.disabled = true;
+            btnAutoFillKeyring.textContent = 'Populating Keyring Cards...';
 
-        if (!parsedKeyringEntries.length && rawTextInputKeyring && rawTextInputKeyring.value.trim()) {
-            parseKeyringInput();
-        }
+            if (!parsedKeyringEntries.length && rawTextInputKeyring && rawTextInputKeyring.value.trim()) {
+                parseKeyringInput();
+            }
 
-        var extPath = csInterface.getSystemPath(SystemPath.EXTENSION);
-        var reloadJSX = "try { $.evalFile(new File('" + extPath + "/jsx/hostscript.jsx')); } catch(e) {}";
-        var scriptCall = reloadJSX + "; populateCards(" + JSON.stringify(JSON.stringify(payload)) + ")";
+            var scriptCall = "populateCards(" + JSON.stringify(JSON.stringify(payload)) + ")";
 
-        csInterface.evalScript(scriptCall, function(resStr) {
+            csInterface.evalScript(scriptCall, function(resStr) {
+                btnAutoFillKeyring.disabled = false;
+                btnAutoFillKeyring.textContent = 'Auto Fill Keyring Cards';
+
+                try {
+                    var res = JSON.parse(resStr);
+                    if (res.status === 'success') {
+                        if (autoRemove) {
+                            var placedCount = res.filledCount || 0;
+                            var remaining = parsedKeyringEntries.slice(currentKeyringStartIndex + placedCount);
+                            var newText = remaining.map(function(e) { return e.rawText || e.name; }).join('\n\n');
+                            if (rawTextInputKeyring) rawTextInputKeyring.value = newText;
+                            if (rawTextInputDiary) rawTextInputDiary.value = newText;
+                            currentKeyringStartIndex = 0;
+                            if (inputStartIndexKeyring) inputStartIndexKeyring.value = 1;
+                            parseKeyringInput();
+                            showToast('Populated ' + placedCount + ' card(s)! Remaining in queue: ' + remaining.length, 'success');
+                        } else {
+                            currentKeyringStartIndex = res.nextStartIndex;
+                            if (inputStartIndexKeyring) inputStartIndexKeyring.value = currentKeyringStartIndex + 1;
+                            renderKeyringPreview();
+                            showToast(res.message, 'success');
+                        }
+                    } else {
+                        showToast(res.message || 'Failed to populate cards', 'error');
+                    }
+                } catch (e) {
+                    if (resStr && String(resStr).indexOf("Error") !== -1) {
+                        showToast(String(resStr).substring(0, 80), 'error');
+                    } else {
+                        showToast('Communication error', 'error');
+                    }
+                }
+            });
+        } catch(err) {
             btnAutoFillKeyring.disabled = false;
             btnAutoFillKeyring.textContent = 'Auto Fill Keyring Cards';
-
-            try {
-                var res = JSON.parse(resStr);
-                if (res.status === 'success') {
-                    if (autoRemove) {
-                        var placedCount = res.filledCount || 0;
-                        var remaining = parsedKeyringEntries.slice(currentKeyringStartIndex + placedCount);
-                        var newText = remaining.map(function(e) { return e.rawText || e.name; }).join('\n\n');
-                        if (rawTextInputKeyring) rawTextInputKeyring.value = newText;
-                        if (rawTextInputDiary) rawTextInputDiary.value = newText;
-                        currentKeyringStartIndex = 0;
-                        if (inputStartIndexKeyring) inputStartIndexKeyring.value = 1;
-                        parseKeyringInput();
-                        showToast('Populated ' + placedCount + ' card(s)! Remaining in queue: ' + remaining.length, 'success');
-                    } else {
-                        currentKeyringStartIndex = res.nextStartIndex;
-                        if (inputStartIndexKeyring) inputStartIndexKeyring.value = currentKeyringStartIndex + 1;
-                        renderKeyringPreview();
-                        showToast(res.message, 'success');
-                    }
-                } else {
-                    showToast(res.message || 'Failed to populate cards', 'error');
-                }
-            } catch (e) {
-                if (resStr && String(resStr).indexOf("Error") !== -1) {
-                    showToast(String(resStr).substring(0, 80), 'error');
-                } else {
-                    showToast('Communication error', 'error');
-                }
-            }
-        });
+            showToast('Error: ' + err.message, 'error');
+        }
     }
 
     // ==========================================
@@ -1192,89 +1192,93 @@
     }
 
     function executeAutoFillDiary() {
-        if (!parsedDiaryEntries.length) {
-            showToast('Please enter biodata list first', 'error');
-            return;
-        }
+        try {
+            if (!parsedDiaryEntries.length) {
+                showToast('Please enter biodata list first', 'error');
+                return;
+            }
 
-        var chkSkipFilledD = document.getElementById('chkSkipFilledDiary');
-        var chkAutoRemoveD = document.getElementById('chkAutoRemoveFilledDiary');
-        var inputStartIndexD = document.getElementById('inputStartIndexDiary');
-        var skipFilled = chkSkipFilledD ? chkSkipFilledD.checked : true;
-        var autoRemove = chkAutoRemoveD ? chkAutoRemoveD.checked : true;
+            var chkSkipFilledD = document.getElementById('chkSkipFilledDiary');
+            var chkAutoRemoveD = document.getElementById('chkAutoRemoveFilledDiary');
+            var inputStartIndexD = document.getElementById('inputStartIndexDiary');
+            var skipFilled = chkSkipFilledD ? chkSkipFilledD.checked : true;
+            var autoRemove = chkAutoRemoveD ? chkAutoRemoveD.checked : true;
 
-        var inputDetHScaleD = document.getElementById('inputDetailsHScaleDiary');
-        var inputNmHScaleD = document.getElementById('inputNameHScaleDiary');
-        var detHScaleD = inputDetHScaleD ? (parseFloat(inputDetHScaleD.value) || 85) : 85;
-        var nmHScaleD = inputNmHScaleD ? (parseFloat(inputNmHScaleD.value) || 100) : 100;
+            var inputDetHScaleD = document.getElementById('inputDetailsHScaleDiary');
+            var inputNmHScaleD = document.getElementById('inputNameHScaleDiary');
+            var detHScaleD = inputDetHScaleD ? (parseFloat(inputDetHScaleD.value) || 85) : 85;
+            var nmHScaleD = inputNmHScaleD ? (parseFloat(inputNmHScaleD.value) || 100) : 100;
 
-        var inputDetLeadD = document.getElementById('inputDetailsLeadingDiary');
-        var inputNmLeadD = document.getElementById('inputNameLeadingDiary');
-        var detLeadD = inputDetLeadD ? inputDetLeadD.value.trim() : "Auto";
-        var nmLeadD = inputNmLeadD ? inputNmLeadD.value.trim() : "Auto";
+            var inputDetLeadD = document.getElementById('inputDetailsLeadingDiary');
+            var inputNmLeadD = document.getElementById('inputNameLeadingDiary');
+            var detLeadD = inputDetLeadD ? inputDetLeadD.value.trim() : "Auto";
+            var nmLeadD = inputNmLeadD ? inputNmLeadD.value.trim() : "Auto";
 
-        var payload = {
-            entries: parsedDiaryEntries,
-            order: selectFillOrderDiary ? selectFillOrderDiary.value : "column",
-            scope: selectScopeDiary ? selectScopeDiary.value : "artboard",
-            makeBold: chkMakeBoldDiary ? chkMakeBoldDiary.checked : true,
-            stripNumber: false, // In Diary mode, keep formatted serial on Name
-            fillBani: false,
-            fillQty: false,
-            qtyFormat: "auto",
-            nameColor: currentDiaryColor,
-            startIndex: currentDiaryStartIndex,
-            skipFilledCards: skipFilled,
-            detailsHScale: detHScaleD,
-            nameHScale: nmHScaleD,
-            detailsLeading: detLeadD,
-            nameLeading: nmLeadD
-        };
+            var payload = {
+                entries: parsedDiaryEntries,
+                order: selectFillOrderDiary ? selectFillOrderDiary.value : "column",
+                scope: selectScopeDiary ? selectScopeDiary.value : "artboard",
+                makeBold: chkMakeBoldDiary ? chkMakeBoldDiary.checked : true,
+                stripNumber: false, // In Diary mode, keep formatted serial on Name
+                fillBani: false,
+                fillQty: false,
+                qtyFormat: "auto",
+                nameColor: currentDiaryColor,
+                startIndex: currentDiaryStartIndex,
+                skipFilledCards: skipFilled,
+                detailsHScale: detHScaleD,
+                nameHScale: nmHScaleD,
+                detailsLeading: detLeadD,
+                nameLeading: nmLeadD
+            };
 
-        btnAutoFillDiary.disabled = true;
-        btnAutoFillDiary.textContent = 'Populating Diary Names...';
+            btnAutoFillDiary.disabled = true;
+            btnAutoFillDiary.textContent = 'Populating Diary Names...';
 
-        if (!parsedDiaryEntries.length && rawTextInputDiary && rawTextInputDiary.value.trim()) {
-            parseDiaryInput();
-        }
+            if (!parsedDiaryEntries.length && rawTextInputDiary && rawTextInputDiary.value.trim()) {
+                parseDiaryInput();
+            }
 
-        var extPath = csInterface.getSystemPath(SystemPath.EXTENSION);
-        var reloadJSX = "try { $.evalFile(new File('" + extPath + "/jsx/hostscript.jsx')); } catch(e) {}";
-        var scriptCall = reloadJSX + "; populateCards(" + JSON.stringify(JSON.stringify(payload)) + ")";
+            var scriptCall = "populateCards(" + JSON.stringify(JSON.stringify(payload)) + ")";
 
-        csInterface.evalScript(scriptCall, function(resStr) {
+            csInterface.evalScript(scriptCall, function(resStr) {
+                btnAutoFillDiary.disabled = false;
+                btnAutoFillDiary.textContent = 'Auto Fill Diary Names';
+
+                try {
+                    var res = JSON.parse(resStr);
+                    if (res.status === 'success') {
+                        if (autoRemove) {
+                            var placedCount = res.filledCount || 0;
+                            var remaining = parsedDiaryEntries.slice(currentDiaryStartIndex + placedCount);
+                            var newText = remaining.map(function(e) { return e.rawText || e.name; }).join('\n\n');
+                            if (rawTextInputDiary) rawTextInputDiary.value = newText;
+                            currentDiaryStartIndex = 0;
+                            if (inputStartIndexDiary) inputStartIndexDiary.value = 1;
+                            parseDiaryInput();
+                            showToast('Populated ' + placedCount + ' diary card(s)! Remaining in queue: ' + remaining.length, 'success');
+                        } else {
+                            currentDiaryStartIndex = res.nextStartIndex;
+                            if (inputStartIndexDiary) inputStartIndexDiary.value = currentDiaryStartIndex + 1;
+                            renderDiaryPreview();
+                            showToast(res.message, 'success');
+                        }
+                    } else {
+                        showToast(res.message || 'Failed to populate diary names', 'error');
+                    }
+                } catch (e) {
+                    if (resStr && String(resStr).indexOf("Error") !== -1) {
+                        showToast(String(resStr).substring(0, 80), 'error');
+                    } else {
+                        showToast('Communication error', 'error');
+                    }
+                }
+            });
+        } catch(err) {
             btnAutoFillDiary.disabled = false;
             btnAutoFillDiary.textContent = 'Auto Fill Diary Names';
-
-            try {
-                var res = JSON.parse(resStr);
-                if (res.status === 'success') {
-                    if (autoRemove) {
-                        var placedCount = res.filledCount || 0;
-                        var remaining = parsedDiaryEntries.slice(currentDiaryStartIndex + placedCount);
-                        var newText = remaining.map(function(e) { return e.rawText || e.name; }).join('\n\n');
-                        if (rawTextInputDiary) rawTextInputDiary.value = newText;
-                        currentDiaryStartIndex = 0;
-                        if (inputStartIndexDiary) inputStartIndexDiary.value = 1;
-                        parseDiaryInput();
-                        showToast('Populated ' + placedCount + ' diary card(s)! Remaining in queue: ' + remaining.length, 'success');
-                    } else {
-                        currentDiaryStartIndex = res.nextStartIndex;
-                        if (inputStartIndexDiary) inputStartIndexDiary.value = currentDiaryStartIndex + 1;
-                        renderDiaryPreview();
-                        showToast(res.message, 'success');
-                    }
-                } else {
-                    showToast(res.message || 'Failed to populate diary names', 'error');
-                }
-            } catch (e) {
-                if (resStr && String(resStr).indexOf("Error") !== -1) {
-                    showToast(String(resStr).substring(0, 80), 'error');
-                } else {
-                    showToast('Communication error', 'error');
-                }
-            }
-        });
+            showToast('Error: ' + err.message, 'error');
+        }
     }
 
     // ==========================================
