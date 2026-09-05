@@ -1305,6 +1305,12 @@ var CardAutoFiller = {
         return out.join("\r");
     },
 
+    toBengaliDigits: function(str) {
+        if (!str) return "";
+        var bn = {'0':'০','1':'১','2':'২','3':'৩','4':'৪','5':'৫','6':'৬','7':'৭','8':'৮','9':'৯'};
+        return String(str).replace(/[0-9]/g, function(d) { return bn[d] || d; });
+    },
+
     getAdaptiveHScale: function(lineText, baseHScale, maxStandardChars) {
         if (!lineText) return baseHScale;
         var clean = lineText.replace(/^\s+|\s+$/g, '').replace(/\r|\n/g, '');
@@ -1676,10 +1682,10 @@ var CardAutoFiller = {
                     var cleanDetails = (entry.details || '').replace(/^\s+|\s+$/g, '');
                     cleanDetails = cleanDetails.split('\r\n').join('\r').split('\n').join('\r');
 
-                    // If form number was not placed in separate box, append it to details
-                    if (entry.formNumber && !formHandled && cleanDetails) {
+                    // Only append form number to details if the card has NO dedicated formFrame
+                    if (entry.formNumber && !card.formFrame && !formHandled && cleanDetails) {
                         cleanDetails += '\r' + entry.formNumber;
-                    } else if (entry.formNumber && !formHandled && !cleanDetails) {
+                    } else if (entry.formNumber && !card.formFrame && !formHandled && !cleanDetails) {
                         cleanDetails = entry.formNumber;
                     }
 
