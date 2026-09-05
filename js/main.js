@@ -720,7 +720,7 @@
                     curLines = [];
                 }
             } else {
-                // If a new block starts with a standalone serial number e.g. "১০" and curLines already has items
+                // If a new block starts with a standalone serial number e.g. "169", "১১৯", "১০" and curLines already has items
                 if (curLines.length >= 2 && serialLineRegex.test(line)) {
                     blocks.push(curLines);
                     curLines = [line];
@@ -731,6 +731,8 @@
         }
         if (curLines.length > 0) blocks.push(curLines);
 
+        var formRegex = /^(?:ফরম|ফরম\s*নম্বর|ফরম\s*নং|দাখেলা|রোল|Form|Roll|No\.?)\s*[:\-\s]?\s*([০-৯0-9A-Za-z\s]+)/i;
+
         var result = [];
         for (var b = 0; b < blocks.length; b++) {
             var blk = blocks[b];
@@ -739,6 +741,7 @@
                 cleanName: "",
                 rawName: "",
                 details: "",
+                formNumber: "",
                 qty: "",
                 bani: "",
                 rawText: blk.join('\n')
@@ -749,7 +752,9 @@
             var inBani = false;
 
             for (var l = 0; l < blk.length; l++) {
-                var lText = blk[l];
+                var lText = blk[l].trim();
+                if (!lText) continue;
+
                 if (inBani) {
                     baniLines.push(lText);
                     continue;
@@ -764,7 +769,13 @@
                     item.qty = qm[1];
                     continue;
                 }
-                // Check if line 0 is standalone serial number e.g. "১", "১০"
+                // Check for form number (e.g. "ফরম: ৯৯৮৪৯", "ফরম ৯৯৮৪৯", "রোল: ১২")
+                if (formRegex.test(lText) || /^ফরম\s*[০-৯0-9]+/i.test(lText)) {
+                    item.formNumber = lText;
+                    continue;
+                }
+
+                // Check if line 0 is standalone serial number e.g. "169", "১১৯", "১", "১০"
                 var slm = lText.match(serialLineRegex);
                 if (l === 0 && slm) {
                     item.serial = slm[1];
@@ -791,9 +802,6 @@
         return result;
     }
 
-    // ==========================================
-    // Keyring Mode Parser & UI
-    // ==========================================
     function parseKeyringInput() {
         var raw = (rawTextInputKeyring ? rawTextInputKeyring.value : "").trim();
         parsedKeyringEntries = [];
@@ -1008,7 +1016,7 @@
             return;
         }
 
-        var serialFormat = selectSerialFormatDiary ? selectSerialFormatDiary.value : "bn_dot";
+        var serialFormat = selectSerialFormatDiary ? selectSerialFormatDiary.value : "standalone";
         var renumberMode = selectDiaryRenumber ? selectDiaryRenumber.value : "auto_1";
         var includeDetails = chkIncludeDetailsDiary ? chkIncludeDetailsDiary.checked : true;
 
@@ -1029,6 +1037,8 @@
             var enNum = String(num);
 
             var formattedName = blk.cleanName;
+            var finalSerial = bnNum;
+
             if (serialFormat === "bn_dot") {
                 formattedName = bnNum + ". " + blk.cleanName;
             } else if (serialFormat === "bn_bracket") {
@@ -1038,14 +1048,21 @@
             } else if (serialFormat === "en_dot") {
                 formattedName = enNum + ". " + blk.cleanName;
             } else if (serialFormat === "keep_orig") {
-                formattedName = (blk.serial ? (blk.serial + ". ") : (bnNum + ". ")) + blk.cleanName;
+                finalSerial = blk.serial || bnNum;
+                formattedName = blk.cleanName;
+            } else if (serialFormat === "standalone") {
+                finalSerial = (renumberMode === "use_input" && blk.serial) ? blk.serial : bnNum;
+                formattedName = blk.cleanName;
             } else if (serialFormat === "none") {
+                finalSerial = "";
                 formattedName = blk.cleanName;
             }
 
             parsedDiaryEntries.push({
+                serial: finalSerial,
                 name: formattedName,
                 details: includeDetails ? blk.details : "",
+                formNumber: blk.formNumber || "",
                 qty: "",
                 bani: ""
             });

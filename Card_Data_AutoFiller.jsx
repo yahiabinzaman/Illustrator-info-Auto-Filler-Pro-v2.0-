@@ -1,373 +1,1089 @@
 /**
- * Illustrator Name & Bio Card Auto-Filler Pro (Standalone Script)
- * Author: Yahia Bin Zaman (https://github.com/yahiabinzaman)
- * Version: 2.2.0 Pro - Enhanced with Keyring & Multi-Field Auto-Fill (Name, Bani & Pcs)
+ * Illustrator Name & Bio Card Auto-Filler Pro Engine
+ * Author: Yahia Bin Zaman
+ * Version: 2.2.1 Pro - Enhanced with Unicode-Safe JSON & Keyring Support
  */
 
 #target illustrator
 
-(function() {
-    'use strict';
-
-    if (!app.documents.length) {
-        alert("Please open an Illustrator document first.");
-        return;
+// Safe JSON parser for ExtendScript supporting Unicode Bengali text
+if (typeof JSON !== "object") {
+    JSON = {};
+}
+JSON.stringify = function(obj) {
+    if (obj === null) return "null";
+    if (typeof obj === "undefined") return "undefined";
+    if (typeof obj === "number" || typeof obj === "boolean") return String(obj);
+    if (typeof obj === "string") {
+        return '"' + obj.replace(/\\/g, '\\\\')
+                        .replace(/"/g, '\\"')
+                        .replace(/\r/g, '\\r')
+                        .replace(/\n/g, '\\n')
+                        .replace(/\t/g, '\\t') + '"';
     }
-
-    var doc = app.activeDocument;
-    var serialPrefixRegex = /^(\s*[\(\[\{]?[০-৯0-9]{1,4}[\.\)\-\/\:\|\]\}]\s*)/;
-    var serialLineRegex = /^\s*[\(\[\{]?([০-৯0-9]{1,4})[\.\)\-\/\:\|\]\}]?\s*$/;
-    var qtyRegex = /(?:^|\s*)([০-৯0-9]{1,4})\s*(?:পিস|পিছ|টি|টা|pc|pcs|piece|pieces)(?:\s*|$)/i;
-    var bnDigits = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
-
-    var sampleBanglaData = "১\n" +
-        "হাফেজ মো: সিফাতুল্লাহ বিশ্বাস\n" +
-        "পিতা: আজাহারুল ইসলাম\n" +
-        "ব্রাহ্মণডাঙ্গা, মনিরামপুর, যশোর\n" +
-        "০১৯২৩৪৩০৯৬০\n" +
-        "১০ পিস\n" +
-        "বাণী: বিন্দু বিন্দু জলে তৈরী হয় সাগর, একটু একটু চেষ্টায় সফল হয় জীবন। — মাওলানা আবু তাহের মিসবাহ দা:বা:\n\n" +
-        "২\n" +
-        "হাফেজ শুয়াইব হুসাইন\n" +
-        "পিতা: সাইফুল ইসলাম\n" +
-        "বাঁকড়া, ঝিকরগাছা, যশোর\n" +
-        "০১৭৪৫৬৪৩২৯৪\n" +
-        "১৫ পিস\n" +
-        "বাণী: আল্লাহর উপর ভরসা রেখে যারা দ্বীনের মেহনত মোজাহাদা করে, হতাশা কখনো তাদের হতোদ্যম করতে পারেনা, তারা তো সফলতার জন্য নয়, আল্লাহর সন্তুষ্টির জন্যই কাজ করে। — মাওলানা আবু তাহের মিসবাহ দা:বা:\n\n" +
-        "৩\n" +
-        "হাফেজ আবু বকর সিদ্দিক\n" +
-        "পিতা: জনাব হাসিবুল ইসলাম\n" +
-        "আকুন্দবাড়ীয়া, সদর, চুয়াডাঙ্গা\n" +
-        "০১৯৬৫৮২৮৮৫৭\n" +
-        "২৫ পিস\n" +
-        "বাণী: আমি পিঁপড়া হয়ে পদদলিত হব, কিন্তু ভ্রমর হয়ে কাউকে দংশন করব না। — শায়খুল হাদিস ইবরাহীম খলীল রহ.";
-
-    // Build ScriptUI Window
-    var win = new Window("dialog", "Name & Card Auto-Filler Pro v2.2 - Yahia Bin Zaman");
-    win.orientation = "column";
-    win.alignChildren = ["fill", "top"];
-    win.spacing = 10;
-    win.margins = 14;
-
-    // Tabbed Panel
-    var tpanel = win.add("tabbedpanel");
-    tpanel.alignChildren = ["fill", "fill"];
-
-    // ==========================================
-    // TAB 1: Auto Fill (Keyring / Card Auto-Fill)
-    // ==========================================
-    var tabFill = tpanel.add("tab", undefined, "⚡ Auto Fill Cards");
-    tabFill.alignChildren = ["fill", "top"];
-    tabFill.spacing = 8;
-    tabFill.margins = 10;
-
-    var txtInput = tabFill.add("edittext", undefined, sampleBanglaData, { multiline: true, scrolling: true });
-    txtInput.preferredSize = [490, 130];
-
-    var btnRow = tabFill.add("group");
-    btnRow.orientation = "row";
-    var btnLoadFromCanvas = btnRow.add("button", undefined, "Load Selected Text from Canvas");
-    var btnSample = btnRow.add("button", undefined, "Load Sample");
-    var btnClear = btnRow.add("button", undefined, "Clear");
-
-    var grpOpt = tabFill.add("group");
-    grpOpt.orientation = "row";
-    grpOpt.add("statictext", undefined, "Order:");
-    var ddlOrder = grpOpt.add("dropdownlist", undefined, [
-        "Column-wise (Col 1: top->bottom, Col 2)",
-        "Row by Row (1, 2 | 3, 4)",
-        "Match Badge Number (০১, ০২...)"
-    ]);
-    ddlOrder.selection = 0;
-
-    grpOpt.add("statictext", undefined, "Scope:");
-    var ddlScope = grpOpt.add("dropdownlist", undefined, [
-        "Active Artboard",
-        "Selected Cards",
-        "All Artboards"
-    ]);
-    ddlScope.selection = 0;
-
-    // Options Checkboxes
-    var pnlOptions = tabFill.add("panel", undefined, "Auto-Fill Settings & Features");
-    pnlOptions.alignChildren = ["fill", "top"];
-    pnlOptions.spacing = 6;
-    pnlOptions.margins = 10;
-
-    var grpMode = pnlOptions.add("group");
-    grpMode.orientation = "row";
-    grpMode.add("statictext", undefined, "কাজের ধরন (Mode):");
-    var ddlWorkMode = grpMode.add("dropdownlist", undefined, [
-        "🔑 Keyring Mode (সিরিয়াল ছাড়া শুধু নাম, বাণী ও পিস)",
-        "📔 Diary Mode (সিরিয়ালসহ নাম ও ডিটেইলস)"
-    ]);
-    ddlWorkMode.selection = 0;
-
-    var chkStripNum = pnlOptions.add("checkbox", undefined, "নাম থেকে সিরিয়াল নাম্বার বাদ দাও (১, ২, ১০ ইত্যাদি বাদ যাবে)");
-    chkStripNum.value = true;
-
-    ddlWorkMode.onChange = function() {
-        if (ddlWorkMode.selection.index === 0) {
-            // Keyring
-            chkStripNum.value = true;
-            chkFillBani.value = true;
-            chkFillQty.value = true;
-        } else {
-            // Diary
-            chkStripNum.value = false;
-            chkFillBani.value = false;
-            chkFillQty.value = false;
+    if (obj instanceof Array) {
+        var a = [];
+        for (var i = 0; i < obj.length; i++) {
+            a.push(JSON.stringify(obj[i]));
         }
-    };
-
-    var chkMakeBold = pnlOptions.add("checkbox", undefined, "নামে Bold ফন্ট স্টাইলিং প্রিজার্ভ / অ্যাপ্লাই করো");
-    chkMakeBold.value = true;
-
-    var grpNameColor = pnlOptions.add("group");
-    grpNameColor.orientation = "row";
-    grpNameColor.add("statictext", undefined, "নামের কালার (Name Color):");
-    var ddlNameColor = grpNameColor.add("dropdownlist", undefined, [
-        "টেমপ্লেট লালচে-ব্রাউন (Default #A22F10)",
-        "সলিড ব্ল্যাক (Solid Black #000000)",
-        "রয়্যাল ব্লু (Royal Blue #1E5AA8)",
-        "ইসলামিক গ্রীন (Green #1B6E3F)",
-        "মেরুন লাল (Crimson #9C1A1A)",
-        "গোল্ডেন আম্বার (Amber #C88210)"
-    ]);
-    ddlNameColor.selection = 0;
-
-    var chkFillBani = pnlOptions.add("checkbox", undefined, "বাণী (Bani Quote) আলাদা ফ্রেমে অটো বসাও");
-    chkFillBani.value = true;
-
-    var grpQty = pnlOptions.add("group");
-    grpQty.orientation = "row";
-    var chkFillQty = grpQty.add("checkbox", undefined, "পিস / সংখ্যা অটো রিপ্লেস করো (Demo '10' -> Pcs):");
-    chkFillQty.value = true;
-    var ddlQtyFormat = grpQty.add("dropdownlist", undefined, [
-        "Auto (Match Demo Digits)",
-        "English Digits (10, 15, 25)",
-        "Bangla Digits (১০, ১৫, ২৫)"
-    ]);
-    ddlQtyFormat.selection = 0;
-
-    var chkSkipNoName = pnlOptions.add("checkbox", undefined, "নাম ছাড়া শুধু সংখ্যা/পিস এন্ট্রিগুলো বাদ দাও (Skip empty names)");
-    chkSkipNoName.value = true;
-
-    // ==========================================
-    // TAB 2: Canvas Move & Align
-    // ==========================================
-    var tabMove = tpanel.add("tab", undefined, "🎯 Canvas Move & Align");
-    tabMove.alignChildren = ["fill", "top"];
-    tabMove.spacing = 8;
-    tabMove.margins = 10;
-
-    tabMove.add("statictext", undefined, "Select Template Cards (Left) and Text Blocks (Right) on canvas:", { multiline: true });
-
-    var grpMoveSort = tabMove.add("group");
-    grpMoveSort.orientation = "row";
-    grpMoveSort.add("statictext", undefined, "Direction:");
-    var ddlMoveSort = grpMoveSort.add("dropdownlist", undefined, ["Column-wise", "Row by Row"]);
-    ddlMoveSort.selection = 0;
-
-    var grpOffset = tabMove.add("group");
-    grpOffset.orientation = "row";
-    grpOffset.add("statictext", undefined, "Offset X (pt):");
-    var txtOffsetX = grpOffset.add("edittext", undefined, "45");
-    txtOffsetX.characters = 5;
-    grpOffset.add("statictext", undefined, "Offset Y (pt):");
-    var txtOffsetY = grpOffset.add("edittext", undefined, "-15");
-    txtOffsetY.characters = 5;
-
-    var chkGroupPlaced = tabMove.add("checkbox", undefined, "Group placed text block with card shape");
-    chkGroupPlaced.value = true;
-    var chkBringFront = tabMove.add("checkbox", undefined, "Bring placed text to front");
-    chkBringFront.value = true;
-
-    // ==========================================
-    // TAB 3: Badge Renumber
-    // ==========================================
-    var tabBadge = tpanel.add("tab", undefined, "🏷️ Badge Renumber");
-    tabBadge.alignChildren = ["fill", "top"];
-    tabBadge.spacing = 8;
-    tabBadge.margins = 10;
-
-    var grpBadgeStyle = tabBadge.add("group");
-    grpBadgeStyle.orientation = "row";
-    grpBadgeStyle.add("statictext", undefined, "Style:");
-    var ddlBadgeStyle = grpBadgeStyle.add("dropdownlist", undefined, [
-        "Bangla 2-Digit (০১, ০২, ০৩...)",
-        "Bangla (১, ২, ৩...)",
-        "English 2-Digit (01, 02, 03...)",
-        "English (1, 2, 3...)"
-    ]);
-    ddlBadgeStyle.selection = 0;
-
-    grpBadgeStyle.add("statictext", undefined, "Start:");
-    var txtBadgeStart = grpBadgeStyle.add("edittext", undefined, "1");
-    txtBadgeStart.characters = 4;
-
-    var btnRenumber = tabBadge.add("button", undefined, "🔢 Renumber Selected Badges");
-
-    // ==========================================
-    // TAB 4: Template Duplicator
-    // ==========================================
-    var tabDup = tpanel.add("tab", undefined, "📋 Template Duplicator");
-    tabDup.alignChildren = ["fill", "top"];
-    tabDup.spacing = 8;
-    tabDup.margins = 10;
-
-    var pnlDupInfo = tabDup.add("panel", undefined, "Duplication & Artboard Settings");
-    pnlDupInfo.alignChildren = ["fill", "top"];
-    pnlDupInfo.spacing = 6;
-
-    var lblDupDesc = pnlDupInfo.add("statictext", undefined, "Select 1 template card on canvas to duplicate across artboards:", { multiline: true });
-    lblDupDesc.preferredSize = [-1, 24];
-
-    var grpDupInputs = pnlDupInfo.add("group");
-    grpDupInputs.orientation = "row";
-    grpDupInputs.add("statictext", undefined, "Total Copies:");
-    var txtTotalCopies = grpDupInputs.add("edittext", undefined, "50");
-    txtTotalCopies.characters = 5;
-
-    grpDupInputs.add("statictext", undefined, "Cards / Artboard:");
-    var txtCardsPerAB = grpDupInputs.add("edittext", undefined, "20");
-    txtCardsPerAB.characters = 4;
-
-    var grpDupPresets = pnlDupInfo.add("group");
-    grpDupPresets.orientation = "row";
-    grpDupPresets.add("statictext", undefined, "Presets:");
-    var btnP10 = grpDupPresets.add("button", undefined, "10 / AB");
-    var btnP20 = grpDupPresets.add("button", undefined, "20 / AB");
-    var btnP25 = grpDupPresets.add("button", undefined, "25 / AB");
-    btnP10.onClick = function() { txtCardsPerAB.text = "10"; updateDupSummary(); };
-    btnP20.onClick = function() { txtCardsPerAB.text = "20"; updateDupSummary(); };
-    btnP25.onClick = function() { txtCardsPerAB.text = "25"; updateDupSummary(); };
-
-    var grpDupGrid = pnlDupInfo.add("group");
-    grpDupGrid.orientation = "row";
-    grpDupGrid.add("statictext", undefined, "Cols (0=Auto):");
-    var txtCols = grpDupGrid.add("edittext", undefined, "2");
-    txtCols.characters = 3;
-    grpDupGrid.add("statictext", undefined, "Gap X:");
-    var txtGapX = grpDupGrid.add("edittext", undefined, "0");
-    txtGapX.characters = 3;
-    grpDupGrid.add("statictext", undefined, "Gap Y:");
-    var txtGapY = grpDupGrid.add("edittext", undefined, "0");
-    txtGapY.characters = 3;
-
-    var lblDupSummary = pnlDupInfo.add("statictext", undefined, "Summary: 50 cards -> 3 artboards (20, 20, 10)");
-    function updateDupSummary() {
-        var tot = parseInt(txtTotalCopies.text, 10) || 50;
-        var pAB = parseInt(txtCardsPerAB.text, 10) || 20;
-        if (pAB <= 0) pAB = 20;
-        var abC = Math.ceil(tot / pAB);
-        lblDupSummary.text = "Summary: " + tot + " cards -> " + abC + " artboard(s)";
+        return "[" + a.join(",") + "]";
     }
-    txtTotalCopies.onChanging = updateDupSummary;
-    txtCardsPerAB.onChanging = updateDupSummary;
+    if (typeof obj === "object") {
+        var o = [];
+        for (var k in obj) {
+            if (obj.hasOwnProperty(k)) {
+                o.push(JSON.stringify(k) + ":" + JSON.stringify(obj[k]));
+            }
+        }
+        return "{" + o.join(",") + "}";
+    }
+    return String(obj);
+};
 
-    var btnRunDup = tabDup.add("button", undefined, "✨ Duplicate Templates & Create Artboards");
-    btnRunDup.preferredSize = [-1, 35];
-    btnRunDup.onClick = function() {
-        executeDuplicator();
-    };
+JSON.parse = function(str) {
+    if (!str) return null;
+    return eval('(' + str + ')');
+};
 
-    // ==========================================
-    // Action Buttons Row
-    // ==========================================
-    var actGroup = win.add("group");
-    actGroup.orientation = "row";
-    actGroup.alignment = ["fill", "center"];
+var CardAutoFiller = {
+    getActiveDoc: function() {
+        if (!app.documents || app.documents.length === 0) return null;
+        try {
+            return app.activeDocument;
+        } catch(e) {
+            try {
+                return app.documents[0];
+            } catch(e2) {
+                return null;
+            }
+        }
+    },
+    bnDigits: ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'],
+    baniRegex: /[\u09AC][\u09BE][\u09A3\u09A8][\u09C0]/,
+    badgeRegex: /(?:[\u09B9][\u09BF][\u09AB][\u099C]|[\u0995][\u09C1][\u09B0][\u0986][\u09A8]|[\u09B8][\u09AE][\u09BE][\u09AA][\u09A8][\u09C0]|[\u09B8][\u09CD][\u09AE][\u09C3][\u09A4][\u09BF])/,
 
-    var btnCancel = actGroup.add("button", undefined, "Cancel", { name: "cancel" });
-    var btnExecute = actGroup.add("button", undefined, "🚀 Execute Action", { name: "ok" });
-    btnExecute.preferredSize = [200, 36];
+    intToBengali: function(num, pad2) {
+        var str = String(num);
+        if (pad2 && num < 10) str = "0" + str;
+        var res = "";
+        for (var i = 0; i < str.length; i++) {
+            var c = str.charAt(i);
+            if (c >= '0' && c <= '9') {
+                res += this.bnDigits[parseInt(c, 10)];
+            } else {
+                res += c;
+            }
+        }
+        return res;
+    },
 
-    // Author Footer
-    var lblAuthor = win.add("statictext", undefined, "Developed by Yahia Bin Zaman  •  github.com/yahiabinzaman");
-    lblAuthor.alignment = ["center", "center"];
-    lblAuthor.graphics.foregroundColor = lblAuthor.graphics.newPen(lblAuthor.graphics.PenType.SOLID_COLOR, [0.3, 0.7, 1.0, 1], 1);
+    bengaliToInt: function(str) {
+        if (!str) return -1;
+        var bnNums = { '০': 0, '১': 1, '২': 2, '৩': 3, '৪': 4, '৫': 5, '৬': 6, '৭': 7, '৮': 8, '৯': 9 };
+        var clean = str.replace(/[^০-৯0-9]/g, '');
+        if (!clean) return -1;
+        var res = 0;
+        for (var i = 0; i < clean.length; i++) {
+            var ch = clean.charAt(i);
+            if (bnNums[ch] !== undefined) {
+                res = res * 10 + bnNums[ch];
+            } else if (ch >= '0' && ch <= '9') {
+                res = res * 10 + parseInt(ch, 10);
+            }
+        }
+        return res > 0 ? res : -1;
+    },
 
-    // ==========================================
-    // Event Handlers
-    // ==========================================
-    btnSample.onClick = function() { txtInput.text = sampleBanglaData; };
-    btnClear.onClick = function() { txtInput.text = ""; };
+    getSelectedCanvasColor: function() {
+        if (!app.documents.length) {
+            return JSON.stringify({ status: "error", message: "No document open." });
+        }
+        var doc = app.activeDocument;
+        var sel = doc.selection;
+        if (!sel) {
+            return JSON.stringify({ status: "error", message: "Please select text or an object on the canvas." });
+        }
 
-    btnLoadFromCanvas.onClick = function() {
+        var col = null;
+        if (sel.typename === "TextRange") {
+            col = sel.characterAttributes.fillColor;
+        } else if (sel.typename === "TextFrame") {
+            if (sel.characters.length > 0) col = sel.characters[0].fillColor;
+        } else if (sel instanceof Array && sel.length > 0) {
+            var item = sel[0];
+            if (item.typename === "TextRange") col = item.characterAttributes.fillColor;
+            else if (item.typename === "TextFrame" && item.characters.length > 0) col = item.characters[0].fillColor;
+            else if (item.textFrames && item.textFrames.length > 0 && item.textFrames[0].characters.length > 0) col = item.textFrames[0].characters[0].fillColor;
+            else if (item.fillColor) col = item.fillColor;
+        }
+
+        if (!col || col.typename === "NoColor") {
+            return JSON.stringify({ status: "error", message: "No visible fill color found in selection." });
+        }
+
+        var res = { status: "success", typename: col.typename };
+        if (col.typename === "SpotColor") {
+            res.spotName = col.spot.name;
+            var sc = col.spot.color;
+            if (sc.typename === "CMYKColor") {
+                res.cmyk = [sc.cyan, sc.magenta, sc.yellow, sc.black];
+                res.hex = this.cmykToHex(sc.cyan, sc.magenta, sc.yellow, sc.black);
+            }
+        } else if (col.typename === "CMYKColor") {
+            res.cmyk = [col.cyan, col.magenta, col.yellow, col.black];
+            res.hex = this.cmykToHex(col.cyan, col.magenta, col.yellow, col.black);
+        } else if (col.typename === "RGBColor") {
+            res.rgb = [col.red, col.green, col.blue];
+            res.hex = this.rgbToHex(col.red, col.green, col.blue);
+        }
+
+        return JSON.stringify(res);
+    },
+
+    cmykToHex: function(c, m, y, k) {
+        c = c / 100; m = m / 100; y = y / 100; k = k / 100;
+        var r = Math.round(255 * (1 - c) * (1 - k));
+        var g = Math.round(255 * (1 - m) * (1 - k));
+        var b = Math.round(255 * (1 - y) * (1 - k));
+        var toHex = function(n) {
+            var h = Math.max(0, Math.min(255, n)).toString(16);
+            return h.length === 1 ? "0" + h : h;
+        };
+        return ("#" + toHex(r) + toHex(g) + toHex(b)).toUpperCase();
+    },
+
+    rgbToHex: function(r, g, b) {
+        var toHex = function(n) {
+            var h = Math.max(0, Math.min(255, Math.round(n))).toString(16);
+            return h.length === 1 ? "0" + h : h;
+        };
+        return ("#" + toHex(r) + toHex(g) + toHex(b)).toUpperCase();
+    },
+
+    hexToColor: function(hex, isCMYK) {
+        if (!hex) return null;
+        hex = hex.replace(/[^0-9A-Fa-f]/g, "");
+        if (hex.length === 3) hex = hex.charAt(0)+hex.charAt(0) + hex.charAt(1)+hex.charAt(1) + hex.charAt(2)+hex.charAt(2);
+        if (hex.length !== 6) return null;
+
+        var r = parseInt(hex.substring(0, 2), 16);
+        var g = parseInt(hex.substring(2, 4), 16);
+        var b = parseInt(hex.substring(4, 6), 16);
+
+        if (isCMYK) {
+            var rN = r / 255, gN = g / 255, bN = b / 255;
+            var k = 1 - Math.max(rN, Math.max(gN, bN));
+            var c = 0, m = 0, y = 0;
+            if (k < 1) {
+                c = (1 - rN - k) / (1 - k);
+                m = (1 - gN - k) / (1 - k);
+                y = (1 - bN - k) / (1 - k);
+            }
+            var cmyk = new CMYKColor();
+            cmyk.cyan = Math.round(c * 100);
+            cmyk.magenta = Math.round(m * 100);
+            cmyk.yellow = Math.round(y * 100);
+            cmyk.black = Math.round(k * 100);
+            return cmyk;
+        } else {
+            var rgb = new RGBColor();
+            rgb.red = r; rgb.green = g; rgb.blue = b;
+            return rgb;
+        }
+    },
+    getSelectedCanvasText: function() {
+        if (!app.documents.length) {
+            return JSON.stringify({ status: "error", message: "No active Illustrator document found." });
+        }
+        var doc = app.activeDocument;
         var sel = doc.selection;
         if (!sel || !sel.length) {
-            alert("Please select text frame(s) on canvas.");
-            return;
+            return JSON.stringify({ status: "error", message: "Please select one or more text frames on the canvas." });
         }
-        var tfs = [];
-        collectTextFrames(sel, tfs);
-        if (!tfs.length) {
-            alert("No text frames found in selection.");
-            return;
+
+        var textFrames = [];
+        this.collectTextFrames(sel, textFrames);
+
+        if (!textFrames.length) {
+            return JSON.stringify({ status: "error", message: "No text frames found in your selection." });
         }
-        tfs.sort(function(a, b) {
-            var bTop = b.geometricBounds[1], aTop = a.geometricBounds[1];
-            if (Math.abs(bTop - aTop) > 20) return bTop - aTop;
+
+        textFrames.sort(function(a, b) {
+            var bTop = b.geometricBounds[1];
+            var aTop = a.geometricBounds[1];
+            if (Math.abs(bTop - aTop) > 20) {
+                return bTop - aTop;
+            }
             return a.geometricBounds[0] - b.geometricBounds[0];
         });
-        var out = [];
-        for (var i = 0; i < tfs.length; i++) {
-            var c = tfs[i].contents;
-            if (c && c.replace(/\s+/g, '').length > 0) out.push(c);
-        }
-        txtInput.text = out.join("\n\n");
-    };
 
-    btnRenumber.onClick = function() {
-        var sel = doc.selection;
-        if (!sel || !sel.length) { alert("Please select card badge frames."); return; }
-        var tfs = [];
-        collectTextFrames(sel, tfs);
-        var badges = [];
-        for (var i = 0; i < tfs.length; i++) {
-            var txt = tfs[i].contents.replace(/\s+/g, '');
-            if (txt.length <= 4 || bengaliToInt(txt) > 0) badges.push(tfs[i]);
+        var combinedText = [];
+        for (var i = 0; i < textFrames.length; i++) {
+            var content = textFrames[i].contents;
+            if (content && content.replace(/\s+/g, '').length > 0) {
+                combinedText.push(content);
+            }
         }
-        if (!badges.length) { alert("No number badges found in selection."); return; }
+
+        return JSON.stringify({
+            status: "success",
+            text: combinedText.join("\n\n"),
+            count: textFrames.length
+        });
+    },
+    isTextFrameNoColor: function(tf) {
+        if (!tf) return false;
+        try {
+            if (tf.paragraphs && tf.paragraphs.length > 0) {
+                try {
+                    var pfc = tf.paragraphs[0].fillColor;
+                    if (pfc && pfc.typename === "NoColor") return true;
+                } catch(pe) {}
+            }
+            if (tf.characters && tf.characters.length > 0) {
+                for (var c = 0; c < Math.min(tf.characters.length, 5); c++) {
+                    try {
+                        var ca = tf.characters[c].characterAttributes;
+                        if (ca && ca.fillColor && ca.fillColor.typename === "NoColor") return true;
+                    } catch(ce) {}
+                }
+            }
+        } catch(e) {}
+        return false;
+    },
+
+    isItemHidden: function(item) {
+        if (!item) return true;
+        try {
+            if (item.hidden || item.locked) return true;
+        } catch(e) {}
+        try {
+            var cur = item;
+            while (cur) {
+                if (cur.typename === "Layer") {
+                    if (!cur.visible || cur.locked) return true;
+                    var pLayer = cur.parent;
+                    while (pLayer && pLayer.typename === "Layer") {
+                        if (!pLayer.visible || pLayer.locked) return true;
+                        pLayer = pLayer.parent;
+                    }
+                    break;
+                }
+                if (cur.hidden || cur.locked) return true;
+                cur = cur.parent;
+            }
+        } catch(e) {}
+        return false;
+    },
+
+    isBackSideText: function(text) {
+        if (!text) return false;
+        var norm = text.replace(/[\s\(\)\-\_–—\.\,\:\;\[\]\{\}\/\\।০-৯0-9\'\"]/g, '');
+        if (norm.indexOf("দাওরায়েহাদীস") !== -1 ||
+            norm.indexOf("দাওরায়েহাদিস") !== -1 ||
+            norm.indexOf("দাওরায়েহাদীছ") !== -1 ||
+            norm.indexOf("দাওরায়েহাদিসসমাপনীস্মৃতি") !== -1 ||
+            norm.indexOf("দাওরায়েহাদীসমাস্টার্সসমাপনীস্মৃতি") !== -1 ||
+            norm.indexOf("মাস্টার্সসমাপনীস্মৃতি") !== -1 ||
+            norm.indexOf("সমাপনীস্মৃতি") !== -1 ||
+            norm.indexOf("হিফজসমাপনী") !== -1 ||
+            norm.indexOf("হিফযসমাপনী") !== -1 ||
+            norm.indexOf("হিফজুলকুরআন") !== -1 ||
+            norm.indexOf("হিফযুলকুরআন") !== -1 ||
+            norm.indexOf("হিফযুলকোরআন") !== -1 ||
+            norm.indexOf("হিফজুলকোরআন") !== -1) {
+            return true;
+        }
+
+        var backKeywords = [
+            "দাওরায়ে", "সমাপনী", "স্মৃতি", "হিফজ", "হিফয",
+            "শিক্ষাবর্ষ", "সনদপত্র", "স্মারক", "দস্তারবন্দী", "গ্রুপছবি",
+            "আমন্ত্রনপত্র", "দাওয়াতনামা", "স্মৃতিচারণ"
+        ];
+        for (var b = 0; b < backKeywords.length; b++) {
+            if (text.indexOf(backKeywords[b]) !== -1 && (text.indexOf("স্মৃতি") !== -1 || text.indexOf("সমাপনী") !== -1 || text.indexOf("হাদ") !== -1)) {
+                return true;
+            }
+        }
+        return false;
+    },
+
+    hasStudentBiodata: function(text) {
+        if (!text) return false;
+        if (text.indexOf("পিতা:") !== -1 || text.indexOf("পিতা :") !== -1 || text.indexOf("পিতা") !== -1 ||
+            text.indexOf("الوالد:") !== -1 || text.indexOf("الوالদ :") !== -1 || text.indexOf("বাবার নাম") !== -1) {
+            return true;
+        }
+        if (/01[3-9]\d{8}/.test(text) || /০১[৩-৯][০-৯]{8}/.test(text) || /٠١[٠-৯]{9}/.test(text)) {
+            return true;
+        }
+        var studentTitles = ["মাওলানা", "মুহাম্মাদ", "মোহাম্মদ", "মোঃ", "হাফেজ", "মুফতী", "ক্বারী", "শিক্ষার্থী", "ছাত্র", "الحافظ", "مولانا"];
+        for (var s = 0; s < studentTitles.length; s++) {
+            if (text.indexOf(studentTitles[s]) !== -1 && (text.indexOf("\n") !== -1 || text.indexOf("\r") !== -1)) {
+                return true;
+            }
+        }
+        return false;
+    },
+
+    collectVisibleLayers: function(parent, outLayers) {
+        if (!parent) return;
+        try {
+            var lays = parent.layers;
+            if (!lays) return;
+            for (var l = 0; l < lays.length; l++) {
+                var lay = lays[l];
+                if (!lay.visible) continue; // STRICT: Ignore hidden layers completely!
+                outLayers.push(lay);
+                if (lay.layers && lay.layers.length > 0) {
+                    this.collectVisibleLayers(lay, outLayers);
+                }
+            }
+        } catch(e) {}
+    },
+
+    collectTextFrames: function(items, outList) {
+        if (!items) return;
+        for (var i = 0; i < items.length; i++) {
+            var it = items[i];
+            if (this.isItemHidden(it)) continue; // STRICT: Ignore hidden items
+            if (it.typename === "TextFrame") {
+                outList.push(it);
+            } else if (it.typename === "GroupItem") {
+                this.collectTextFrames(it.pageItems, outList);
+            }
+        }
+    },
+
+    detectCards: function(scope) {
+        var doc = this.getActiveDoc();
+        if (!doc) return [];
+        var cardUnits = [];
+        var candidateItems = [];
+
+        if (scope === "selection" && (!doc.selection || doc.selection.length === 0)) {
+            scope = "artboard";
+        }
+
+        if (scope === "selection" && doc.selection && doc.selection.length > 0) {
+            for (var s = 0; s < doc.selection.length; s++) {
+                var sItem = doc.selection[s];
+                if (this.isItemHidden(sItem)) continue;
+                candidateItems.push(sItem);
+            }
+        } else if (scope === "all_artboards") {
+            var visibleLayers = [];
+            this.collectVisibleLayers(doc, visibleLayers);
+            for (var l = 0; l < visibleLayers.length; l++) {
+                var layer = visibleLayers[l];
+                for (var g = 0; g < layer.groupItems.length; g++) {
+                    var grp = layer.groupItems[g];
+                    if (this.isItemHidden(grp)) continue;
+                    candidateItems.push(grp);
+                }
+                for (var t = 0; t < layer.textFrames.length; t++) {
+                    var tf = layer.textFrames[t];
+                    if (this.isItemHidden(tf)) continue;
+                    candidateItems.push(tf);
+                }
+            }
+        } else {
+            var abIndex = doc.artboards.getActiveArtboardIndex();
+            var abRect = doc.artboards[abIndex].artboardRect;
+            var visibleLayers = [];
+            this.collectVisibleLayers(doc, visibleLayers);
+            for (var l = 0; l < visibleLayers.length; l++) {
+                var layer = visibleLayers[l];
+                for (var g = 0; g < layer.groupItems.length; g++) {
+                    var grp = layer.groupItems[g];
+                    if (this.isItemHidden(grp)) continue;
+                    var gb = grp.geometricBounds;
+                    if (gb[0] < abRect[2] && gb[2] > abRect[0] && gb[1] > abRect[3] && gb[3] < abRect[1]) {
+                        candidateItems.push(grp);
+                    }
+                }
+                for (var t = 0; t < layer.textFrames.length; t++) {
+                    var tf = layer.textFrames[t];
+                    if (this.isItemHidden(tf)) continue;
+                    var gb = tf.geometricBounds;
+                    if (gb[0] < abRect[2] && gb[2] > abRect[0] && gb[1] > abRect[3] && gb[3] < abRect[1]) {
+                        candidateItems.push(tf);
+                    }
+                }
+            }
+        }
+
+        for (var g = 0; g < candidateItems.length; g++) {
+            this.extractCardsFromItem(candidateItems[g], cardUnits);
+        }
+
+        if (cardUnits.length === 0) {
+            var allTFs = [];
+            this.collectTextFrames(candidateItems, allTFs);
+            var filteredTFs = [];
+            for (var t = 0; t < allTFs.length; t++) {
+                var tf = allTFs[t];
+                if (this.isItemHidden(tf)) continue;
+                if (this.isBackSideText(tf.contents)) continue;
+                if (tf.contents.length > 500 || tf.lines.length > 15) continue;
+                filteredTFs.push(tf);
+            }
+            if (filteredTFs.length >= 2) {
+                cardUnits = this.clusterProximityCards(filteredTFs);
+            }
+        }
+
+        return cardUnits;
+    },
+
+    extractCardsFromItem: function(item, outCards) {
+        if (!item || this.isItemHidden(item)) return;
+
+        if (item.typename === "GroupItem") {
+            var tfs = [];
+            this.collectTextFrames(item.pageItems, tfs);
+            if (tfs.length === 0) return;
+
+            var hasBack = false;
+            var hasBio = false;
+            var hasQty = false;
+            var personCount = 0;
+            var nonBackTfs = 0;
+
+            for (var t = 0; t < tfs.length; t++) {
+                var cTxt = tfs[t].contents;
+                var clean = cTxt.replace(/\s+/g, "");
+                var num = this.bengaliToInt(clean);
+                if (clean.length <= 4 && num > 0) hasQty = true;
+                if (this.hasStudentBiodata(cTxt)) {
+                    hasBio = true;
+                    personCount++;
+                }
+                if (this.isBackSideText(cTxt)) {
+                    hasBack = true;
+                } else if (!/gv`vwim|gv`ivmv|mZxNvUv|মাদ্রাসা|মাদরাসা|মারকায|জামিয়া/.test(cTxt)) {
+                    nonBackTfs++;
+                }
+            }
+
+            if (hasBack && !hasBio && !hasQty && nonBackTfs === 0) {
+                return;
+            }
+
+            if (personCount > 1 || tfs.length > 8) {
+                for (var c = 0; c < item.pageItems.length; c++) {
+                    this.extractCardsFromItem(item.pageItems[c], outCards);
+                }
+                return;
+            }
+
+            if (tfs.length >= 1) {
+                var card = this.analyzeCardGroup(tfs, item);
+                if (card.nameFrame || card.namePlaceholderPath) {
+                    card.group = item;
+                    card.bounds = item.geometricBounds;
+                    outCards.push(card);
+                    return;
+                }
+            }
+
+            for (var k = 0; k < item.pageItems.length; k++) {
+                if (item.pageItems[k].typename === "GroupItem") {
+                    this.extractCardsFromItem(item.pageItems[k], outCards);
+                }
+            }
+        }
+    },
+
+    analyzeCardGroup: function(tfs, group) {
+        var card = {
+            nameFrame: null,
+            detailsFrame: null,
+            baniFrame: null,
+            qtyFrame: null,
+            badgeFrame: null,
+            serialFrame: null,
+            formFrame: null,
+            badgeNumber: -1
+        };
+        var candidateFrames = [];
+
+        var groupBounds = group ? group.geometricBounds : null;
+        var groupTop = groupBounds ? groupBounds[1] : 0;
+        var groupBottom = groupBounds ? groupBounds[3] : 0;
+        var groupLeft = groupBounds ? groupBounds[0] : 0;
+        var groupRight = groupBounds ? groupBounds[2] : 0;
+        var groupWidth = groupBounds ? (groupRight - groupLeft) : 0;
+        var groupHeight = groupBounds ? (groupTop - groupBottom) : 0;
+
+        for (var i = 0; i < tfs.length; i++) {
+            var tf = tfs[i];
+            if (this.isItemHidden(tf)) continue; // STRICT: Ignore locked & hidden items
+            var rawTxt = tf.contents;
+            var cleanTxt = rawTxt.replace(/\s+/g, "");
+            var num = this.bengaliToInt(cleanTxt);
+            var gb = tf.geometricBounds;
+            var tfW = Math.abs(gb[2] - gb[0]);
+            var tfH = Math.abs(gb[1] - gb[3]);
+
+            // Form number frame (e.g. contains "ফরম", "দাখেলা", "রোল", "Form" or sits near bottom-right)
+            if (/(?:ফরম|দাখেলা|রোল|Form|Roll)/i.test(rawTxt)) {
+                card.formFrame = tf;
+                continue;
+            }
+
+            // Top corner serial/badge frame (e.g. "১১৯", "169", "১০", "10", "--" or top corner small box)
+            var isTopCorner = false;
+            if (groupBounds && groupHeight > 0) {
+                var relY = (groupTop - gb[1]);
+                var relX = (gb[0] - groupLeft);
+                if (relY < groupHeight * 0.40 && (relX > groupWidth * 0.55 || relX < groupWidth * 0.35) && tfW < 70 && tfH < 45) {
+                    isTopCorner = true;
+                }
+            }
+
+            if ((cleanTxt.length <= 5 && num > 0 && tfW < 55 && tfH < 35) || isTopCorner) {
+                if (!card.serialFrame) {
+                    card.serialFrame = tf;
+                    card.badgeFrame = tf;
+                    card.badgeNumber = num > 0 ? num : -1;
+                } else if (!card.qtyFrame) {
+                    card.qtyFrame = tf;
+                } else {
+                    candidateFrames.push(tf);
+                }
+                continue;
+            }
+
+            // Title / Memorabilia / Back-side frame
+            if (this.isBackSideText(rawTxt) || /(?:দাওরায়ে|মাস্টার্স|স্মৃতি|সমাপনী|হিফ[জয]|তাকমীল|দস্তারবন্দী|বিদায়ী|স্মারক)/.test(rawTxt)) {
+                if (rawTxt.length < 90) {
+                    continue;
+                }
+            }
+
+            // Institution name frame
+            if (/gv`vwim|gv`ivmv|mZxNvUv|মাদ্রাসা|মাদরাসা|মারকায|জামিয়া|ইনস্টিটিউট|বিদ্যালয়|স্কুল|কলেজ/.test(rawTxt)) {
+                continue;
+            }
+
+            // Design label
+            if (/^ডিজাইন\s*[০-৯0-9]+/i.test(rawTxt) || /^(?:Tapper|Round|Design)/i.test(rawTxt)) {
+                continue;
+            }
+
+            candidateFrames.push(tf);
+        }
+
+        // Sort candidate frames by Y coordinate descending (top-to-bottom):
+        candidateFrames.sort(function(a, b) {
+            return b.geometricBounds[1] - a.geometricBounds[1];
+        });
+
+        if (candidateFrames.length === 1) {
+            card.nameFrame = candidateFrames[0];
+        } else if (candidateFrames.length === 2) {
+            card.nameFrame = candidateFrames[0];
+            card.detailsFrame = candidateFrames[1];
+            card.baniFrame = candidateFrames[1];
+        } else if (candidateFrames.length >= 3) {
+            card.nameFrame = candidateFrames[0];
+            card.detailsFrame = candidateFrames[1];
+            card.baniFrame = candidateFrames[2];
+        }
+
+        return card;
+    },
+
+    clusterProximityCards: function(allTFs) {
+        var infoList = [];
+        for (var j = 0; j < allTFs.length; j++) {
+            var itf = allTFs[j];
+            if (this.isItemHidden(itf)) continue; // STRICT: Ignore hidden items
+            var txt = itf.contents;
+            var width = itf.geometricBounds[2] - itf.geometricBounds[0];
+
+            // NEVER treat back-side text as student info frame!
+            if (this.isBackSideText(txt)) continue;
+            if (this.baniRegex.test(txt)) continue;
+            if (/^[০-৯0-9]{1,4}$/.test(txt.replace(/\s+/g, ''))) continue;
+            if (this.badgeRegex.test(txt) || width < 40) continue;
+
+            if (this.hasStudentBiodata(txt) || itf.lines.length >= 2 || txt.indexOf("পিতা:") !== -1 || txt.indexOf("হাফেজ") !== -1 || txt.indexOf("মো:") !== -1) {
+                infoList.push(itf);
+            }
+        }
+
+        var cards = [];
+        for (var k = 0; k < infoList.length; k++) {
+            var infoTF = infoList[k];
+            var igb = infoTF.geometricBounds;
+            var infoTop = igb[1];
+            var infoLeft = igb[0];
+
+            var card = {
+                nameFrame: infoTF,
+                detailsFrame: null,
+                baniFrame: null,
+                qtyFrame: null,
+                badgeFrame: null,
+                badgeNumber: -1,
+                bounds: [igb[0] - 50, igb[1] + 20, igb[2] + 80, igb[3] - 40]
+            };
+
+            for (var m = 0; m < allTFs.length; m++) {
+                var cand = allTFs[m];
+                if (cand === infoTF || this.isItemHidden(cand)) continue;
+                var cgb = cand.geometricBounds;
+                var dy = infoTop - cgb[1];
+                var dx = cgb[0] - infoLeft;
+
+                if (dy >= -30 && dy <= 90 && dx >= -60 && dx <= 140) {
+                    var ctxt = cand.contents.replace(/^\s+|\s+$/g, '');
+                    if (this.isBackSideText(ctxt)) continue; // STRICT: Never treat back-side text as bani/qty
+                    if (this.baniRegex.test(cand.contents)) {
+                        card.baniFrame = cand;
+                    } else if (/^[০-৯0-9]{1,4}$/.test(ctxt)) {
+                        card.qtyFrame = cand;
+                    } else if (this.badgeRegex.test(ctxt)) {
+                        card.badgeFrame = cand;
+                    }
+                }
+            }
+            cards.push(card);
+        }
+
+        return cards;
+    },
+
+    sortCards: function(cards, order) {
+        var doc = app.activeDocument;
+        var numABs = doc ? doc.artboards.length : 0;
+
+        // Tag each card with its artboard index if multiple artboards exist
+        if (numABs > 1) {
+            for (var i = 0; i < cards.length; i++) {
+                var c = cards[i];
+                var midX = (c.bounds[0] + c.bounds[2]) / 2;
+                var midY = (c.bounds[1] + c.bounds[3]) / 2;
+                c.artboardIndex = 0;
+                for (var a = 0; a < numABs; a++) {
+                    var r = doc.artboards[a].artboardRect;
+                    if (midX >= r[0] && midX <= r[2] && midY <= r[1] && midY >= r[3]) {
+                        c.artboardIndex = a;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (order === "auto_badge") {
+            cards.sort(function(a, b) {
+                if (numABs > 1 && a.artboardIndex !== b.artboardIndex) return a.artboardIndex - b.artboardIndex;
+                if (a.badgeNumber > 0 && b.badgeNumber > 0) return a.badgeNumber - b.badgeNumber;
+                var bTop = b.bounds[1];
+                var aTop = a.bounds[1];
+                if (Math.abs(bTop - aTop) > 35) return bTop - aTop;
+                return a.bounds[0] - b.bounds[0];
+            });
+            return cards;
+        }
+
+        if (order === "column") {
+            cards.sort(function(a, b) {
+                if (numABs > 1 && a.artboardIndex !== b.artboardIndex) return a.artboardIndex - b.artboardIndex;
+                var aLeft = a.bounds[0];
+                var bLeft = b.bounds[0];
+                if (Math.abs(aLeft - bLeft) > 60) return aLeft - bLeft; // Col 1 before Col 2
+                return b.bounds[1] - a.bounds[1]; // Top to bottom
+            });
+            return cards;
+        }
+
+        // Row by Row (zigzag)
+        cards.sort(function(a, b) {
+            if (numABs > 1 && a.artboardIndex !== b.artboardIndex) return a.artboardIndex - b.artboardIndex;
+            var bTop = b.bounds[1];
+            var aTop = a.bounds[1];
+            if (Math.abs(bTop - aTop) > 35) return bTop - aTop;
+            return a.bounds[0] - b.bounds[0];
+        });
+        return cards;
+    },
+
+        _fontCache: {},
+
+    getBornomalaFonts: function() {
+        if (this._fontCache["bornomala_default"]) return this._fontCache["bornomala_default"];
+        var res = { bold: null, regular: null };
+        try {
+            for (var i = 0; i < app.textFonts.length; i++) {
+                var f = app.textFonts[i];
+                var fn = f.name;
+                var fs = f.style || "";
+                if (/bornomala/i.test(fn)) {
+                    if (!res.bold && /bold/i.test(fn + fs)) res.bold = f;
+                    if (!res.regular && /regular|normal/i.test(fn + fs)) res.regular = f;
+                }
+                if (res.bold && res.regular) break;
+            }
+        } catch(e) {}
+        this._fontCache["bornomala_default"] = res;
+        return res;
+    },
+
+    getFamilyFonts: function(baseFont) {
+        if (!baseFont) return this.getBornomalaFonts();
+        var fam = "";
+        try { fam = baseFont.family; } catch(e) {}
+        if (!fam) {
+            try { fam = baseFont.name.split("-")[0]; } catch(e) {}
+        }
+        if (!fam) return this.getBornomalaFonts();
+
+        var cacheKey = fam.toLowerCase();
+        if (this._fontCache[cacheKey]) {
+            return this._fontCache[cacheKey];
+        }
+
+        var res = { bold: null, regular: null };
+
+        try {
+            var bName = baseFont.name;
+            var bStyle = baseFont.style || "";
+            if (/bold/i.test(bName) || /bold/i.test(bStyle)) res.bold = baseFont;
+            else if (/regular|normal/i.test(bName) || /regular|normal/i.test(bStyle)) res.regular = baseFont;
+        } catch(e) {}
+
+        try {
+            for (var i = 0; i < app.textFonts.length; i++) {
+                var f = app.textFonts[i];
+                var fFam = f.family || "";
+                if (fFam && fFam.toLowerCase() === cacheKey) {
+                    var fn = f.name;
+                    var fs = f.style || "";
+                    if (!res.bold && /bold/i.test(fs + fn)) {
+                        res.bold = f;
+                    }
+                    if (!res.regular && (/regular|normal/i.test(fs + fn) || (!/bold|italic|oblique/i.test(fs) && !/bold|italic/i.test(fn)))) {
+                        res.regular = f;
+                    }
+                }
+                if (res.bold && res.regular) break;
+            }
+        } catch(e) {}
+
+        var bn = this.getBornomalaFonts();
+        if (!res.bold) res.bold = bn.bold;
+        if (!res.regular) res.regular = bn.regular;
+
+        this._fontCache[cacheKey] = res;
+        return res;
+    },
+
+    applyBoldFont: function(textRangeOrFrame) {
+        try {
+            var tr = textRangeOrFrame.textRange ? textRangeOrFrame.textRange : textRangeOrFrame;
+            if (!tr || !tr.characterAttributes) return;
+            var currFont = tr.characterAttributes.textFont;
+            if (!currFont) return;
+            if (/bold|bl/i.test(currFont.name) || /bold|bl/i.test(currFont.style)) return;
+
+            var pair = this.getFamilyFonts(currFont);
+            if (pair.bold) {
+                tr.characterAttributes.textFont = pair.bold;
+                return;
+            }
+            var bn = this.getBornomalaFonts();
+            if (bn.bold) tr.characterAttributes.textFont = bn.bold;
+        } catch (e) {}
+    },
+
+    applyRegularFont: function(textRangeOrFrame) {
+        try {
+            var tr = textRangeOrFrame.textRange ? textRangeOrFrame.textRange : textRangeOrFrame;
+            if (!tr || !tr.characterAttributes) return;
+            var currFont = tr.characterAttributes.textFont;
+            if (!currFont) return;
+            if (/regular|normal/i.test(currFont.name) || /regular|normal/i.test(currFont.style)) return;
+
+            var pair = this.getFamilyFonts(currFont);
+            if (pair.regular) {
+                tr.characterAttributes.textFont = pair.regular;
+                return;
+            }
+            var bn = this.getBornomalaFonts();
+            if (bn.regular) tr.characterAttributes.textFont = bn.regular;
+        } catch (e) {}
+    },
+
+    placeTextBlocksIntoCards: function(payloadJson) {
+        if (!app.documents.length) {
+            return JSON.stringify({ status: "error", message: "No active Illustrator document found." });
+        }
+        var doc = app.activeDocument;
+        var sel = doc.selection;
+        if (!sel || sel.length < 2) {
+            return JSON.stringify({
+                status: "error",
+                message: "Please select both your Template Cards and your Text Blocks on the canvas."
+            });
+        }
+
+        var payload = {};
+        try {
+            if (typeof payloadJson === "string") payload = eval('(' + payloadJson + ')');
+            else payload = payloadJson;
+        } catch(e) {}
+
+        var cardOrder = payload.cardOrder || "column";
+        var textOrder = payload.textOrder || "column";
+        var offsetX = typeof payload.offsetX === "number" ? payload.offsetX : 45;
+        var offsetY = typeof payload.offsetY === "number" ? payload.offsetY : -15;
+        var groupPlaced = payload.groupPlaced !== false;
+        var bringToFront = payload.bringToFront !== false;
+
+        var allBounds = [];
+        for (var k = 0; k < sel.length; k++) {
+            allBounds.push({ item: sel[k], x: sel[k].geometricBounds[0] });
+        }
+        allBounds.sort(function(a, b) { return a.x - b.x; });
+        var half = Math.floor(allBounds.length / 2);
+        var cards = [];
+        var textBlocks = [];
+        for (var m = 0; m < half; m++) cards.push(allBounds[m].item);
+        for (var n = half; n < allBounds.length; n++) textBlocks.push(allBounds[n].item);
+
+        var sortFn = function(items, ord) {
+            if (ord === "column") {
+                items.sort(function(a, b) {
+                    var aGB = a.geometricBounds;
+                    var bGB = b.geometricBounds;
+                    if (Math.abs(aGB[0] - bGB[0]) > 60) return aGB[0] - bGB[0];
+                    return bGB[1] - aGB[1];
+                });
+            } else {
+                items.sort(function(a, b) {
+                    var aGB = a.geometricBounds;
+                    var bGB = b.geometricBounds;
+                    if (Math.abs(bGB[1] - aGB[1]) > 35) return bGB[1] - aGB[1];
+                    return aGB[0] - bGB[0];
+                });
+            }
+        };
+
+        sortFn(cards, cardOrder);
+        sortFn(textBlocks, textOrder);
+
+        var count = Math.min(cards.length, textBlocks.length);
+        for (var p = 0; p < count; p++) {
+            var targetCard = cards[p];
+            var srcText = textBlocks[p];
+            var cGB = targetCard.geometricBounds;
+            var tGB = srcText.geometricBounds;
+
+            var targetX = cGB[0] + offsetX;
+            var targetY = cGB[1] + offsetY;
+
+            var currPos = srcText.position;
+            var dx = targetX - tGB[0];
+            var dy = targetY - tGB[1];
+
+            srcText.position = [currPos[0] + dx, currPos[1] + dy];
+
+            if (bringToFront) {
+                srcText.zOrder(ZOrderMethod.BRINGTOFRONT);
+            }
+
+            if (groupPlaced && targetCard.typename === "GroupItem" && srcText.parent !== targetCard) {
+                try {
+                    srcText.moveToBeginning(targetCard);
+                } catch (e) {}
+            }
+        }
+
+        app.redraw();
+
+        return JSON.stringify({
+            status: "success",
+            count: count,
+            message: "Successfully moved " + count + " text blocks into cards!"
+        });
+    },
+
+    renumberBadges: function(payloadJson) {
+        if (!app.documents.length) {
+            return JSON.stringify({ status: "error", message: "No active Illustrator document found." });
+        }
+        var doc = app.activeDocument;
+        var sel = doc.selection;
+        if (!sel || !sel.length) {
+            return JSON.stringify({ status: "error", message: "Please select badge text frames on canvas." });
+        }
+
+        var payload = {};
+        try {
+            if (typeof payloadJson === "string") payload = eval('(' + payloadJson + ')');
+            else payload = payloadJson;
+        } catch(e) {}
+
+        var style = payload.style || "bangla_2digit";
+        var startNum = parseInt(payload.startNum, 10) || 1;
+        var prefix = payload.prefix || "";
+        var suffix = payload.suffix || "";
+
+        var textFrames = [];
+        this.collectTextFrames(sel, textFrames);
+
+        var badges = [];
+        for (var i = 0; i < textFrames.length; i++) {
+            var tf = textFrames[i];
+            var txt = tf.contents.replace(/\s+/g, '');
+            if (txt.length <= 4 || this.bengaliToInt(txt) > 0) {
+                badges.push(tf);
+            }
+        }
+
+        if (!badges.length) {
+            return JSON.stringify({
+                status: "error",
+                message: "No number badges found in selection. Ensure badge frames contain short numbers."
+            });
+        }
+
         badges.sort(function(a, b) {
-            var bTop = b.geometricBounds[1], aTop = a.geometricBounds[1];
+            var bTop = b.geometricBounds[1];
+            var aTop = a.geometricBounds[1];
             if (Math.abs(bTop - aTop) > 35) return bTop - aTop;
             return a.geometricBounds[0] - b.geometricBounds[0];
         });
-        var st = parseInt(txtBadgeStart.text, 10) || 1;
-        var mode = ddlBadgeStyle.selection.index;
-        for (var j = 0; j < badges.length; j++) {
-            var cur = st + j;
-            var formatted = "";
-            if (mode === 0) formatted = intToBengali(cur, true);
-            else if (mode === 1) formatted = intToBengali(cur, false);
-            else if (mode === 2) formatted = (cur < 10 ? "0" : "") + cur;
-            else formatted = String(cur);
-            badges[j].contents = formatted;
-        }
-        app.redraw();
-        alert("Renumbered " + badges.length + " badges successfully!");
-        win.close();
-    };
 
-    
-    function executeDuplicator() {
+        for (var j = 0; j < badges.length; j++) {
+            var cur = startNum + j;
+            var formatted = "";
+
+            if (style === "bangla_2digit") formatted = this.intToBengali(cur, true);
+            else if (style === "bangla") formatted = this.intToBengali(cur, false);
+            else if (style === "english_2digit") formatted = (cur < 10 ? "0" : "") + cur;
+            else formatted = String(cur);
+
+            badges[j].contents = prefix + formatted + suffix;
+        }
+
+        app.redraw();
+
+        return JSON.stringify({
+            status: "success",
+            count: badges.length,
+            message: "Successfully renumbered " + badges.length + " card badges!"
+        });
+    },
+
+    getAccurateCardBounds: function(item, customW, customH) {
+        if (!item) return { width: 192, height: 98, bounds: [0, 0, 192, -98] };
+
+        var gb = item.geometricBounds;
+        var w = gb[2] - gb[0];
+        var h = gb[1] - gb[3];
+        var b = [gb[0], gb[1], gb[2], gb[3]];
+
+        if (customW > 0 && customH > 0) {
+            return {
+                width: customW,
+                height: customH,
+                bounds: [b[0], b[1], b[0] + customW, b[1] - customH]
+            };
+        }
+
+        // Check if group has clipping mask
+        if (item.typename === "GroupItem") {
+            try {
+                if (item.clipped) {
+                    for (var c = 0; c < item.pageItems.length; c++) {
+                        var cp = item.pageItems[c];
+                        if (cp.clipping) {
+                            var cgb = cp.geometricBounds;
+                            return {
+                                width: Math.round(cgb[2] - cgb[0]),
+                                height: Math.round(cgb[1] - cgb[3]),
+                                bounds: cgb
+                            };
+                        }
+                    }
+                }
+            } catch (e) {}
+
+            // Search for primary card background path inside group
+            try {
+                for (var i = 0; i < item.pageItems.length; i++) {
+                    var sub = item.pageItems[i];
+                    if (sub.clipping) {
+                        var sgb = sub.geometricBounds;
+                        return {
+                            width: Math.round(sgb[2] - sgb[0]),
+                            height: Math.round(sgb[1] - sgb[3]),
+                            bounds: sgb
+                        };
+                    }
+                    if (sub.typename === "PathItem" && sub.closed) {
+                        var pb = sub.geometricBounds;
+                        var pw = Math.round(pb[2] - pb[0]);
+                        var ph = Math.round(pb[1] - pb[3]);
+                        if (pw >= 150 && pw <= 240 && ph >= 70 && ph <= 130) {
+                            return {
+                                width: pw,
+                                height: ph,
+                                bounds: pb
+                            };
+                        }
+                    }
+                }
+            } catch (e2) {}
+        }
+
+        return {
+            width: Math.round(w),
+            height: Math.round(h),
+            bounds: b
+        };
+    },
+
+    duplicateCardTemplates: function(payloadJson) {
+        if (!app.documents.length) {
+            return JSON.stringify({ status: "error", message: "No active Illustrator document found." });
+        }
+        var doc = app.activeDocument;
         var sel = doc.selection;
         if (!sel || sel.length === 0) {
-            alert("Please select your template card on canvas first.");
-            return;
+            return JSON.stringify({ status: "error", message: "Please select your template card on canvas first." });
         }
 
-        var totalCopies = parseInt(txtTotalCopies.text, 10) || 50;
-        var cardsPerAB = parseInt(txtCardsPerAB.text, 10) || 20;
-        var customCols = parseInt(txtCols.text, 10) || 0;
-        var gapX = parseFloat(txtGapX.text) || 0;
-        var gapY = parseFloat(txtGapY.text) || 0;
+        var payload;
+        try {
+            if (typeof payloadJson === "string") {
+                payload = eval('(' + payloadJson + ')');
+                if (typeof payload === "string") payload = eval('(' + payload + ')');
+            } else {
+                payload = payloadJson;
+            }
+        } catch (e) {
+            return JSON.stringify({ status: "error", message: "Invalid payload JSON: " + e.message });
+        }
+
+        var totalCopies = parseInt(payload.totalCopies, 10) || 20;
+        var cardsPerAB = parseInt(payload.cardsPerArtboard, 10) || 20;
+        var customCols = parseInt(payload.cols, 10) || 0;
+        var gapX = parseFloat(payload.gapX) || 0;
+        var gapY = parseFloat(payload.gapY) || 0;
+        var fitArtboard = payload.fitArtboard !== false;
+
+        var customW = parseFloat(payload.cardW) || 0;
+        var customH = parseFloat(payload.cardH) || 0;
 
         if (totalCopies <= 0) totalCopies = 1;
         if (cardsPerAB <= 0) cardsPerAB = 20;
 
+        // Form single master item if selection has multiple loose items
         var masterItem = null;
         if (sel.length === 1) {
             masterItem = sel[0];
@@ -381,32 +1097,37 @@
 
         try { if (masterItem.locked) masterItem.locked = false; } catch (e) {}
 
-        var mGB = masterItem.geometricBounds;
-        var cardW = mGB[2] - mGB[0];
-        var cardH = mGB[1] - mGB[3];
+        var accurate = this.getAccurateCardBounds(masterItem, customW, customH);
+        var cardW = accurate.width;
+        var cardH = accurate.height;
+        var refBounds = accurate.bounds;
+        var curRefLeft = refBounds[0];
+        var curRefTop = refBounds[1];
 
         var curABIndex = doc.artboards.getActiveArtboardIndex();
         var baseAB = doc.artboards[curABIndex];
         var baseRect = baseAB.artboardRect;
-        var abW = baseRect[2] - baseRect[0];
-        var abH = baseRect[1] - baseRect[3];
+        var baseW = baseRect[2] - baseRect[0];
+        var baseH = baseRect[1] - baseRect[3];
 
+        // Determine columns
         var cols = customCols;
         if (cols <= 0) {
-            cols = Math.max(1, Math.floor((abW + gapX) / (cardW + gapX)));
+            cols = Math.max(1, Math.floor((baseW + gapX) / (cardW + gapX)));
         }
 
-        var totalGridW = cols * cardW + (cols - 1) * gapX;
         var rowsPerAB = Math.ceil(cardsPerAB / cols);
+        var totalGridW = cols * cardW + (cols - 1) * gapX;
         var totalGridH = rowsPerAB * cardH + (rowsPerAB - 1) * gapY;
 
         var marginX = 15;
         var marginY = 15;
 
-        // Uniform Artboard Dimensions (All artboards exactly identical)
-        var finalABW = Math.max(abW, Math.round(totalGridW + 2 * marginX));
-        var finalABH = Math.max(abH, Math.round(totalGridH + 2 * marginY));
+        // Calculate uniform artboard dimensions
+        var finalABW = fitArtboard ? Math.max(baseW, Math.round(totalGridW + 2 * marginX)) : baseW;
+        var finalABH = fitArtboard ? Math.round(totalGridH + 2 * marginY) : baseH;
 
+        // Resize the base artboard
         baseAB.artboardRect = [baseRect[0], baseRect[1], baseRect[0] + finalABW, baseRect[1] - finalABH];
 
         var marginL = Math.max(marginX, (finalABW - totalGridW) / 2);
@@ -415,6 +1136,7 @@
         var totalABsNeeded = Math.ceil(totalCopies / cardsPerAB);
         var abList = [baseAB];
 
+        // Find rightmost artboard edge to prevent overlap
         var maxRight = -999999;
         var topRef = baseRect[1];
         for (var abIdx = 0; abIdx < doc.artboards.length; abIdx++) {
@@ -422,6 +1144,7 @@
             if (r[2] > maxRight) maxRight = r[2];
         }
 
+        // Create new artboards with identical dimensions
         for (var a = 1; a < totalABsNeeded; a++) {
             var nLeft = maxRight + 50;
             var nTop = topRef;
@@ -433,6 +1156,10 @@
             maxRight = nRight;
         }
 
+        var placedItems = [];
+        var targetX_0 = baseRect[0] + marginL;
+        var targetY_0 = baseRect[1] - marginT;
+
         for (var i = 0; i < totalCopies; i++) {
             var abPage = Math.floor(i / cardsPerAB);
             var idxOnPage = i % cardsPerAB;
@@ -442,89 +1169,39 @@
             var targetAB = abList[abPage];
             var tRect = targetAB.artboardRect;
 
-            var posX = tRect[0] + marginL + c * (cardW + gapX);
-            var posY = tRect[1] - marginT - r * (cardH + gapY);
+            var targetX = tRect[0] + marginL + c * (cardW + gapX);
+            var targetY = tRect[1] - marginT - r * (cardH + gapY);
 
+            var itemToPlace;
             if (i === 0) {
-                masterItem.position = [posX, posY];
+                var dX = targetX - curRefLeft;
+                var dY = targetY - curRefTop;
+                masterItem.translate(dX, dY);
+                itemToPlace = masterItem;
             } else {
                 var dup = masterItem.duplicate();
-                dup.position = [posX, posY];
+                var dX = targetX - targetX_0;
+                var dY = targetY - targetY_0;
+                dup.translate(dX, dY);
+                itemToPlace = dup;
             }
+            try { itemToPlace.note = ""; } catch(e) {}
+            placedItems.push(itemToPlace);
         }
 
         app.redraw();
-        alert("Successfully generated " + totalCopies + " duplicate template(s) across " + totalABsNeeded + " artboard(s)!");
-        tpanel.selection = tabFill;
-    }
 
-btnExecute.onClick = function() {
-        if (tpanel.selection === tabDup) { executeDuplicator(); return; }
-        if (tpanel.selection.index === 1) {
-            // TAB 2: Canvas Move
-            executeCanvasMove();
-            return;
-        }
+        return JSON.stringify({
+            status: "success",
+            totalCopies: totalCopies,
+            artboardsUsed: totalABsNeeded,
+            cardSize: Math.round(cardW) + " x " + Math.round(cardH) + " pt",
+            artboardSize: Math.round(finalABW) + " x " + Math.round(finalABH) + " pt",
+            message: "Successfully generated " + totalCopies + " templates! Card: " + Math.round(cardW) + "x" + Math.round(cardH) + " pt | Gap: " + gapX + "x" + gapY + " pt | Artboard: " + Math.round(finalABW) + "x" + Math.round(finalABH) + " pt"
+        });
+    },
 
-        // TAB 1: Auto Fill
-        executeAutoFill();
-    };
-
-    function executeCanvasMove() {
-        var sel = doc.selection;
-        if (!sel || sel.length < 2) {
-            alert("Please select Cards (Left) and Text Blocks (Right).");
-            return;
-        }
-        var allBounds = [];
-        for (var k = 0; k < sel.length; k++) allBounds.push({ item: sel[k], x: sel[k].geometricBounds[0] });
-        allBounds.sort(function(a, b) { return a.x - b.x; });
-        var half = Math.floor(allBounds.length / 2);
-        var cards = [], textBlocks = [];
-        for (var m = 0; m < half; m++) cards.push(allBounds[m].item);
-        for (var n = half; n < allBounds.length; n++) textBlocks.push(allBounds[n].item);
-
-        var ord = ddlMoveSort.selection.index === 0 ? "column" : "zigzag";
-        var sortFn = function(items, o) {
-            if (o === "column") {
-                items.sort(function(a, b) {
-                    var aGB = a.geometricBounds, bGB = b.geometricBounds;
-                    if (Math.abs(aGB[0] - bGB[0]) > 60) return aGB[0] - bGB[0];
-                    return bGB[1] - aGB[1];
-                });
-            } else {
-                items.sort(function(a, b) {
-                    var aGB = a.geometricBounds, bGB = b.geometricBounds;
-                    if (Math.abs(bGB[1] - aGB[1]) > 35) return bGB[1] - aGB[1];
-                    return aGB[0] - bGB[0];
-                });
-            }
-        };
-        sortFn(cards, ord);
-        sortFn(textBlocks, ord);
-
-        var offX = parseFloat(txtOffsetX.text) || 45;
-        var offY = parseFloat(txtOffsetY.text) || -15;
-        var count = Math.min(cards.length, textBlocks.length);
-
-        for (var p = 0; p < count; p++) {
-            var c = cards[p], t = textBlocks[p];
-            var cGB = c.geometricBounds, tGB = t.geometricBounds;
-            var curr = t.position;
-            var dx = (cGB[0] + offX) - tGB[0];
-            var dy = (cGB[1] + offY) - tGB[1];
-            t.position = [curr[0] + dx, curr[1] + dy];
-            if (chkBringFront.value) t.zOrder(ZOrderMethod.BRINGTOFRONT);
-            if (chkGroupPlaced.value && c.typename === "GroupItem" && t.parent !== c) {
-                try { t.moveToBeginning(c); } catch(e) {}
-            }
-        }
-        app.redraw();
-        alert("Success! Moved " + count + " text blocks into cards!");
-        win.close();
-    }
-
-    function formatDetailsText(details) {
+    formatDetailsText: function(details) {
         if (!details) return "";
         var lines = details.replace(/\r\n|\n/g, "\r").split("\r");
         var out = [];
@@ -563,50 +1240,119 @@ btnExecute.onClick = function() {
             if (phone) out.push(phone);
         }
         return out.join("\r");
-    }
+    },
 
-    function executeAutoFill() {
-        if (!app.documents.length) {
-            alert("No active document open.");
-            return;
-        }
-        var doc = app.activeDocument;
-        var raw = txtInput.text.replace(/^\s+|\s+$/g, '');
-        if (!raw) {
-            alert("Please enter biodata list or click 'Load Sample'.");
-            return;
+    populateCards: function(jsonPayload) {
+        var doc = this.getActiveDoc();
+        if (!doc) {
+            return JSON.stringify({
+                status: "error",
+                message: "No active Illustrator document found. Please open or create a document."
+            });
         }
 
-        var entries = parseTextAdvanced(raw, chkStripNum.value, chkSkipNoName.value);
-        if (!entries.length) {
-            alert("No valid entries could be parsed from input text.");
-            return;
-        }
-
-        var order = ddlOrder.selection.index === 0 ? "column" : (ddlOrder.selection.index === 1 ? "zigzag" : "auto_badge");
-        var scope = ddlScope.selection.index === 0 ? "artboard" : (ddlScope.selection.index === 1 ? "selection" : "all_artboards");
-
-        var cards = detectCardsAdvanced(scope);
-        if (!cards.length) {
-            alert("No template cards detected. Make sure cards are on the active artboard or selected.");
-            return;
-        }
-        cards = sortCards(cards, order);
-
-        // Skip cards that are already populated with visible text color
-        var targetCards = [];
-        for (var ci = 0; ci < cards.length; ci++) {
-            var cCard = cards[ci];
-            var isFilled = false;
-            if (cCard.nameFrame && cCard.nameFrame.characters.length > 0) {
-                var cfc = cCard.nameFrame.characters[0].fillColor;
-                if (cfc && cfc.typename !== "NoColor") isFilled = true;
+        var payload = {};
+        try {
+            if (typeof jsonPayload === "string") {
+                payload = eval('(' + jsonPayload + ')');
+            } else {
+                payload = jsonPayload;
             }
-            if (!isFilled) targetCards.push(cCard);
+        } catch (e) {
+            return JSON.stringify({
+                status: "error",
+                message: "Failed to parse data: " + e.message
+            });
         }
-        if (targetCards.length === 0) targetCards = cards;
 
-        // Locate template fonts & colors from active document or target cards
+        var entries = payload.entries || [];
+        if (!entries.length) {
+            return JSON.stringify({
+                status: "error",
+                message: "No entries to populate."
+            });
+        }
+
+        var scope = payload.scope || "artboard";
+        var order = payload.order || "column";
+        var makeBold = payload.makeBold !== false;
+        var fillBani = payload.fillBani === true;
+        var isSingleColor = payload.singleColor === true;
+        var skipFilledCards = payload.skipFilledCards !== false;
+        var startIndex = parseInt(payload.startIndex, 10) || 0;
+
+        var detailsHScale = parseFloat(payload.detailsHScale);
+        if (isNaN(detailsHScale) || detailsHScale <= 0) detailsHScale = 85;
+
+        var nameHScale = parseFloat(payload.nameHScale);
+        if (isNaN(nameHScale) || nameHScale <= 0) nameHScale = 100;
+
+        var userDetailsLeading = parseFloat(payload.detailsLeading);
+        var hasCustomDetailsLeading = (!isNaN(userDetailsLeading) && userDetailsLeading > 0);
+
+        var userNameLeading = parseFloat(payload.nameLeading);
+        var hasCustomNameLeading = (!isNaN(userNameLeading) && userNameLeading > 0);
+
+        var cards = this.detectCards(scope);
+        if (!cards.length) {
+            return JSON.stringify({
+                status: "error",
+                message: "No card templates detected. Make sure your cards are visible and unlocked."
+            });
+        }
+
+        cards = this.sortCards(cards, order);
+
+        var targetCards = [];
+        if (!skipFilledCards || scope === "selection") {
+            targetCards = cards;
+        } else {
+            var nameFreq = {};
+            for (var c = 0; c < cards.length; c++) {
+                var cName = cards[c].nameFrame ? cards[c].nameFrame.contents.split(/\r|\n/)[0].replace(/\s+/g, '') : "";
+                if (cName) nameFreq[cName] = (nameFreq[cName] || 0) + 1;
+            }
+            var maxFreq = 0;
+            var templateName = "";
+            for (var nm in nameFreq) {
+                if (nameFreq[nm] > maxFreq) {
+                    maxFreq = nameFreq[nm];
+                    templateName = nm;
+                }
+            }
+
+            for (var c = 0; c < cards.length; c++) {
+                var card = cards[c];
+                var cardNm = card.nameFrame ? card.nameFrame.contents.split(/\r|\n/)[0].replace(/\s+/g, '') : "";
+
+                if (maxFreq >= 2 && cardNm === templateName) {
+                    targetCards.push(card);
+                    continue;
+                }
+
+                var isPriorEntry = false;
+                for (var p = 0; p < startIndex && p < entries.length; p++) {
+                    if (entries[p].name && entries[p].name.replace(/\s+/g, '') === cardNm) {
+                        isPriorEntry = true;
+                        break;
+                    }
+                }
+                if (isPriorEntry) continue;
+
+                targetCards.push(card);
+            }
+        }
+
+        if (targetCards.length === 0) {
+            targetCards = cards;
+        }
+
+        var activeEntries = entries.slice(startIndex);
+        if (activeEntries.length === 0) {
+            startIndex = 0;
+            activeEntries = entries;
+        }
+
         var docNameColor = null;
         var docBoldFont = null;
         var docRegularFont = null;
@@ -614,7 +1360,6 @@ btnExecute.onClick = function() {
         var docNameLeading = null;
         var docBaniLeading = null;
 
-        // Step A: Inspect target template cards
         for (var tc = 0; tc < targetCards.length; tc++) {
             var cCard = targetCards[tc];
             var cTF = cCard.nameFrame;
@@ -661,856 +1406,311 @@ btnExecute.onClick = function() {
                 } catch(le) {}
             }
 
-            if (!docBaniLeading && cCard.baniFrame && cCard.baniFrame.characters.length > 0) {
-                try {
-                    var bl = cCard.baniFrame.characters[0].characterAttributes.leading;
-                    if (bl > 0) docBaniLeading = bl;
-                } catch(be) {}
-            }
-
             if (docBoldFont && docRegularFont && docNameColor && docDetailsLeading && docNameLeading) break;
         }
 
-        // Step B: Fallback check all document text frames
-        if (!docBoldFont || !docRegularFont || !docNameColor) {
-            for (var tfIdx = 0; tfIdx < doc.textFrames.length; tfIdx++) {
-                var candTF = doc.textFrames[tfIdx];
-                try {
-                    for (var c = 0; c < Math.min(candTF.characters.length, 30); c++) {
-                        var ch = candTF.characters[c];
-                        var ca = ch.characterAttributes;
-                        if (!ca) continue;
-                        var tfnt = ca.textFont;
-                        if (tfnt) {
-                            var fn = tfnt.name || "";
-                            if (!docRegularFont && (fn.indexOf("Regular") !== -1 || fn.indexOf("Normal") !== -1)) {
-                                docRegularFont = tfnt;
-                            }
-                            if (!docBoldFont && fn.indexOf("Bold") !== -1) {
-                                docBoldFont = tfnt;
-                            }
-                        }
-                        var fc = ca.fillColor;
-                        if (!docNameColor && fc && fc.typename !== "NoColor") {
-                            if (fc.typename === "SpotColor" || (fc.typename === "CMYKColor" && fc.magenta > 50)) {
-                                docNameColor = fc;
-                            }
-                        }
-                    }
-                } catch(e) {}
-                if (docBoldFont && docRegularFont && docNameColor) break;
-            }
-        }
-
-        if (!docNameColor) {
-            try {
-                var sw = doc.swatches.getByName("C=0 M=87 Y=100 K=38");
-                if (sw) docNameColor = sw.color;
-            } catch(e) {}
-        }
-        if (!docNameColor) {
-            var cmykBrown = new CMYKColor();
-            cmykBrown.cyan = 0; cmykBrown.magenta = 87; cmykBrown.yellow = 100; cmykBrown.black = 38;
-            docNameColor = cmykBrown;
-        }
+        var bornomalaPair = this.getBornomalaFonts();
+        if (!docBoldFont) docBoldFont = bornomalaPair.bold;
+        if (!docRegularFont) docRegularFont = bornomalaPair.regular;
 
         var solidBlackCMYK = new CMYKColor();
         solidBlackCMYK.cyan = 0; solidBlackCMYK.magenta = 0; solidBlackCMYK.yellow = 0; solidBlackCMYK.black = 100;
 
-        var colorMap = [null, "#000000", "#1E5AA8", "#1B6E3F", "#9C1A1A", "#C88210"];
-        var chosenHex = colorMap[ddlNameColor.selection.index];
+        var solidWhiteCMYK = new CMYKColor();
+        solidWhiteCMYK.cyan = 0; solidWhiteCMYK.magenta = 0; solidWhiteCMYK.yellow = 0; solidWhiteCMYK.black = 0;
+
         var isCMYK = (doc.documentColorSpace === DocumentColorSpace.CMYK);
-        var finalNameColor = docNameColor;
-        if (chosenHex) {
-            finalNameColor = hexToColor(chosenHex, isCMYK) || docNameColor;
+        var userChosenColor = null;
+        if (payload.nameColor && payload.nameColor !== "#000000" && payload.nameColor !== "#000" && !isSingleColor) {
+            try {
+                var sw = doc.swatches.getByName(payload.nameColor);
+                if (sw) userChosenColor = sw.color;
+            } catch(e) {}
+
+            if (!userChosenColor && /^#?[0-9A-Fa-f]{3,6}$/.test(payload.nameColor)) {
+                userChosenColor = this.hexToColor(payload.nameColor, isCMYK);
+            }
         }
 
-        var detHScale = (typeof txtDetailsHScale !== "undefined" && txtDetailsHScale) ? (parseFloat(txtDetailsHScale.text) || 85) : 85;
-        var nmHScale = (typeof txtNameHScale !== "undefined" && txtNameHScale) ? (parseFloat(txtNameHScale.text) || 100) : 100;
+        var finalNameColor = (isSingleColor || payload.nameColor === "#000000") ? solidBlackCMYK : (userChosenColor || docNameColor || solidBlackCMYK);
+        var finalDetailsColor = solidBlackCMYK;
 
         var filledCount = 0;
-        var limit = Math.min(targetCards.length, entries.length);
+        var fillLimit = Math.min(targetCards.length, activeEntries.length);
 
-        for (var i = 0; i < limit; i++) {
-            var cd = targetCards[i];
-            var en = entries[i];
+        for (var i = 0; i < fillLimit; i++) {
+            var card = targetCards[i];
+            var entry = activeEntries[i];
 
-            // Extract this specific card's own leading BEFORE modifying contents
             var thisCardDetailsLeading = null;
             var thisCardNameLeading = null;
-            var thisCardBaniLeading = null;
-
             try {
-                if (cd.detailsFrame && cd.detailsFrame.characters.length > 0) {
-                    var l0 = cd.detailsFrame.characters[0].characterAttributes.leading;
-                    if (l0 > 0) thisCardDetailsLeading = l0;
-                }
-                if (cd.nameFrame && cd.nameFrame.characters.length > 0) {
-                    if (cd.nameFrame.paragraphs.length > 0 && cd.nameFrame.paragraphs[0].characters.length > 0) {
-                        var nl0 = cd.nameFrame.paragraphs[0].characters[0].characterAttributes.leading;
-                        if (nl0 > 0) thisCardNameLeading = nl0;
-                    }
-                    if (!thisCardDetailsLeading && cd.nameFrame.paragraphs.length > 1 && cd.nameFrame.paragraphs[1].characters.length > 0) {
-                        var dl0 = cd.nameFrame.paragraphs[1].characters[0].characterAttributes.leading;
-                        if (dl0 > 0) thisCardDetailsLeading = dl0;
+                if (card.nameFrame && card.nameFrame.characters.length > 0) {
+                    var l0 = card.nameFrame.paragraphs[0].characters[0].characterAttributes.leading;
+                    if (l0 > 0) thisCardNameLeading = l0;
+                    if (card.nameFrame.paragraphs.length > 1 && card.nameFrame.paragraphs[1].characters.length > 0) {
+                        var l1 = card.nameFrame.paragraphs[1].characters[0].characterAttributes.leading;
+                        if (l1 > 0) thisCardDetailsLeading = l1;
                     }
                 }
-                if (cd.baniFrame && cd.baniFrame.characters.length > 0) {
-                    var bl0 = cd.baniFrame.characters[0].characterAttributes.leading;
-                    if (bl0 > 0) thisCardBaniLeading = bl0;
+                if (card.detailsFrame && card.detailsFrame.characters.length > 0) {
+                    var dl0 = card.detailsFrame.characters[0].characterAttributes.leading;
+                    if (dl0 > 0) thisCardDetailsLeading = dl0;
                 }
             } catch(e) {}
 
-            var finalDetailsLeading = thisCardDetailsLeading || docDetailsLeading || 9.6;
-            var finalNameLeading = thisCardNameLeading || docNameLeading || finalDetailsLeading || 10;
-            var finalBaniLeading = thisCardBaniLeading || docBaniLeading || 6.1279;
+            var finalNameLeading = hasCustomNameLeading ? userNameLeading : (thisCardNameLeading || docNameLeading || 10.5);
+            var finalDetailsLeading = hasCustomDetailsLeading ? userDetailsLeading : (thisCardDetailsLeading || docDetailsLeading || 8.75);
 
+            var cardBaseFont = null;
             try {
-                // 1. Personal Info (Name + Details)
-                if (cd.nameFrame && en.name) {
-                    var cardNameColor = null;
+                if (card.nameFrame && card.nameFrame.characters.length > 0) cardBaseFont = card.nameFrame.characters[0].characterAttributes.textFont;
+            } catch(e) {}
+            if (!cardBaseFont) cardBaseFont = docBoldFont || docRegularFont;
+
+            var fontPair = this.getFamilyFonts(cardBaseFont);
+            var cardBoldFont = fontPair.bold || docBoldFont;
+            var cardRegularFont = fontPair.regular || docRegularFont;
+
+            // 1. POPULATE SERIAL / KROMIK (Top corner frame or badge)
+            if (card.serialFrame && entry.serial) {
+                try {
+                    // Check if existing character has fill color (e.g. white on dark pill)
+                    var existingSerialColor = null;
                     try {
-                        if (cd.nameFrame.characters.length > 0) {
-                            var fc = cd.nameFrame.characters[0].characterAttributes.fillColor;
-                            if (fc && (fc.typename === "SpotColor" || (fc.typename === "CMYKColor" && fc.magenta > 50))) {
-                                cardNameColor = fc;
+                        if (card.serialFrame.characters.length > 0) {
+                            var sc = card.serialFrame.characters[0].characterAttributes.fillColor;
+                            if (sc && sc.typename !== "NoColor") {
+                                existingSerialColor = sc;
                             }
                         }
-                    } catch(e) {}
+                    } catch(scErr) {}
 
-                    if (cd.detailsFrame) {
-                        cd.nameFrame.contents = en.name;
+                    // Check if sitting on top of a dark shape
+                    var isDarkPill = false;
+                    try {
+                        if (card.group) {
+                            var sgb = card.serialFrame.geometricBounds;
+                            for (var p = 0; p < card.group.pageItems.length; p++) {
+                                var pi = card.group.pageItems[p];
+                                if (pi.typename === "PathItem" && pi.filled) {
+                                    var pgb = pi.geometricBounds;
+                                    if (pgb[0] <= sgb[0] + 8 && pgb[2] >= sgb[2] - 8 && pgb[1] >= sgb[1] - 8 && pgb[3] <= sgb[3] + 8) {
+                                        var pfc = pi.fillColor;
+                                        if (pfc && (pfc.typename === "SpotColor" || (pfc.typename === "CMYKColor" && (pfc.black > 40 || pfc.cyan > 40 || pfc.magenta > 40)))) {
+                                            isDarkPill = true;
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    } catch(dpErr) {}
+
+                    var finalSerialColor = existingSerialColor || (isDarkPill ? solidWhiteCMYK : solidBlackCMYK);
+                    card.serialFrame.contents = entry.serial;
+                    if (cardBoldFont) card.serialFrame.textRange.characterAttributes.textFont = cardBoldFont;
+                    card.serialFrame.textRange.characterAttributes.fillColor = finalSerialColor;
+                } catch(serErr) {}
+            }
+
+            // 2. POPULATE FORM NUMBER
+            var formHandled = false;
+            if (card.formFrame && entry.formNumber) {
+                try {
+                    card.formFrame.contents = entry.formNumber;
+                    if (cardRegularFont) card.formFrame.textRange.characterAttributes.textFont = cardRegularFont;
+                    card.formFrame.textRange.characterAttributes.size = 7.0;
+                    card.formFrame.textRange.characterAttributes.fillColor = solidBlackCMYK;
+                    formHandled = true;
+                } catch(ffErr) {}
+            }
+
+            // 3. POPULATE NAME & DETAILS
+            try {
+                if (card.nameFrame && entry.name) {
+                    var cleanName = (entry.name || "").replace(/^\s+|\s+$/g, '');
+                    var cleanDetails = (entry.details || "").replace(/^\s+|\s+$/g, '');
+                    cleanDetails = cleanDetails.replace(/\r\n|\n/g, '\r').replace(/\r{2,}/g, '\r');
+
+                    // If form number was not placed in a separate frame, append it to details
+                    if (entry.formNumber && !formHandled && cleanDetails) {
+                        cleanDetails += "\r" + entry.formNumber;
+                    } else if (entry.formNumber && !formHandled && !cleanDetails) {
+                        cleanDetails = entry.formNumber;
+                    }
+
+                    if (card.detailsFrame) {
+                        // Separate Name and Details frames
+                        card.nameFrame.contents = cleanName;
                         try {
-                            if (docBoldFont) cd.nameFrame.textRange.characterAttributes.textFont = docBoldFont;
-                            else if (chkMakeBold.value) applyBoldFont(cd.nameFrame);
-                            cd.nameFrame.textRange.characterAttributes.size = 10;
-                            cd.nameFrame.textRange.characterAttributes.leading = finalNameLeading;
-                            cd.nameFrame.textRange.characterAttributes.tracking = -14;
-                            cd.nameFrame.textRange.characterAttributes.horizontalScale = nmHScale;
-                            cd.nameFrame.textRange.characterAttributes.fillColor = finalNameColor;
+                            if (makeBold && cardBoldFont) card.nameFrame.textRange.characterAttributes.textFont = cardBoldFont;
+                            card.nameFrame.textRange.characterAttributes.size = 10;
+                            card.nameFrame.textRange.characterAttributes.leading = finalNameLeading;
+                            card.nameFrame.textRange.characterAttributes.tracking = -14;
+                            card.nameFrame.textRange.characterAttributes.horizontalScale = nameHScale;
+                            card.nameFrame.textRange.characterAttributes.fillColor = finalNameColor;
+                            card.nameFrame.textRange.paragraphAttributes.spaceBefore = 0;
+                            card.nameFrame.textRange.paragraphAttributes.spaceAfter = 0;
                         } catch(e) {}
 
-                        if (en.details) {
-                            cd.detailsFrame.contents = en.details;
+                        if (cleanDetails) {
+                            card.detailsFrame.contents = cleanDetails;
                             try {
-                                if (docRegularFont) cd.detailsFrame.textRange.characterAttributes.textFont = docRegularFont;
-                                cd.detailsFrame.textRange.characterAttributes.size = 7.5;
-                                cd.detailsFrame.textRange.characterAttributes.leading = finalDetailsLeading;
-                                cd.detailsFrame.textRange.characterAttributes.tracking = -15;
-                                cd.detailsFrame.textRange.characterAttributes.horizontalScale = detHScale;
-                                cd.detailsFrame.textRange.characterAttributes.fillColor = solidBlackCMYK;
+                                if (cardRegularFont) card.detailsFrame.textRange.characterAttributes.textFont = cardRegularFont;
+                                card.detailsFrame.textRange.characterAttributes.size = 7.5;
+                                card.detailsFrame.textRange.characterAttributes.leading = finalDetailsLeading;
+                                card.detailsFrame.textRange.characterAttributes.tracking = -15;
+                                card.detailsFrame.textRange.characterAttributes.horizontalScale = detailsHScale;
+                                card.detailsFrame.textRange.characterAttributes.fillColor = finalDetailsColor;
+                                card.detailsFrame.textRange.paragraphAttributes.spaceBefore = 0;
+                                card.detailsFrame.textRange.paragraphAttributes.spaceAfter = 0;
                             } catch(e) {}
                         }
                     } else {
-                        var fullInfo = en.name + (en.details ? ("\r" + en.details) : "");
-                        cd.nameFrame.contents = fullInfo;
+                        // Single combined text frame (Name on line 1, details on lines 2..N)
+                        var fullInfo = cleanDetails ? (cleanName + "\r" + cleanDetails) : cleanName;
+                        card.nameFrame.contents = fullInfo;
 
-                        // Precise typography matching template:
-                        // Line 1: Bornomala-Bold, 10pt, Leading matching template, Tracking -14, User chosen color
-                        // Lines 2-N: Bornomala-Regular, 7.5pt, Leading matching template, Tracking -15, Solid Black
                         try {
-                            if (cd.nameFrame.paragraphs.length > 0) {
-                                var p0 = cd.nameFrame.paragraphs[0];
-                                if (docBoldFont) p0.characterAttributes.textFont = docBoldFont;
-                                else if (chkMakeBold.value) applyBoldFont(p0);
+                            card.nameFrame.textRange.paragraphAttributes.spaceBefore = 0;
+                            card.nameFrame.textRange.paragraphAttributes.spaceAfter = 0;
+                        } catch(e) {}
+
+                        try {
+                            if (card.nameFrame.paragraphs.length > 0) {
+                                var p0 = card.nameFrame.paragraphs[0];
+                                if (makeBold && cardBoldFont) {
+                                    p0.characterAttributes.textFont = cardBoldFont;
+                                }
                                 p0.characterAttributes.size = 10;
                                 p0.characterAttributes.leading = finalNameLeading;
                                 p0.characterAttributes.tracking = -14;
-                                p0.characterAttributes.horizontalScale = nmHScale;
+                                p0.characterAttributes.horizontalScale = nameHScale;
                                 p0.characterAttributes.fillColor = finalNameColor;
+                                p0.paragraphAttributes.spaceBefore = 0;
+                                p0.paragraphAttributes.spaceAfter = 0;
                             }
                         } catch(p0Err) {}
 
-                        // Additional pass for lines 2..N: strictly apply Regular font, 7.5pt, Solid Black
-                        var pLen = cd.nameFrame.paragraphs.length;
+                        var pLen = card.nameFrame.paragraphs.length;
                         for (var p = 1; p < pLen; p++) {
                             try {
-                                var para = cd.nameFrame.paragraphs[p];
+                                var para = card.nameFrame.paragraphs[p];
                                 if (!para || para.characters.length === 0) continue;
-                                if (docRegularFont) {
-                                    para.characterAttributes.textFont = docRegularFont;
-                                } else {
-                                    applyRegularFont(para);
+                                if (cardRegularFont) {
+                                    para.characterAttributes.textFont = cardRegularFont;
                                 }
                                 para.characterAttributes.size = 7.5;
                                 para.characterAttributes.leading = finalDetailsLeading;
                                 para.characterAttributes.tracking = -15;
-                                para.characterAttributes.horizontalScale = detHScale;
-                                para.characterAttributes.fillColor = solidBlackCMYK;
+                                para.characterAttributes.horizontalScale = detailsHScale;
+                                para.characterAttributes.fillColor = finalDetailsColor;
+                                para.paragraphAttributes.spaceBefore = 0;
+                                para.paragraphAttributes.spaceAfter = 0;
                             } catch(pe) {}
                         }
                     }
                 }
 
-                // 2. Bani Quote: Bornomala-Bold, 5pt, Dynamic Leading, Tracking -15, Solid Black
-                if (chkFillBani.value && cd.baniFrame && en.bani) {
-                    cd.baniFrame.contents = en.bani;
-                    try {
-                        var btf = cd.baniFrame;
-                        if (docBoldFont) btf.textRange.characterAttributes.textFont = docBoldFont;
-                        btf.textRange.characterAttributes.size = 5;
-                        btf.textRange.characterAttributes.leading = finalBaniLeading;
-                        btf.textRange.characterAttributes.tracking = -15;
-                                                // Smart background color check: White on dark shapes, Black on light
-                        var isDarkBg = false;
-                        try {
-                            if (cd.group) {
-                                var bgb = btf.geometricBounds;
-                                for (var p = 0; p < cd.group.pageItems.length; p++) {
-                                    var pi = cd.group.pageItems[p];
-                                    if (pi.typename === "PathItem" && pi.filled) {
-                                        var pgb = pi.geometricBounds;
-                                        if (pgb[0] <= bgb[0] + 10 && pgb[2] >= bgb[2] - 10 && pgb[1] >= bgb[1] - 10 && pgb[3] <= bgb[3] + 10) {
-                                            var fc = pi.fillColor;
-                                            if (fc.typename === "CMYKColor") {
-                                                if (fc.black > 25 || (fc.cyan + fc.magenta > 70)) isDarkBg = true;
-                                            } else if (fc.typename === "RGBColor") {
-                                                if (fc.red < 120 && fc.green < 120 && fc.blue < 120) isDarkBg = true;
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        } catch(bge) {}
-
-                        if (isDarkBg) {
-                            var whiteColor = (doc.documentColorSpace === DocumentColorSpace.CMYK) ? new CMYKColor() : new RGBColor();
-                            if (doc.documentColorSpace === DocumentColorSpace.CMYK) {
-                                whiteColor.cyan = 0; whiteColor.magenta = 0; whiteColor.yellow = 0; whiteColor.black = 0;
-                            } else {
-                                whiteColor.red = 255; whiteColor.green = 255; whiteColor.blue = 255;
-                            }
-                            btf.textRange.characterAttributes.fillColor = whiteColor;
-                        } else {
-                            btf.textRange.characterAttributes.fillColor = solidBlackCMYK;
-                        }
-
-                        if (en.bani.length > 140 && btf.kind === TextType.AREATEXT) {
-                            btf.textRange.characterAttributes.size = 4.3;
-                            btf.textRange.characterAttributes.leading = 5.2;
-                        }
-                    } catch(be) {}
-                }
-
-                // 3. Quantity Demo Number replacement
-                if (chkFillQty.value && cd.qtyFrame && en.qty) {
-                    var rawNum = bengaliToInt(en.qty);
-                    if (rawNum > 0) {
-                        var fmt = ddlQtyFormat.selection.index;
-                        var finalQtyStr = "";
-                        if (fmt === 1) finalQtyStr = String(rawNum);
-                        else if (fmt === 2) finalQtyStr = intToBengali(rawNum, false);
-                        else {
-                            var demoTxt = cd.qtyFrame.contents;
-                            if (/[০-৯]/.test(demoTxt)) finalQtyStr = intToBengali(rawNum, false);
-                            else finalQtyStr = String(rawNum);
-                        }
-                        cd.qtyFrame.contents = finalQtyStr;
-                        try {
-                            cd.qtyFrame.textRange.characterAttributes.fillColor = solidBlackCMYK;
-                        } catch(qe) {}
-                    }
+                // 4. POPULATE BANI (if in keyring mode)
+                if (fillBani && card.baniFrame && entry.bani) {
+                    card.baniFrame.contents = entry.bani.replace(/\r\n|\n/g, ' ');
+                    if (cardBoldFont) card.baniFrame.textRange.characterAttributes.textFont = cardBoldFont;
+                    card.baniFrame.textRange.characterAttributes.size = 5;
+                    card.baniFrame.textRange.characterAttributes.leading = 6.1279;
                 }
 
                 filledCount++;
-            } catch (err) {}
+            } catch(cardErr) {}
         }
 
-        app.redraw();
-        alert("🎉 Success!\nPopulated " + filledCount + " card(s) out of " + entries.length + " parsed entries.\n(Cards available: " + cards.length + ")");
-        win.close();
-    }
+        try { app.redraw(); } catch(e) {}
 
-    // ==========================================
-    // Advanced Parser (Handles Serial, Name, Details, Qty & Bani)
-    // ==========================================
-    function parseTextAdvanced(raw, stripNum, skipEmptyName) {
-        var lines = raw.split(/\r\n|\r|\n/);
-        var entries = [];
-        var cur = null;
-
-        function finalizeEntry(e) {
-            if (!e) return;
-            var nonMetaLines = [];
-            var baniLines = [];
-            var inBani = false;
-
-            for (var l = 0; l < e.rawLines.length; l++) {
-                var line = e.rawLines[l].replace(/^\s+|\s+$/g, '');
-                if (!line) continue;
-
-                if (inBani) {
-                    baniLines.push(line);
-                    continue;
-                }
-
-                if (/^(?:[\u09AC][\u09BE][\u09A3\u09A8][\u09C0])\s*[:\u0983]/i.test(line)) {
-                    inBani = true;
-                    baniLines.push(line);
-                    continue;
-                }
-
-                var qm = line.match(qtyRegex);
-                if (qm) {
-                    e.qty = qm[1];
-                    continue;
-                }
-
-                nonMetaLines.push(line);
-            }
-
-            if (nonMetaLines.length > 0) {
-                var nameLine = nonMetaLines[0];
-                if (stripNum) {
-                    // Keyring mode: completely strip serial prefix
-                    nameLine = nameLine.replace(serialPrefixRegex, '').replace(/^\s+|\s+$/g, '');
-                } else {
-                    // Diary mode: ensure serial is prefixed
-                    var clean = nameLine.replace(serialPrefixRegex, '').replace(/^\s+|\s+$/g, '');
-                    if (e.serial) nameLine = e.serial + ". " + clean;
-                }
-                e.name = nameLine;
-                e.details = nonMetaLines.slice(1).join('\r');
-            }
-            if (baniLines.length > 0) {
-                e.bani = baniLines.join(' ');
-            }
-        }
-
-        for (var j = 0; j < lines.length; j++) {
-            var line = lines[j].replace(/^\s+|\s+$/g, '');
-            if (!line) continue;
-
-            var sm = line.match(serialLineRegex);
-            if (sm) {
-                if (cur) { finalizeEntry(cur); entries.push(cur); }
-                cur = { serial: sm[1], rawLines: [], name: "", details: "", qty: "", bani: "" };
-            } else if (serialPrefixRegex.test(line)) {
-                if (cur) { finalizeEntry(cur); entries.push(cur); }
-                cur = { serial: "", rawLines: [line], name: "", details: "", qty: "", bani: "" };
-            } else {
-                if (!cur) cur = { serial: "", rawLines: [], name: "", details: "", qty: "", bani: "" };
-                cur.rawLines.push(line);
-            }
-        }
-        if (cur) { finalizeEntry(cur); entries.push(cur); }
-
-        var result = [];
-        for (var k = 0; k < entries.length; k++) {
-            if (skipEmptyName && !entries[k].name) continue;
-            result.push(entries[k]);
-        }
-        return result;
-    }
-
-    // ==========================================
-    // Advanced Card Detection (Handles Grouped & Proximity Loose Frames)
-    // ==========================================
-    function isTextFrameNoColor(tf) {
-        if (!tf) return false;
-        try {
-            if (tf.paragraphs && tf.paragraphs.length > 0) {
-                try {
-                    var pfc = tf.paragraphs[0].fillColor;
-                    if (pfc && pfc.typename === "NoColor") return true;
-                } catch(pe) {}
-            }
-            if (tf.characters && tf.characters.length > 0) {
-                for (var c = 0; c < Math.min(tf.characters.length, 5); c++) {
-                    try {
-                        var ca = tf.characters[c].characterAttributes;
-                        if (ca && ca.fillColor && ca.fillColor.typename === "NoColor") return true;
-                    } catch(ce) {}
-                }
-            }
-        } catch(e) {}
-        return false;
-    }
-
-    function isItemHidden(item) {
-        if (!item) return true;
-        try {
-            if (item.hidden) return true;
-        } catch(e) {}
-        try {
-            var cur = item;
-            while (cur) {
-                if (cur.typename === "Layer") {
-                    if (!cur.visible) return true;
-                    if (cur.parent && cur.parent.typename === "Layer" && !cur.parent.visible) return true;
-                    break;
-                }
-                if (cur.hidden) return true;
-                cur = cur.parent;
-            }
-        } catch(e) {}
-        return false;
-    }
-
-    function isBackSideText(text) {
-        if (!text) return false;
-        var norm = text.replace(/[\s\(\)\-\_–—\.\,\:\;\[\]\{\}\/\\।০-৯0-9'"]/g, '');
-        if (norm.indexOf("দাওরায়েহাদীস") !== -1 ||
-            norm.indexOf("দাওরায়েহাদিস") !== -1 ||
-            norm.indexOf("দাওরায়েহাদীছ") !== -1 ||
-            norm.indexOf("দাওরায়েহাদিসসমাপনীস্মৃতি") !== -1 ||
-            norm.indexOf("দাওরায়েহাদীসমাস্টার্সসমাপনীস্মৃতি") !== -1 ||
-            norm.indexOf("মাস্টার্সসমাপনীস্মৃতি") !== -1 ||
-            norm.indexOf("হিফজসমাপনী") !== -1 ||
-            norm.indexOf("হিফযসমাপনী") !== -1 ||
-            norm.indexOf("হিফজুলকুরআন") !== -1 ||
-            norm.indexOf("হিফযুলকুরআন") !== -1 ||
-            norm.indexOf("হিফজুলকুরআনসমাপনী") !== -1 ||
-            norm.indexOf("হিফযুলকুরআনসমাপনী") !== -1 ||
-            norm.indexOf("সমাপনীস্মৃতি") !== -1 ||
-            norm.indexOf("বিদায়ীস্মৃতি") !== -1 ||
-            norm.indexOf("বিদায়িস্মৃতি") !== -1 ||
-            norm.indexOf("স্মৃতিস্মারক") !== -1) {
-            return true;
-        }
-        var backRegex = /(?:দাওরায়ে\s*হাদ[ীি][সছ]|হিফ[জয]\s*সমাপনী|হিফ[জয]ুল\s*কুর?আন|সমাপনী\s*স্মৃতি|মাস্টার্স\s*সমাপনী|বিদায়[ীি]\s*স্মৃতি|স্মৃতি\s*স্মারক|مرحلة\s*التكميل)/;
-        return backRegex.test(text);
-    }
-
-    function hasStudentBiodata(text) {
-        if (!text) return false;
-        if (text.indexOf("পিতা:") !== -1 || text.indexOf("পিতা :") !== -1 || text.indexOf("পিতা") !== -1 ||
-            text.indexOf("الوالদ:") !== -1 || text.indexOf("الوالড :") !== -1 || text.indexOf("বাবার নাম") !== -1) {
-            return true;
-        }
-        if (/01[3-9]\d{8}/.test(text) || /০১[৩-৯][০-৯]{8}/.test(text) || /٠١[٠-৯]{9}/.test(text)) {
-            return true;
-        }
-        var studentTitles = ["মাওলানা", "মুহাম্মাদ", "মোহাম্মদ", "মোঃ", "হাফেজ", "মুফতী", "ক্বারী", "শিক্ষার্থী", "ছাত্র", "الحافظ", "مولانا"];
-        for (var s = 0; s < studentTitles.length; s++) {
-            if (text.indexOf(studentTitles[s]) !== -1 && (text.indexOf("\n") !== -1 || text.indexOf("\r") !== -1)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    function collectVisibleLayers(parent, outLayers) {
-        if (!parent) return;
-        try {
-            var lays = parent.layers;
-            if (!lays) return;
-            for (var l = 0; l < lays.length; l++) {
-                var lay = lays[l];
-                if (!lay.visible) continue; // STRICT: Ignore hidden layers completely!
-                outLayers.push(lay);
-                if (lay.layers && lay.layers.length > 0) {
-                    collectVisibleLayers(lay, outLayers);
-                }
-            }
-        } catch(e) {}
-    }
-
-    function collectTextFrames(items, outList) {
-        if (!items) return;
-        for (var i = 0; i < items.length; i++) {
-            var it = items[i];
-            if (isItemHidden(it)) continue; // STRICT: Ignore hidden items
-            if (it.typename === "TextFrame") {
-                outList.push(it);
-            } else if (it.typename === "GroupItem") {
-                collectTextFrames(it.pageItems, outList);
-            }
-        }
-    }
-
-    function detectCardsAdvanced(scope) {
-        var cardUnits = [];
-        var candidateItems = [];
-
-        if (scope === "selection" && doc.selection && doc.selection.length > 0) {
-            for (var s = 0; s < doc.selection.length; s++) {
-                var sItem = doc.selection[s];
-                if (isItemHidden(sItem)) continue; // STRICT: Ignore hidden items
-                candidateItems.push(sItem);
-            }
-        } else if (scope === "all_artboards") {
-            var visibleLayers = [];
-            collectVisibleLayers(doc, visibleLayers);
-            for (var l = 0; l < visibleLayers.length; l++) {
-                var layer = visibleLayers[l];
-                for (var i = 0; i < layer.pageItems.length; i++) {
-                    var pIt = layer.pageItems[i];
-                    if (isItemHidden(pIt)) continue; // STRICT: Ignore hidden items
-                    candidateItems.push(pIt);
-                }
-            }
-        } else {
-            var abIndex = doc.artboards.getActiveArtboardIndex();
-            var abRect = doc.artboards[abIndex].artboardRect;
-            var visibleLayers = [];
-            collectVisibleLayers(doc, visibleLayers);
-            for (var l = 0; l < visibleLayers.length; l++) {
-                var layer = visibleLayers[l];
-                for (var j = 0; j < layer.pageItems.length; j++) {
-                    var pItem = layer.pageItems[j];
-                    if (isItemHidden(pItem)) continue; // STRICT: Ignore hidden items
-                    var gb = pItem.geometricBounds;
-                    if (gb[0] < abRect[2] && gb[2] > abRect[0] && gb[1] > abRect[3] && gb[3] < abRect[1]) {
-                        candidateItems.push(pItem);
-                    }
-                }
-            }
-        }
-
-        // 1. Recursive group-based detection
-        for (var g = 0; g < candidateItems.length; g++) {
-            extractCardsFromItem(candidateItems[g], cardUnits);
-        }
-
-        // 2. Proximity-based detection fallback
-        if (cardUnits.length === 0) {
-            var allTFs = [];
-            collectTextFrames(candidateItems, allTFs);
-            var filteredTFs = [];
-            for (var t = 0; t < allTFs.length; t++) {
-                var tf = allTFs[t];
-                if (isItemHidden(tf)) continue;
-                if (isBackSideText(tf.contents)) continue; // STRICT: Never consider back-side text
-                if (tf.contents.length > 500 || tf.lines.length > 15) continue;
-                filteredTFs.push(tf);
-            }
-            if (filteredTFs.length >= 2) {
-                cardUnits = clusterProximityCards(filteredTFs);
-            }
-        }
-
-        // 3. Tag artboardIndex and exclude items floating on pasteboard outside any artboard
-        var validCards = [];
-        for (var c = 0; c < cardUnits.length; c++) {
-            var cd = cardUnits[c];
-            var midX = (cd.bounds[0] + cd.bounds[2]) / 2;
-            var midY = (cd.bounds[1] + cd.bounds[3]) / 2;
-            cd.artboardIndex = 0;
-            var isOnArtboard = false;
-            for (var a = 0; a < doc.artboards.length; a++) {
-                var r = doc.artboards[a].artboardRect;
-                if (midX >= r[0] && midX <= r[2] && midY <= r[1] && midY >= r[3]) {
-                    cd.artboardIndex = a;
-                    isOnArtboard = true;
-                    break;
-                }
-            }
-            if (scope === "selection" || isOnArtboard) {
-                validCards.push(cd);
-            }
-        }
-
-        return validCards;
-    }
-
-    function extractCardsFromItem(item, outCards) {
-        if (!item || isItemHidden(item)) return;
-
-        if (item.typename === "GroupItem") {
-            var tfs = [];
-            collectTextFrames(item.pageItems, tfs);
-            if (tfs.length === 0) return;
-
-            var hasBack = false;
-            var hasBio = false;
-            var personCount = 0;
-
-            for (var t = 0; t < tfs.length; t++) {
-                var cTxt = tfs[t].contents;
-                if (isBackSideText(cTxt)) {
-                    hasBack = true;
-                }
-                if (hasStudentBiodata(cTxt)) {
-                    hasBio = true;
-                    personCount++;
-                }
-            }
-
-            // STRICT: If this group is a BACK-SIDE design (e.g. দাওরায়ে হাদীস সমাপনী স্মৃতি, হিফজ সমাপনী, etc.)
-            // and contains NO student biodata, it must NEVER be detected as a card!
-            if (hasBack && !hasBio) {
-                return; // DO NOT DETECT BACK-SIDE TEMPLATES!
-            }
-
-            // If this group contains multiple cards (e.g. column or grid of cards grouped together):
-            if (personCount > 1) {
-                for (var c = 0; c < item.pageItems.length; c++) {
-                    extractCardsFromItem(item.pageItems[c], outCards);
-                }
-                return;
-            }
-
-            // Otherwise, analyze this group as a potential single card
-            if (tfs.length >= 1) {
-                var card = analyzeCardGroup(tfs, item);
-                if (card.nameFrame || card.namePlaceholderPath) {
-                    card.group = item;
-                    card.bounds = item.geometricBounds;
-                    outCards.push(card);
-                    return;
-                }
-            }
-
-            // If not recognized directly, drill down into child groups
-            for (var k = 0; k < item.pageItems.length; k++) {
-                if (item.pageItems[k].typename === "GroupItem") {
-                    extractCardsFromItem(item.pageItems[k], outCards);
-                }
-            }
-        }
-    }
-
-    function analyzeCardGroup(tfs, group) {
-        var card = { nameFrame: null, detailsFrame: null, baniFrame: null, qtyFrame: null, badgeFrame: null, badgeNumber: -1 };
-        var candidateFrames = [];
-
-        for (var i = 0; i < tfs.length; i++) {
-            var tf = tfs[i];
-            if (isItemHidden(tf)) continue; // STRICT: Ignore hidden items
-            var rawTxt = tf.contents;
-            var cleanTxt = rawTxt.replace(/\s+/g, "");
-            var num = bengaliToInt(cleanTxt);
-
-            // 1. Qty / Pcs frame: small numeric frame (e.g. "10", "২০", "15")
-            if (cleanTxt.length <= 4 && num > 0 && tf.width < 45 && tf.height < 30) {
-                if (!card.qtyFrame) card.qtyFrame = tf;
-                else card.badgeFrame = tf;
-                card.badgeNumber = num;
-                continue;
-            }
-
-            // 2. Title / Memorabilia / Back-side frame (STRICT: "দাওরায়ে হাদীস সমাপনী স্মৃতি", "হিফজ সমাপনী", etc.)
-            if (isBackSideText(rawTxt) || /(?:দাওরায়ে|মাস্টার্স|স্মৃতি|সমাপনী|হিফ[জয]|তাকমীল|দস্তারবন্দী|বিদায়ী|স্মারক)/.test(rawTxt)) {
-                if (rawTxt.length < 90) {
-                    continue;
-                }
-            }
-
-            // 3. Madrasa / Institution name frame
-            if (/gv`vwim|gv`ivmv|mZxNvUv|মাদ্রাসা|মাদরাসা|মারকায|জামিয়া|ইনস্টিটিউট|বিদ্যালয়|স্কুল|কলেজ/.test(rawTxt)) {
-                continue;
-            }
-
-            // 4. Design label (e.g. "ডিজাইন ১", "ডিজাইন ২", "Tapper Round")
-            if (/^ডিজাইন\s*[০-৯0-9]+/i.test(rawTxt) || /^(?:Tapper|Round|Design)/i.test(rawTxt)) {
-                continue;
-            }
-
-            candidateFrames.push(tf);
-        }
-
-        // USER RULE: "name er jayga ar banir jaygay kono fill color thakbe na oi jayga gulo te data gula bosbe"
-        // In card templates, Name sits at the TOP (higher Y), Bani sits at the BOTTOM (lower Y).
-        // Sort candidate frames by Y coordinate descending (top-to-bottom):
-        candidateFrames.sort(function(a, b) {
-            return b.geometricBounds[1] - a.geometricBounds[1];
+        return JSON.stringify({
+            status: "success",
+            filledCount: filledCount,
+            totalCards: targetCards.length,
+            totalEntries: entries.length,
+            nextStartIndex: startIndex + filledCount
         });
+    },
 
-        // Check for explicit "বাণী" in candidate frames
-        var explicitBaniIdx = -1;
-        for (var b = 0; b < candidateFrames.length; b++) {
-            if (/[ব][া][ণন][ী]/.test(candidateFrames[b].contents) || /^[ব][া][ণন][ী]/i.test(candidateFrames[b].contents.replace(/\s+/g, ""))) {
-                explicitBaniIdx = b;
-                break;
-            }
-        }
+    function openWebUrl(url) {
+    try {
+        var isMac = (File.fs === "Macintosh" || (typeof $.os !== "undefined" && $.os.indexOf("Mac") !== -1));
+        if (isMac) {
+            try {
+                var webloc = new File(Folder.temp.fsName + "/open_link.webloc");
+                webloc.open("w");
+                webloc.write('<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<dict>\n\t<key>URL</key>\n\t<string>' + url + '</string>\n</dict>\n</plist>');
+                webloc.close();
+                webloc.execute();
+            } catch (err1) {}
 
-        var explicitBioIdx = -1;
-        for (var bio = 0; bio < candidateFrames.length; bio++) {
-            if (hasStudentBiodata(candidateFrames[bio].contents)) {
-                explicitBioIdx = bio;
-                break;
-            }
-        }
-
-        if (candidateFrames.length === 1) {
-            card.nameFrame = candidateFrames[0];
-        } else if (candidateFrames.length === 2) {
-            if (explicitBaniIdx === 0 && explicitBioIdx === 1) {
-                card.baniFrame = candidateFrames[0];
-                card.nameFrame = candidateFrames[1];
-            } else if (explicitBaniIdx === 1) {
-                card.nameFrame = candidateFrames[0];
-                card.baniFrame = candidateFrames[1];
-            } else {
-                card.nameFrame = candidateFrames[0]; // Top = Name
-                card.baniFrame = candidateFrames[1]; // Bottom = Bani
-            }
-        } else if (candidateFrames.length >= 3) {
-            if (explicitBaniIdx !== -1) {
-                card.baniFrame = candidateFrames[explicitBaniIdx];
-                var rest = [];
-                for (var r = 0; r < candidateFrames.length; r++) {
-                    if (r !== explicitBaniIdx) rest.push(candidateFrames[r]);
+            try {
+                if (typeof app.system === "function") {
+                    app.system('/usr/bin/open "' + url + '"');
                 }
-                card.nameFrame = rest[0];
-                if (rest.length > 1) card.detailsFrame = rest[1];
-            } else {
-                card.nameFrame = candidateFrames[0]; // Top = Name
-                card.detailsFrame = candidateFrames[1]; // Middle = Details
-                card.baniFrame = candidateFrames[candidateFrames.length - 1]; // Bottom = Bani
-            }
-        }
-
-        // Fallback: If no textframes for Name/Bani found, check for unfilled PathItems (transparent placeholder boxes)
-        if (!card.nameFrame && group && group.pageItems) {
-            var noFillPaths = [];
-            for (var p = 0; p < group.pageItems.length; p++) {
-                var pi = group.pageItems[p];
-                if (isItemHidden(pi)) continue;
-                if (pi.typename === "PathItem") {
-                    var isF = false;
-                    try { isF = pi.filled; } catch(e) {}
-                    if (!isF && pi.width > 40 && pi.height > 10) {
-                        noFillPaths.push(pi);
-                    }
-                }
-            }
-            if (noFillPaths.length > 0) {
-                noFillPaths.sort(function(a, b) {
-                    return b.geometricBounds[1] - a.geometricBounds[1];
-                });
-                card.namePlaceholderPath = noFillPaths[0];
-                if (noFillPaths.length > 1) {
-                    card.baniPlaceholderPath = noFillPaths[noFillPaths.length - 1];
-                }
-            }
-        }
-
-        return card;
-    }
-
-    function clusterProximityCards(allTFs) {
-        var infoList = [];
-        for (var j = 0; j < allTFs.length; j++) {
-            var itf = allTFs[j];
-            if (isItemHidden(itf)) continue; // STRICT: Ignore hidden items
-            var txt = itf.contents;
-            var width = itf.geometricBounds[2] - itf.geometricBounds[0];
-
-            // NEVER treat back-side text as student info frame!
-            if (isBackSideText(txt)) continue;
-            if (/[ব][া][ণন][ী]/.test(txt)) continue;
-            if (/^[০-৯0-9]{1,4}$/.test(txt.replace(/\s+/g, ''))) continue;
-            if (txt.indexOf("হিফজুল") !== -1 || txt.indexOf("সমাপনী") !== -1 || txt.indexOf("স্মৃতি") !== -1 || width < 40) continue;
-
-            if (hasStudentBiodata(txt) || itf.lines.length >= 2 || txt.indexOf("পিতা:") !== -1 || txt.indexOf("হাফেজ") !== -1 || txt.indexOf("মো:") !== -1) {
-                infoList.push(itf);
-            }
-        }
-
-        var cards = [];
-        for (var k = 0; k < infoList.length; k++) {
-            var infoTF = infoList[k];
-            var igb = infoTF.geometricBounds;
-            var infoTop = igb[1];
-            var infoLeft = igb[0];
-
-            var card = {
-                nameFrame: infoTF,
-                detailsFrame: null,
-                baniFrame: null,
-                qtyFrame: null,
-                badgeFrame: null,
-                badgeNumber: -1,
-                bounds: [igb[0] - 50, igb[1] + 20, igb[2] + 80, igb[3] - 40]
-            };
-
-            for (var m = 0; m < allTFs.length; m++) {
-                var cand = allTFs[m];
-                if (cand === infoTF || isItemHidden(cand)) continue;
-                var cgb = cand.geometricBounds;
-                var dy = infoTop - cgb[1];
-                var dx = cgb[0] - infoLeft;
-
-                if (dy >= -30 && dy <= 90 && dx >= -60 && dx <= 140) {
-                    var ctxt = cand.contents.replace(/^\s+|\s+$/g, '');
-                    if (isBackSideText(ctxt)) continue; // STRICT: Never treat back-side text as bani/qty
-                    if (/[ব][া][ণন][ী]/.test(ctxt)) {
-                        card.baniFrame = cand;
-                    } else if (/^[০-৯0-9]{1,4}$/.test(ctxt)) {
-                        card.qtyFrame = cand;
-                    } else if (ctxt.indexOf("হিফজুল") !== -1 || ctxt.indexOf("সমাপনী") !== -1 || ctxt.indexOf("স্মৃতি") !== -1) {
-                        card.badgeFrame = cand;
-                    }
-                }
-            }
-            cards.push(card);
-        }
-
-        return cards;
-    }
-
-    function applyBoldFont(textRangeOrFrame) {
-        try {
-            var tr = textRangeOrFrame.textRange ? textRangeOrFrame.textRange : textRangeOrFrame;
-            if (!tr || !tr.characterAttributes) return;
-            var currFont = tr.characterAttributes.textFont;
-            if (!currFont) return;
-            if (/bold|bl/i.test(currFont.name) || /bold|bl/i.test(currFont.style)) return;
-            for (var i = 0; i < app.textFonts.length; i++) {
-                var f = app.textFonts[i];
-                if (f.family === currFont.family && /bold|semibold|demi/i.test(f.style)) {
-                    tr.characterAttributes.textFont = f;
-                    return;
-                }
-            }
-        } catch (e) {}
-    }
-
-    function applyRegularFont(textRangeOrFrame) {
-        try {
-            var tr = textRangeOrFrame.textRange ? textRangeOrFrame.textRange : textRangeOrFrame;
-            if (!tr || !tr.characterAttributes) return;
-            var currFont = tr.characterAttributes.textFont;
-            if (!currFont) return;
-            if (/regular|normal/i.test(currFont.name) || /regular|normal/i.test(currFont.style)) return;
-
-            var doc = app.activeDocument;
-            for (var i = 0; i < doc.textFrames.length; i++) {
-                var tf = doc.textFrames[i];
-                for (var c = 0; c < Math.min(tf.characters.length, 15); c++) {
-                    var f = tf.characters[c].textFont;
-                    if (f && f.family === currFont.family && /regular|normal/i.test(f.style || f.name)) {
-                        tr.characterAttributes.textFont = f;
-                        return;
-                    }
-                }
-            }
-        } catch (e) {}
-    }
-
-    
-    function hexToColor(hex, isCMYK) {
-        if (!hex) return null;
-        hex = hex.replace(/[^0-9A-Fa-f]/g, "");
-        if (hex.length === 3) hex = hex.charAt(0)+hex.charAt(0) + hex.charAt(1)+hex.charAt(1) + hex.charAt(2)+hex.charAt(2);
-        if (hex.length !== 6) return null;
-        var r = parseInt(hex.substring(0, 2), 16);
-        var g = parseInt(hex.substring(2, 4), 16);
-        var b = parseInt(hex.substring(4, 6), 16);
-        if (isCMYK) {
-            var rN = r / 255, gN = g / 255, bN = b / 255;
-            var k = 1 - Math.max(rN, Math.max(gN, bN));
-            var c = 0, m = 0, y = 0;
-            if (k < 1) {
-                c = (1 - rN - k) / (1 - k);
-                m = (1 - gN - k) / (1 - k);
-                y = (1 - bN - k) / (1 - k);
-            }
-            var cmyk = new CMYKColor();
-            cmyk.cyan = Math.round(c * 100);
-            cmyk.magenta = Math.round(m * 100);
-            cmyk.yellow = Math.round(y * 100);
-            cmyk.black = Math.round(k * 100);
-            return cmyk;
+            } catch (err2) {}
         } else {
-            var rgb = new RGBColor();
-            rgb.red = r; rgb.green = g; rgb.blue = b;
-            return rgb;
-        }
-    }
+            try {
+                var urlFile = new File(Folder.temp.fsName + "/open_link.url");
+                urlFile.open("w");
+                urlFile.write('[InternetShortcut]\r\nURL=' + url + '\r\n');
+                urlFile.close();
+                urlFile.execute();
+            } catch (err3) {}
 
-    win.show();
-})();
+            try {
+                if (typeof app.system === "function") {
+                    app.system('cmd.exe /c start "" "' + url + '"');
+                }
+            } catch (err4) {}
+        }
+    } catch (e) {}
+}
+
+function getSelectedCanvasText() {
+    return CardAutoFiller.getSelectedCanvasText();
+}
+
+function populateCards(payloadJson) {
+    return CardAutoFiller.populateCards(payloadJson);
+}
+
+function placeTextBlocksIntoCards(payloadJson) {
+    return CardAutoFiller.placeTextBlocksIntoCards(payloadJson);
+}
+
+function renumberBadges(payloadJson) {
+    return CardAutoFiller.renumberBadges(payloadJson);
+}
+
+function duplicateCardTemplates(payloadJson) {
+    return CardAutoFiller.duplicateCardTemplates(payloadJson);
+}
+
+
+function getSelectionCardSize() {
+    if (!app.documents.length) return JSON.stringify({ status: "error", message: "No document open." });
+    var doc = app.activeDocument;
+    var sel = doc.selection;
+    if (!sel || !sel.length) return JSON.stringify({ status: "error", message: "Select a card first." });
+    var item = sel[0];
+    var acc = CardAutoFiller.getAccurateCardBounds(item);
+    return JSON.stringify({
+        status: "success",
+        width: Math.round(acc.width * 10) / 10,
+        height: Math.round(acc.height * 10) / 10
+    });
+}
+
+
+function detectCards(scope) {
+    var cards = CardAutoFiller.detectCards(scope);
+    return JSON.stringify({
+        status: "success",
+        count: cards.length
+    });
+}

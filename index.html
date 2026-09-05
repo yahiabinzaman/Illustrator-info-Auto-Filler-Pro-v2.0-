@@ -260,7 +260,8 @@ Example:
                 <div class="control-group">
                     <label for="selectSerialFormatDiary">Serial Format</label>
                     <select id="selectSerialFormatDiary">
-                        <option value="bn_dot" selected>১. নাম (Bangla 1. Name)</option>
+                        <option value="standalone" selected>Top Corner Box (১১৯ - উপরের ঘরে)</option>
+                        <option value="bn_dot">১. নাম (Bangla 1. Name)</option>
                         <option value="bn_bracket">১) নাম (Bangla 1) Name)</option>
                         <option value="bn_dash">১ - নাম (Bangla 1 - Name)</option>
                         <option value="en_dot">1. Name (English 1. Name)</option>
@@ -381,6 +382,10 @@ Example:
             </div>
 
             <div class="checkbox-list" style="margin-top: 6px;">
+                                <label class="checkbox-label" style="color: #6edcb5; font-weight: bold;">
+                    <input type="checkbox" id="chkSingleColorDiary" checked>
+                    <span>সব লেখা একই কালো কালার (Single Unified Black Color)</span>
+                </label>
                 <label class="checkbox-label">
                     <input type="checkbox" id="chkIncludeDetailsDiary" checked>
                     <span>পিতা ও ঠিকানা অন্তর্ভুক্ত করো (Include Father & Address)</span>

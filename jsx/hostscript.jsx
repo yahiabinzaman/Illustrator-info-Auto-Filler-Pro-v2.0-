@@ -255,21 +255,21 @@ var CardAutoFiller = {
     isItemHidden: function(item) {
         if (!item) return true;
         try {
-            if (item.hidden) return true;
+            if (item.hidden || item.locked) return true;
         } catch(e) {}
         try {
             var cur = item;
             while (cur) {
                 if (cur.typename === "Layer") {
-                    if (!cur.visible) return true;
+                    if (!cur.visible || cur.locked) return true;
                     var pLayer = cur.parent;
                     while (pLayer && pLayer.typename === "Layer") {
-                        if (!pLayer.visible) return true;
+                        if (!pLayer.visible || pLayer.locked) return true;
                         pLayer = pLayer.parent;
                     }
                     break;
                 }
-                if (cur.hidden) return true;
+                if (cur.hidden || cur.locked) return true;
                 cur = cur.parent;
             }
         } catch(e) {}
@@ -496,37 +496,78 @@ var CardAutoFiller = {
     },
 
     analyzeCardGroup: function(tfs, group) {
-        var card = { nameFrame: null, detailsFrame: null, baniFrame: null, qtyFrame: null, badgeFrame: null, badgeNumber: -1 };
+        var card = {
+            nameFrame: null,
+            detailsFrame: null,
+            baniFrame: null,
+            qtyFrame: null,
+            badgeFrame: null,
+            serialFrame: null,
+            formFrame: null,
+            badgeNumber: -1
+        };
         var candidateFrames = [];
+
+        var groupBounds = group ? group.geometricBounds : null;
+        var groupTop = groupBounds ? groupBounds[1] : 0;
+        var groupBottom = groupBounds ? groupBounds[3] : 0;
+        var groupLeft = groupBounds ? groupBounds[0] : 0;
+        var groupRight = groupBounds ? groupBounds[2] : 0;
+        var groupWidth = groupBounds ? (groupRight - groupLeft) : 0;
+        var groupHeight = groupBounds ? (groupTop - groupBottom) : 0;
 
         for (var i = 0; i < tfs.length; i++) {
             var tf = tfs[i];
-            if (this.isItemHidden(tf)) continue; // STRICT: Ignore hidden items
+            if (this.isItemHidden(tf)) continue; // STRICT: Ignore locked & hidden items
             var rawTxt = tf.contents;
             var cleanTxt = rawTxt.replace(/\s+/g, "");
             var num = this.bengaliToInt(cleanTxt);
+            var gb = tf.geometricBounds;
+            var tfW = Math.abs(gb[2] - gb[0]);
+            var tfH = Math.abs(gb[1] - gb[3]);
 
-            // 1. Qty / Pcs frame: small numeric frame (e.g. "10", "২০", "15")
-            if (cleanTxt.length <= 4 && num > 0 && tf.width < 45 && tf.height < 30) {
-                if (!card.qtyFrame) card.qtyFrame = tf;
-                else card.badgeFrame = tf;
-                card.badgeNumber = num;
+            // Form number frame (e.g. contains "ফরম", "দাখেলা", "রোল", "Form" or sits near bottom-right)
+            if (/(?:ফরম|দাখেলা|রোল|Form|Roll)/i.test(rawTxt)) {
+                card.formFrame = tf;
                 continue;
             }
 
-            // 2. Title / Memorabilia / Back-side frame (STRICT: "দাওরায়ে হাদীস সমাপনী স্মৃতি", "হিফজ সমাপনী", etc.)
+            // Top corner serial/badge frame (e.g. "১১৯", "169", "১০", "10", "--" or top corner small box)
+            var isTopCorner = false;
+            if (groupBounds && groupHeight > 0) {
+                var relY = (groupTop - gb[1]);
+                var relX = (gb[0] - groupLeft);
+                if (relY < groupHeight * 0.40 && (relX > groupWidth * 0.55 || relX < groupWidth * 0.35) && tfW < 70 && tfH < 45) {
+                    isTopCorner = true;
+                }
+            }
+
+            if ((cleanTxt.length <= 5 && num > 0 && tfW < 55 && tfH < 35) || isTopCorner) {
+                if (!card.serialFrame) {
+                    card.serialFrame = tf;
+                    card.badgeFrame = tf;
+                    card.badgeNumber = num > 0 ? num : -1;
+                } else if (!card.qtyFrame) {
+                    card.qtyFrame = tf;
+                } else {
+                    candidateFrames.push(tf);
+                }
+                continue;
+            }
+
+            // Title / Memorabilia / Back-side frame
             if (this.isBackSideText(rawTxt) || /(?:দাওরায়ে|মাস্টার্স|স্মৃতি|সমাপনী|হিফ[জয]|তাকমীল|দস্তারবন্দী|বিদায়ী|স্মারক)/.test(rawTxt)) {
                 if (rawTxt.length < 90) {
                     continue;
                 }
             }
 
-            // 3. Madrasa / Institution name frame
+            // Institution name frame
             if (/gv`vwim|gv`ivmv|mZxNvUv|মাদ্রাসা|মাদরাসা|মারকায|জামিয়া|ইনস্টিটিউট|বিদ্যালয়|স্কুল|কলেজ/.test(rawTxt)) {
                 continue;
             }
 
-            // 4. Design label (e.g. "ডিজাইন ১", "ডিজাইন ২", "Tapper Round")
+            // Design label
             if (/^ডিজাইন\s*[০-৯0-9]+/i.test(rawTxt) || /^(?:Tapper|Round|Design)/i.test(rawTxt)) {
                 continue;
             }
@@ -534,8 +575,6 @@ var CardAutoFiller = {
             candidateFrames.push(tf);
         }
 
-        // USER RULE: "name er jayga ar banir jaygay kono fill color thakbe na oi jayga gulo te data gula bosbe"
-        // In card templates, Name sits at the TOP (higher Y), Bani sits at the BOTTOM (lower Y).
         // Sort candidate frames by Y coordinate descending (top-to-bottom):
         candidateFrames.sort(function(a, b) {
             return b.geometricBounds[1] - a.geometricBounds[1];
@@ -544,57 +583,13 @@ var CardAutoFiller = {
         if (candidateFrames.length === 1) {
             card.nameFrame = candidateFrames[0];
         } else if (candidateFrames.length === 2) {
-            // STRICT GEOMETRY:
-            // Topmost (candidateFrames[0]) is ALWAYS Name!
-            // Bottommost (candidateFrames[1]) is ALWAYS Bani!
             card.nameFrame = candidateFrames[0];
+            card.detailsFrame = candidateFrames[1];
             card.baniFrame = candidateFrames[1];
         } else if (candidateFrames.length >= 3) {
-            var explicitBaniIdx = -1;
-            for (var b = 0; b < candidateFrames.length; b++) {
-                if (this.baniRegex.test(candidateFrames[b].contents) || /^[ব][া][ণন][ী]/i.test(candidateFrames[b].contents.replace(/\s+/g, ""))) {
-                    explicitBaniIdx = b;
-                    break;
-                }
-            }
-            if (explicitBaniIdx !== -1) {
-                card.baniFrame = candidateFrames[explicitBaniIdx];
-                var rest = [];
-                for (var r = 0; r < candidateFrames.length; r++) {
-                    if (r !== explicitBaniIdx) rest.push(candidateFrames[r]);
-                }
-                card.nameFrame = rest[0]; // Top = Name
-                if (rest.length > 1) card.detailsFrame = rest[1]; // Next = Details
-            } else {
-                card.nameFrame = candidateFrames[0]; // Top = Name
-                card.detailsFrame = candidateFrames[1]; // Middle = Details
-                card.baniFrame = candidateFrames[candidateFrames.length - 1]; // Bottom = Bani
-            }
-        }
-
-        // Fallback: If no textframes for Name/Bani found, check for unfilled PathItems (transparent placeholder boxes)
-        if (!card.nameFrame && group && group.pageItems) {
-            var noFillPaths = [];
-            for (var p = 0; p < group.pageItems.length; p++) {
-                var pi = group.pageItems[p];
-                if (this.isItemHidden(pi)) continue;
-                if (pi.typename === "PathItem") {
-                    var isF = false;
-                    try { isF = pi.filled; } catch(e) {}
-                    if (!isF && pi.width > 40 && pi.height > 10) {
-                        noFillPaths.push(pi);
-                    }
-                }
-            }
-            if (noFillPaths.length > 0) {
-                noFillPaths.sort(function(a, b) {
-                    return b.geometricBounds[1] - a.geometricBounds[1];
-                });
-                card.namePlaceholderPath = noFillPaths[0]; // Top = Name
-                if (noFillPaths.length > 1) {
-                    card.baniPlaceholderPath = noFillPaths[noFillPaths.length - 1]; // Bottom = Bani
-                }
-            }
+            card.nameFrame = candidateFrames[0];
+            card.detailsFrame = candidateFrames[1];
+            card.baniFrame = candidateFrames[2];
         }
 
         return card;
@@ -1281,9 +1276,8 @@ var CardAutoFiller = {
         var scope = payload.scope || "artboard";
         var order = payload.order || "column";
         var makeBold = payload.makeBold !== false;
-        var fillBani = payload.fillBani !== false;
-        var fillQty = payload.fillQty !== false;
-        var qtyFormat = payload.qtyFormat || "auto";
+        var fillBani = payload.fillBani === true;
+        var isSingleColor = payload.singleColor === true;
         var skipFilledCards = payload.skipFilledCards !== false;
         var startIndex = parseInt(payload.startIndex, 10) || 0;
 
@@ -1303,7 +1297,7 @@ var CardAutoFiller = {
         if (!cards.length) {
             return JSON.stringify({
                 status: "error",
-                message: "No card templates detected. Make sure your cards are visible on the artboard."
+                message: "No card templates detected. Make sure your cards are visible and unlocked."
             });
         }
 
@@ -1412,13 +1406,6 @@ var CardAutoFiller = {
                 } catch(le) {}
             }
 
-            if (!docBaniLeading && cCard.baniFrame && cCard.baniFrame.characters.length > 0) {
-                try {
-                    var bl = cCard.baniFrame.characters[0].characterAttributes.leading;
-                    if (bl > 0) docBaniLeading = bl;
-                } catch(be) {}
-            }
-
             if (docBoldFont && docRegularFont && docNameColor && docDetailsLeading && docNameLeading) break;
         }
 
@@ -1426,24 +1413,15 @@ var CardAutoFiller = {
         if (!docBoldFont) docBoldFont = bornomalaPair.bold;
         if (!docRegularFont) docRegularFont = bornomalaPair.regular;
 
-        if (!docNameColor) {
-            try {
-                var sw = doc.swatches.getByName("C=0 M=87 Y=100 K=38");
-                if (sw) docNameColor = sw.color;
-            } catch(e) {}
-        }
-        if (!docNameColor) {
-            var cmykBrown = new CMYKColor();
-            cmykBrown.cyan = 0; cmykBrown.magenta = 87; cmykBrown.yellow = 100; cmykBrown.black = 38;
-            docNameColor = cmykBrown;
-        }
-
         var solidBlackCMYK = new CMYKColor();
         solidBlackCMYK.cyan = 0; solidBlackCMYK.magenta = 0; solidBlackCMYK.yellow = 0; solidBlackCMYK.black = 100;
 
+        var solidWhiteCMYK = new CMYKColor();
+        solidWhiteCMYK.cyan = 0; solidWhiteCMYK.magenta = 0; solidWhiteCMYK.yellow = 0; solidWhiteCMYK.black = 0;
+
         var isCMYK = (doc.documentColorSpace === DocumentColorSpace.CMYK);
         var userChosenColor = null;
-        if (payload.nameColor) {
+        if (payload.nameColor && payload.nameColor !== "#000000" && payload.nameColor !== "#000" && !isSingleColor) {
             try {
                 var sw = doc.swatches.getByName(payload.nameColor);
                 if (sw) userChosenColor = sw.color;
@@ -1453,7 +1431,9 @@ var CardAutoFiller = {
                 userChosenColor = this.hexToColor(payload.nameColor, isCMYK);
             }
         }
-        var finalNameColor = userChosenColor || docNameColor;
+
+        var finalNameColor = (isSingleColor || payload.nameColor === "#000000") ? solidBlackCMYK : (userChosenColor || docNameColor || solidBlackCMYK);
+        var finalDetailsColor = solidBlackCMYK;
 
         var filledCount = 0;
         var fillLimit = Math.min(targetCards.length, activeEntries.length);
@@ -1461,61 +1441,108 @@ var CardAutoFiller = {
         for (var i = 0; i < fillLimit; i++) {
             var card = targetCards[i];
             var entry = activeEntries[i];
-            try {
-                if (!card.nameFrame && card.namePlaceholderPath) {
-                    var pgb = card.namePlaceholderPath.geometricBounds;
-                    card.nameFrame = doc.textFrames.pointText([pgb[0] + 4, pgb[1] - 4]);
-                }
-                if (!card.baniFrame && card.baniPlaceholderPath) {
-                    var bgb = card.baniPlaceholderPath.geometricBounds;
-                    card.baniFrame = doc.textFrames.pointText([bgb[0] + 4, bgb[1] - 4]);
-                }
-            } catch(e) {}
 
-            // Extract this specific card's own leading BEFORE modifying contents
             var thisCardDetailsLeading = null;
             var thisCardNameLeading = null;
-            var thisCardBaniLeading = null;
-
             try {
-                if (card.detailsFrame && card.detailsFrame.characters.length > 0) {
-                    var l0 = card.detailsFrame.characters[0].characterAttributes.leading;
-                    if (l0 > 0) thisCardDetailsLeading = l0;
-                }
                 if (card.nameFrame && card.nameFrame.characters.length > 0) {
-                    if (card.nameFrame.paragraphs.length > 0 && card.nameFrame.paragraphs[0].characters.length > 0) {
-                        var nl0 = card.nameFrame.paragraphs[0].characters[0].characterAttributes.leading;
-                        if (nl0 > 0) thisCardNameLeading = nl0;
-                    }
-                    if (!thisCardDetailsLeading && card.nameFrame.paragraphs.length > 1 && card.nameFrame.paragraphs[1].characters.length > 0) {
-                        var dl0 = card.nameFrame.paragraphs[1].characters[0].characterAttributes.leading;
-                        if (dl0 > 0) thisCardDetailsLeading = dl0;
+                    var l0 = card.nameFrame.paragraphs[0].characters[0].characterAttributes.leading;
+                    if (l0 > 0) thisCardNameLeading = l0;
+                    if (card.nameFrame.paragraphs.length > 1 && card.nameFrame.paragraphs[1].characters.length > 0) {
+                        var l1 = card.nameFrame.paragraphs[1].characters[0].characterAttributes.leading;
+                        if (l1 > 0) thisCardDetailsLeading = l1;
                     }
                 }
-                if (card.baniFrame && card.baniFrame.characters.length > 0) {
-                    var bl0 = card.baniFrame.characters[0].characterAttributes.leading;
-                    if (bl0 > 0) thisCardBaniLeading = bl0;
+                if (card.detailsFrame && card.detailsFrame.characters.length > 0) {
+                    var dl0 = card.detailsFrame.characters[0].characterAttributes.leading;
+                    if (dl0 > 0) thisCardDetailsLeading = dl0;
                 }
             } catch(e) {}
 
-            var finalDetailsLeading = hasCustomDetailsLeading ? userDetailsLeading : (thisCardDetailsLeading || docDetailsLeading || 9.6);
-            var finalNameLeading = hasCustomNameLeading ? userNameLeading : (thisCardNameLeading || docNameLeading || finalDetailsLeading || 10);
-            var finalBaniLeading = thisCardBaniLeading || docBaniLeading || 6.1279;
+            var finalNameLeading = hasCustomNameLeading ? userNameLeading : (thisCardNameLeading || docNameLeading || 10.5);
+            var finalDetailsLeading = hasCustomDetailsLeading ? userDetailsLeading : (thisCardDetailsLeading || docDetailsLeading || 8.75);
 
+            var cardBaseFont = null;
+            try {
+                if (card.nameFrame && card.nameFrame.characters.length > 0) cardBaseFont = card.nameFrame.characters[0].characterAttributes.textFont;
+            } catch(e) {}
+            if (!cardBaseFont) cardBaseFont = docBoldFont || docRegularFont;
+
+            var fontPair = this.getFamilyFonts(cardBaseFont);
+            var cardBoldFont = fontPair.bold || docBoldFont;
+            var cardRegularFont = fontPair.regular || docRegularFont;
+
+            // 1. POPULATE SERIAL / KROMIK (Top corner frame or badge)
+            if (card.serialFrame && entry.serial) {
+                try {
+                    // Check if existing character has fill color (e.g. white on dark pill)
+                    var existingSerialColor = null;
+                    try {
+                        if (card.serialFrame.characters.length > 0) {
+                            var sc = card.serialFrame.characters[0].characterAttributes.fillColor;
+                            if (sc && sc.typename !== "NoColor") {
+                                existingSerialColor = sc;
+                            }
+                        }
+                    } catch(scErr) {}
+
+                    // Check if sitting on top of a dark shape
+                    var isDarkPill = false;
+                    try {
+                        if (card.group) {
+                            var sgb = card.serialFrame.geometricBounds;
+                            for (var p = 0; p < card.group.pageItems.length; p++) {
+                                var pi = card.group.pageItems[p];
+                                if (pi.typename === "PathItem" && pi.filled) {
+                                    var pgb = pi.geometricBounds;
+                                    if (pgb[0] <= sgb[0] + 8 && pgb[2] >= sgb[2] - 8 && pgb[1] >= sgb[1] - 8 && pgb[3] <= sgb[3] + 8) {
+                                        var pfc = pi.fillColor;
+                                        if (pfc && (pfc.typename === "SpotColor" || (pfc.typename === "CMYKColor" && (pfc.black > 40 || pfc.cyan > 40 || pfc.magenta > 40)))) {
+                                            isDarkPill = true;
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    } catch(dpErr) {}
+
+                    var finalSerialColor = existingSerialColor || (isDarkPill ? solidWhiteCMYK : solidBlackCMYK);
+                    card.serialFrame.contents = entry.serial;
+                    if (cardBoldFont) card.serialFrame.textRange.characterAttributes.textFont = cardBoldFont;
+                    card.serialFrame.textRange.characterAttributes.fillColor = finalSerialColor;
+                } catch(serErr) {}
+            }
+
+            // 2. POPULATE FORM NUMBER
+            var formHandled = false;
+            if (card.formFrame && entry.formNumber) {
+                try {
+                    card.formFrame.contents = entry.formNumber;
+                    if (cardRegularFont) card.formFrame.textRange.characterAttributes.textFont = cardRegularFont;
+                    card.formFrame.textRange.characterAttributes.size = 7.0;
+                    card.formFrame.textRange.characterAttributes.fillColor = solidBlackCMYK;
+                    formHandled = true;
+                } catch(ffErr) {}
+            }
+
+            // 3. POPULATE NAME & DETAILS
             try {
                 if (card.nameFrame && entry.name) {
-                    var cardBaseFont = null;
-                    try {
-                        try { if (card.nameFrame.characters.length > 0) cardBaseFont = card.nameFrame.characters[0].characterAttributes.textFont; } catch(e) {}
-                    } catch(e) {}
-                    if (!cardBaseFont) cardBaseFont = docBoldFont || docRegularFont;
+                    var cleanName = (entry.name || "").replace(/^\s+|\s+$/g, '');
+                    var cleanDetails = (entry.details || "").replace(/^\s+|\s+$/g, '');
+                    cleanDetails = cleanDetails.replace(/\r\n|\n/g, '\r').replace(/\r{2,}/g, '\r');
 
-                    var fontPair = this.getFamilyFonts(cardBaseFont);
-                    var cardBoldFont = fontPair.bold || docBoldFont;
-                    var cardRegularFont = fontPair.regular || docRegularFont;
+                    // If form number was not placed in a separate frame, append it to details
+                    if (entry.formNumber && !formHandled && cleanDetails) {
+                        cleanDetails += "\r" + entry.formNumber;
+                    } else if (entry.formNumber && !formHandled && !cleanDetails) {
+                        cleanDetails = entry.formNumber;
+                    }
 
                     if (card.detailsFrame) {
-                        card.nameFrame.contents = (entry.name || "").replace(/^\s+|\s+$/g, '');
+                        // Separate Name and Details frames
+                        card.nameFrame.contents = cleanName;
                         try {
                             if (makeBold && cardBoldFont) card.nameFrame.textRange.characterAttributes.textFont = cardBoldFont;
                             card.nameFrame.textRange.characterAttributes.size = 10;
@@ -1523,15 +1550,11 @@ var CardAutoFiller = {
                             card.nameFrame.textRange.characterAttributes.tracking = -14;
                             card.nameFrame.textRange.characterAttributes.horizontalScale = nameHScale;
                             card.nameFrame.textRange.characterAttributes.fillColor = finalNameColor;
-                            try {
-                                card.nameFrame.textRange.paragraphAttributes.spaceBefore = 0;
-                                card.nameFrame.textRange.paragraphAttributes.spaceAfter = 0;
-                            } catch(e) {}
+                            card.nameFrame.textRange.paragraphAttributes.spaceBefore = 0;
+                            card.nameFrame.textRange.paragraphAttributes.spaceAfter = 0;
                         } catch(e) {}
 
-                        if (entry.details) {
-                            var cleanDetails = entry.details.replace(/^\s+|\s+$/g, '');
-                            cleanDetails = cleanDetails.replace(/\r\n|\n/g, '\r').replace(/\r{2,}/g, '\r');
+                        if (cleanDetails) {
                             card.detailsFrame.contents = cleanDetails;
                             try {
                                 if (cardRegularFont) card.detailsFrame.textRange.characterAttributes.textFont = cardRegularFont;
@@ -1539,20 +1562,14 @@ var CardAutoFiller = {
                                 card.detailsFrame.textRange.characterAttributes.leading = finalDetailsLeading;
                                 card.detailsFrame.textRange.characterAttributes.tracking = -15;
                                 card.detailsFrame.textRange.characterAttributes.horizontalScale = detailsHScale;
-                                card.detailsFrame.textRange.characterAttributes.fillColor = solidBlackCMYK;
-                                try {
-                                    card.detailsFrame.textRange.paragraphAttributes.spaceBefore = 0;
-                                    card.detailsFrame.textRange.paragraphAttributes.spaceAfter = 0;
-                                } catch(e) {}
+                                card.detailsFrame.textRange.characterAttributes.fillColor = finalDetailsColor;
+                                card.detailsFrame.textRange.paragraphAttributes.spaceBefore = 0;
+                                card.detailsFrame.textRange.paragraphAttributes.spaceAfter = 0;
                             } catch(e) {}
                         }
                     } else {
-                        var cleanDetails = (entry.details || "").replace(/^\s+|\s+$/g, '');
-                        cleanDetails = cleanDetails.replace(/\r\n|\n/g, '\r').replace(/\r{2,}/g, '\r');
-
-                        var cleanName = (entry.name || "").replace(/^\s+|\s+$/g, '');
+                        // Single combined text frame (Name on line 1, details on lines 2..N)
                         var fullInfo = cleanDetails ? (cleanName + "\r" + cleanDetails) : cleanName;
-
                         card.nameFrame.contents = fullInfo;
 
                         try {
@@ -1571,10 +1588,8 @@ var CardAutoFiller = {
                                 p0.characterAttributes.tracking = -14;
                                 p0.characterAttributes.horizontalScale = nameHScale;
                                 p0.characterAttributes.fillColor = finalNameColor;
-                                try {
-                                    p0.paragraphAttributes.spaceBefore = 0;
-                                    p0.paragraphAttributes.spaceAfter = 0;
-                                } catch(e) {}
+                                p0.paragraphAttributes.spaceBefore = 0;
+                                p0.paragraphAttributes.spaceAfter = 0;
                             }
                         } catch(p0Err) {}
 
@@ -1590,111 +1605,38 @@ var CardAutoFiller = {
                                 para.characterAttributes.leading = finalDetailsLeading;
                                 para.characterAttributes.tracking = -15;
                                 para.characterAttributes.horizontalScale = detailsHScale;
-                                para.characterAttributes.fillColor = solidBlackCMYK;
-                                try {
-                                    para.paragraphAttributes.spaceBefore = 0;
-                                    para.paragraphAttributes.spaceAfter = 0;
-                                } catch(e) {}
+                                para.characterAttributes.fillColor = finalDetailsColor;
+                                para.paragraphAttributes.spaceBefore = 0;
+                                para.paragraphAttributes.spaceAfter = 0;
                             } catch(pe) {}
                         }
                     }
                 }
 
+                // 4. POPULATE BANI (if in keyring mode)
                 if (fillBani && card.baniFrame && entry.bani) {
                     card.baniFrame.contents = entry.bani.replace(/\r\n|\n/g, ' ');
-                    try {
-                        var btf = card.baniFrame;
-                        if (cardBoldFont) btf.textRange.characterAttributes.textFont = cardBoldFont;
-                        btf.textRange.characterAttributes.size = 5;
-                        btf.textRange.characterAttributes.leading = finalBaniLeading;
-                        btf.textRange.characterAttributes.tracking = -15;
-                        // Smart background color check: White on dark shapes, Black on light
-                        var isDarkBg = false;
-                        try {
-                            if (card.group) {
-                                var bgb = btf.geometricBounds;
-                                for (var p = 0; p < card.group.pageItems.length; p++) {
-                                    var pi = card.group.pageItems[p];
-                                    if (pi.typename === "PathItem" && pi.filled) {
-                                        var pgb = pi.geometricBounds;
-                                        if (pgb[0] <= bgb[0] + 10 && pgb[2] >= bgb[2] - 10 && pgb[1] >= bgb[1] - 10 && pgb[3] <= bgb[3] + 10) {
-                                            var fc = pi.fillColor;
-                                            if (fc.typename === "CMYKColor") {
-                                                if (fc.black > 25 || (fc.cyan + fc.magenta > 70)) isDarkBg = true;
-                                            } else if (fc.typename === "RGBColor") {
-                                                if (fc.red < 120 && fc.green < 120 && fc.blue < 120) isDarkBg = true;
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        } catch(bge) {}
-
-                        if (isDarkBg) {
-                            var whiteColor = (doc.documentColorSpace === DocumentColorSpace.CMYK) ? new CMYKColor() : new RGBColor();
-                            if (doc.documentColorSpace === DocumentColorSpace.CMYK) {
-                                whiteColor.cyan = 0; whiteColor.magenta = 0; whiteColor.yellow = 0; whiteColor.black = 0;
-                            } else {
-                                whiteColor.red = 255; whiteColor.green = 255; whiteColor.blue = 255;
-                            }
-                            btf.textRange.characterAttributes.fillColor = whiteColor;
-                        } else {
-                            btf.textRange.characterAttributes.fillColor = solidBlackCMYK;
-                        }
-
-                        if (entry.bani.length > 140 && btf.kind === TextType.AREATEXT) {
-                            btf.textRange.characterAttributes.size = 4.3;
-                            btf.textRange.characterAttributes.leading = 5.2;
-                        }
-                    } catch(be) {}
-                }
-
-                if (fillQty && card.qtyFrame && entry.qty) {
-                    var rawNum = this.bengaliToInt(entry.qty);
-                    if (rawNum > 0) {
-                        var finalQtyStr = "";
-                        if (qtyFormat === "en") {
-                            finalQtyStr = String(rawNum);
-                        } else if (qtyFormat === "bn") {
-                            finalQtyStr = this.intToBengali(rawNum, false);
-                        } else {
-                            var currentQtyText = card.qtyFrame.contents.replace(/\s+/g, '');
-                            if (/[০-৯]/.test(currentQtyText)) {
-                                finalQtyStr = this.intToBengali(rawNum, false);
-                            } else {
-                                finalQtyStr = String(rawNum);
-                            }
-                        }
-                        card.qtyFrame.contents = finalQtyStr;
-                    }
+                    if (cardBoldFont) card.baniFrame.textRange.characterAttributes.textFont = cardBoldFont;
+                    card.baniFrame.textRange.characterAttributes.size = 5;
+                    card.baniFrame.textRange.characterAttributes.leading = 6.1279;
                 }
 
                 filledCount++;
-            } catch (cardError) {}
+            } catch(cardErr) {}
         }
 
-        app.redraw();
-
-        var nextIndex = startIndex + filledCount;
-        var remaining = entries.length - nextIndex;
-        var msg = "Successfully populated " + filledCount + " card(s)!";
-        if (remaining > 0) {
-            msg += " (" + remaining + " remaining in list)";
-        } else {
-            msg += " (All " + entries.length + " entries completed!)";
-        }
+        try { app.redraw(); } catch(e) {}
 
         return JSON.stringify({
             status: "success",
-            message: msg,
             filledCount: filledCount,
-            nextStartIndex: nextIndex,
-            remainingCount: remaining
+            totalCards: targetCards.length,
+            totalEntries: entries.length,
+            nextStartIndex: startIndex + filledCount
         });
-    }
-};
+    },
 
-function openWebUrl(url) {
+    function openWebUrl(url) {
     try {
         var isMac = (File.fs === "Macintosh" || (typeof $.os !== "undefined" && $.os.indexOf("Mac") !== -1));
         if (isMac) {
