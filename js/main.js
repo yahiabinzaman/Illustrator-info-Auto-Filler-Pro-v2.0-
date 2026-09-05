@@ -1239,9 +1239,7 @@
                     if (autoRemove) {
                         var placedCount = res.filledCount || 0;
                         var remaining = parsedDiaryEntries.slice(currentDiaryStartIndex + placedCount);
-                        var newText = remaining.map(function(e) { return e.rawText || e.name; }).join('
-
-');
+                        var newText = remaining.map(function(e) { return e.rawText || e.name; }).join('\n\n');
                         if (rawTextInputDiary) rawTextInputDiary.value = newText;
                         currentDiaryStartIndex = 0;
                         if (inputStartIndexDiary) inputStartIndexDiary.value = 1;
