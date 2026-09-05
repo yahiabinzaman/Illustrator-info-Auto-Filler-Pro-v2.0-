@@ -1505,26 +1505,6 @@ var CardAutoFiller = {
             var card = targetCards[i];
             var entry = activeEntries[i];
 
-            var thisCardDetailsLeading = null;
-            var thisCardNameLeading = null;
-            try {
-                if (card.nameFrame && card.nameFrame.characters.length > 0) {
-                    var l0 = card.nameFrame.paragraphs[0].characters[0].characterAttributes.leading;
-                    if (l0 > 0) thisCardNameLeading = l0;
-                    if (card.nameFrame.paragraphs.length > 1 && card.nameFrame.paragraphs[1].characters.length > 0) {
-                        var l1 = card.nameFrame.paragraphs[1].characters[0].characterAttributes.leading;
-                        if (l1 > 0) thisCardDetailsLeading = l1;
-                    }
-                }
-                if (card.detailsFrame && card.detailsFrame.characters.length > 0) {
-                    var dl0 = card.detailsFrame.characters[0].characterAttributes.leading;
-                    if (dl0 > 0) thisCardDetailsLeading = dl0;
-                }
-            } catch(e) {}
-
-            var finalNameLeading = hasCustomNameLeading ? userNameLeading : (thisCardNameLeading || docNameLeading || 10.5);
-            var finalDetailsLeading = hasCustomDetailsLeading ? userDetailsLeading : (thisCardDetailsLeading || docDetailsLeading || 8.75);
-
             var cardBaseFont = null;
             try {
                 if (card.nameFrame && card.nameFrame.characters.length > 0) cardBaseFont = card.nameFrame.characters[0].characterAttributes.textFont;
@@ -1535,32 +1515,92 @@ var CardAutoFiller = {
             var cardBoldFont = fontPair.bold || docBoldFont;
             var cardRegularFont = fontPair.regular || docRegularFont;
 
-            // 1. POPULATE SERIAL / KROMIK (Top corner frame or badge)
+            // --- STEP 1: ANALYZE & EXTRACT EXACT TEMPLATE STYLES ---
+            var tplName = { size: 9.1446, leading: 8.3936, tracking: -5, hScale: 80.0, font: cardBoldFont, color: null, just: null };
+            var tplDetails = { size: 6.639, leading: 8.3936, tracking: -5, hScale: 96.38, font: cardRegularFont, color: null, just: null };
+            var tplSerial = { size: 7.585, leading: 8.4, tracking: -5, hScale: 98.6, font: cardBoldFont, color: null, just: null };
+            var tplForm = { size: 5.3181, leading: 5.5884, tracking: -50, hScale: 98.6, font: cardRegularFont, color: null, just: null };
+
+            try {
+                if (card.nameFrame && card.nameFrame.characters && card.nameFrame.characters.length > 0) {
+                    if (card.nameFrame.paragraphs.length > 0) {
+                        var p0 = card.nameFrame.paragraphs[0];
+                        if (p0.characters.length > 0) {
+                            var c0 = p0.characters[0].characterAttributes;
+                            if (c0.size > 0) tplName.size = c0.size;
+                            if (c0.leading > 0) tplName.leading = c0.leading;
+                            if (c0.tracking !== undefined) tplName.tracking = c0.tracking;
+                            if (c0.horizontalScale > 0) tplName.hScale = c0.horizontalScale;
+                            if (c0.textFont) tplName.font = c0.textFont;
+                            if (c0.fillColor && c0.fillColor.typename !== 'NoColor') tplName.color = c0.fillColor;
+                            try { tplName.just = p0.paragraphAttributes.justification; } catch(j0e) {}
+                        }
+                    }
+                    if (card.nameFrame.paragraphs.length > 1) {
+                        var p1 = card.nameFrame.paragraphs[1];
+                        if (p1.characters.length > 0) {
+                            var c1 = p1.characters[0].characterAttributes;
+                            if (c1.size > 0) tplDetails.size = c1.size;
+                            if (c1.leading > 0) tplDetails.leading = c1.leading;
+                            if (c1.tracking !== undefined) tplDetails.tracking = c1.tracking;
+                            if (c1.horizontalScale > 0) tplDetails.hScale = c1.horizontalScale;
+                            if (c1.textFont) tplDetails.font = c1.textFont;
+                            try { tplDetails.just = p1.paragraphAttributes.justification; } catch(j1e) {}
+                        }
+                    }
+                }
+                if (card.detailsFrame && card.detailsFrame.characters && card.detailsFrame.characters.length > 0) {
+                    var cd0 = card.detailsFrame.characters[0].characterAttributes;
+                    if (cd0.size > 0) tplDetails.size = cd0.size;
+                    if (cd0.leading > 0) tplDetails.leading = cd0.leading;
+                    if (cd0.tracking !== undefined) tplDetails.tracking = cd0.tracking;
+                    if (cd0.horizontalScale > 0) tplDetails.hScale = cd0.horizontalScale;
+                    if (cd0.textFont) tplDetails.font = cd0.textFont;
+                    try { tplDetails.just = card.detailsFrame.paragraphs[0].paragraphAttributes.justification; } catch(jde) {}
+                }
+                if (card.serialFrame && card.serialFrame.characters && card.serialFrame.characters.length > 0) {
+                    var cs0 = card.serialFrame.characters[0].characterAttributes;
+                    if (cs0.size > 0) tplSerial.size = cs0.size;
+                    if (cs0.leading > 0) tplSerial.leading = cs0.leading;
+                    if (cs0.tracking !== undefined) tplSerial.tracking = cs0.tracking;
+                    if (cs0.horizontalScale > 0) tplSerial.hScale = cs0.horizontalScale;
+                    if (cs0.textFont) tplSerial.font = cs0.textFont;
+                    if (cs0.fillColor && cs0.fillColor.typename !== 'NoColor') tplSerial.color = cs0.fillColor;
+                    try { tplSerial.just = card.serialFrame.paragraphs[0].paragraphAttributes.justification; } catch(jse) {}
+                }
+                if (card.formFrame && card.formFrame.characters && card.formFrame.characters.length > 0) {
+                    var cf0 = card.formFrame.characters[0].characterAttributes;
+                    if (cf0.size > 0) tplForm.size = cf0.size;
+                    if (cf0.leading > 0) tplForm.leading = cf0.leading;
+                    if (cf0.tracking !== undefined) tplForm.tracking = cf0.tracking;
+                    if (cf0.horizontalScale > 0) tplForm.hScale = cf0.horizontalScale;
+                    if (cf0.textFont) tplForm.font = cf0.textFont;
+                    try { tplForm.just = card.formFrame.paragraphs[0].paragraphAttributes.justification; } catch(jfe) {}
+                }
+            } catch(extErr) {}
+
+            // Determine final values with user override precedence
+            var finalNameFont = (makeBold && cardBoldFont) ? cardBoldFont : (tplName.font || cardBoldFont);
+            var finalDetailsFont = cardRegularFont || tplDetails.font;
+            var finalNameLeading = hasCustomNameLeading ? userNameLeading : tplName.leading;
+            var finalDetailsLeading = hasCustomDetailsLeading ? userDetailsLeading : tplDetails.leading;
+            var finalNameHScale = (payload.nameHScale !== undefined && payload.nameHScale !== 100) ? nameHScale : tplName.hScale;
+            var finalDetailsHScale = (payload.detailsHScale !== undefined && payload.detailsHScale !== 85) ? detailsHScale : tplDetails.hScale;
+
+            // --- STEP 2: POPULATE SERIAL / KROMIK (Top-Right Pill) ---
             if (card.serialFrame && entry.serial) {
                 try {
-                    // Check if existing character has fill color (e.g. white on dark pill)
-                    var existingSerialColor = null;
-                    try {
-                        if (card.serialFrame.characters.length > 0) {
-                            var sc = card.serialFrame.characters[0].characterAttributes.fillColor;
-                            if (sc && sc.typename !== "NoColor") {
-                                existingSerialColor = sc;
-                            }
-                        }
-                    } catch(scErr) {}
-
-                    // Check if sitting on top of a dark shape
                     var isDarkPill = false;
                     try {
                         if (card.group) {
                             var sgb = card.serialFrame.geometricBounds;
                             for (var p = 0; p < card.group.pageItems.length; p++) {
                                 var pi = card.group.pageItems[p];
-                                if (pi.typename === "PathItem" && pi.filled) {
+                                if (pi.typename === 'PathItem' && pi.filled) {
                                     var pgb = pi.geometricBounds;
                                     if (pgb[0] <= sgb[0] + 8 && pgb[2] >= sgb[2] - 8 && pgb[1] >= sgb[1] - 8 && pgb[3] <= sgb[3] + 8) {
                                         var pfc = pi.fillColor;
-                                        if (pfc && (pfc.typename === "SpotColor" || (pfc.typename === "CMYKColor" && (pfc.black > 40 || pfc.cyan > 40 || pfc.magenta > 40)))) {
+                                        if (pfc && (pfc.typename === 'SpotColor' || (pfc.typename === 'CMYKColor' && (pfc.black > 40 || pfc.cyan > 40 || pfc.magenta > 40)))) {
                                             isDarkPill = true;
                                             break;
                                         }
@@ -1570,35 +1610,54 @@ var CardAutoFiller = {
                         }
                     } catch(dpErr) {}
 
-                    var finalSerialColor = existingSerialColor || (isDarkPill ? solidWhiteCMYK : solidBlackCMYK);
+                    var finalSerialColor = tplSerial.color || (isDarkPill ? solidWhiteCMYK : solidBlackCMYK);
                     card.serialFrame.contents = entry.serial;
-                    if (cardBoldFont) card.serialFrame.textRange.characterAttributes.textFont = cardBoldFont;
-                    card.serialFrame.textRange.characterAttributes.fillColor = finalSerialColor;
+                    try {
+                        var sAttr = card.serialFrame.textRange.characterAttributes;
+                        if (finalNameFont) sAttr.textFont = finalNameFont;
+                        sAttr.size = tplSerial.size;
+                        sAttr.leading = tplSerial.leading;
+                        sAttr.tracking = tplSerial.tracking;
+                        sAttr.horizontalScale = tplSerial.hScale;
+                        sAttr.fillColor = finalSerialColor;
+                        if (tplSerial.just !== null) card.serialFrame.textRange.paragraphAttributes.justification = tplSerial.just;
+                        card.serialFrame.textRange.paragraphAttributes.spaceBefore = 0;
+                        card.serialFrame.textRange.paragraphAttributes.spaceAfter = 0;
+                    } catch(sStyErr) {}
                 } catch(serErr) {}
             }
 
-            // 2. POPULATE FORM NUMBER
+            // --- STEP 3: POPULATE FORM NUMBER (Bottom-Right Box) ---
             var formHandled = false;
             if (card.formFrame && entry.formNumber) {
                 try {
                     card.formFrame.contents = entry.formNumber;
-                    if (cardRegularFont) card.formFrame.textRange.characterAttributes.textFont = cardRegularFont;
-                    card.formFrame.textRange.characterAttributes.size = 7.0;
-                    card.formFrame.textRange.characterAttributes.fillColor = solidBlackCMYK;
+                    try {
+                        var fAttr = card.formFrame.textRange.characterAttributes;
+                        if (finalDetailsFont) fAttr.textFont = finalDetailsFont;
+                        fAttr.size = tplForm.size;
+                        fAttr.leading = tplForm.leading;
+                        fAttr.tracking = tplForm.tracking;
+                        fAttr.horizontalScale = tplForm.hScale;
+                        fAttr.fillColor = solidBlackCMYK;
+                        if (tplForm.just !== null) card.formFrame.textRange.paragraphAttributes.justification = tplForm.just;
+                        card.formFrame.textRange.paragraphAttributes.spaceBefore = 0;
+                        card.formFrame.textRange.paragraphAttributes.spaceAfter = 0;
+                    } catch(fStyErr) {}
                     formHandled = true;
                 } catch(ffErr) {}
             }
 
-            // 3. POPULATE NAME & DETAILS
+            // --- STEP 4: POPULATE NAME & DETAILS ---
             try {
                 if (card.nameFrame && entry.name) {
-                    var cleanName = (entry.name || "").replace(/^\s+|\s+$/g, '');
-                    var cleanDetails = (entry.details || "").replace(/^\s+|\s+$/g, '');
-                    cleanDetails = cleanDetails.replace(/\r\n|\n/g, '\r').replace(/\r{2,}/g, '\r');
+                    var cleanName = (entry.name || '').replace(/^\s+|\s+$/g, '');
+                    var cleanDetails = (entry.details || '').replace(/^\s+|\s+$/g, '');
+                    cleanDetails = cleanDetails.split('\r\n').join('\r').split('\n').join('\r');
 
-                    // If form number was not placed in a separate frame, append it to details
+                    // If form number was not placed in separate box, append it to details
                     if (entry.formNumber && !formHandled && cleanDetails) {
-                        cleanDetails += "\r" + entry.formNumber;
+                        cleanDetails += '\r' + entry.formNumber;
                     } else if (entry.formNumber && !formHandled && !cleanDetails) {
                         cleanDetails = entry.formNumber;
                     }
@@ -1607,12 +1666,14 @@ var CardAutoFiller = {
                         // Separate Name and Details frames
                         card.nameFrame.contents = cleanName;
                         try {
-                            if (makeBold && cardBoldFont) card.nameFrame.textRange.characterAttributes.textFont = cardBoldFont;
-                            card.nameFrame.textRange.characterAttributes.size = 10;
-                            card.nameFrame.textRange.characterAttributes.leading = finalNameLeading;
-                            card.nameFrame.textRange.characterAttributes.tracking = -14;
-                            card.nameFrame.textRange.characterAttributes.horizontalScale = nameHScale;
-                            card.nameFrame.textRange.characterAttributes.fillColor = finalNameColor;
+                            var nAttr = card.nameFrame.textRange.characterAttributes;
+                            if (finalNameFont) nAttr.textFont = finalNameFont;
+                            nAttr.size = tplName.size;
+                            nAttr.leading = finalNameLeading;
+                            nAttr.tracking = tplName.tracking;
+                            nAttr.horizontalScale = finalNameHScale;
+                            nAttr.fillColor = finalNameColor;
+                            if (tplName.just !== null) card.nameFrame.textRange.paragraphAttributes.justification = tplName.just;
                             card.nameFrame.textRange.paragraphAttributes.spaceBefore = 0;
                             card.nameFrame.textRange.paragraphAttributes.spaceAfter = 0;
                         } catch(e) {}
@@ -1620,19 +1681,21 @@ var CardAutoFiller = {
                         if (cleanDetails) {
                             card.detailsFrame.contents = cleanDetails;
                             try {
-                                if (cardRegularFont) card.detailsFrame.textRange.characterAttributes.textFont = cardRegularFont;
-                                card.detailsFrame.textRange.characterAttributes.size = 7.5;
-                                card.detailsFrame.textRange.characterAttributes.leading = finalDetailsLeading;
-                                card.detailsFrame.textRange.characterAttributes.tracking = -15;
-                                card.detailsFrame.textRange.characterAttributes.horizontalScale = detailsHScale;
-                                card.detailsFrame.textRange.characterAttributes.fillColor = finalDetailsColor;
+                                var dAttr = card.detailsFrame.textRange.characterAttributes;
+                                if (finalDetailsFont) dAttr.textFont = finalDetailsFont;
+                                dAttr.size = tplDetails.size;
+                                dAttr.leading = finalDetailsLeading;
+                                dAttr.tracking = tplDetails.tracking;
+                                dAttr.horizontalScale = finalDetailsHScale;
+                                dAttr.fillColor = finalDetailsColor;
+                                if (tplDetails.just !== null) card.detailsFrame.textRange.paragraphAttributes.justification = tplDetails.just;
                                 card.detailsFrame.textRange.paragraphAttributes.spaceBefore = 0;
                                 card.detailsFrame.textRange.paragraphAttributes.spaceAfter = 0;
                             } catch(e) {}
                         }
                     } else {
                         // Single combined text frame (Name on line 1, details on lines 2..N)
-                        var fullInfo = cleanDetails ? (cleanName + "\r" + cleanDetails) : cleanName;
+                        var fullInfo = cleanDetails ? (cleanName + '\r' + cleanDetails) : cleanName;
                         card.nameFrame.contents = fullInfo;
 
                         try {
@@ -1640,35 +1703,37 @@ var CardAutoFiller = {
                             card.nameFrame.textRange.paragraphAttributes.spaceAfter = 0;
                         } catch(e) {}
 
+                        // Line 1: Student Name
                         try {
                             if (card.nameFrame.paragraphs.length > 0) {
                                 var p0 = card.nameFrame.paragraphs[0];
-                                if (makeBold && cardBoldFont) {
-                                    p0.characterAttributes.textFont = cardBoldFont;
-                                }
-                                p0.characterAttributes.size = 10;
-                                p0.characterAttributes.leading = finalNameLeading;
-                                p0.characterAttributes.tracking = -14;
-                                p0.characterAttributes.horizontalScale = nameHScale;
-                                p0.characterAttributes.fillColor = finalNameColor;
+                                var p0Attr = p0.characterAttributes;
+                                if (finalNameFont) p0Attr.textFont = finalNameFont;
+                                p0Attr.size = tplName.size;
+                                p0Attr.leading = finalNameLeading;
+                                p0Attr.tracking = tplName.tracking;
+                                p0Attr.horizontalScale = finalNameHScale;
+                                p0Attr.fillColor = finalNameColor;
+                                if (tplName.just !== null) p0.paragraphAttributes.justification = tplName.just;
                                 p0.paragraphAttributes.spaceBefore = 0;
                                 p0.paragraphAttributes.spaceAfter = 0;
                             }
                         } catch(p0Err) {}
 
+                        // Lines 2..N: Details
                         var pLen = card.nameFrame.paragraphs.length;
                         for (var p = 1; p < pLen; p++) {
                             try {
                                 var para = card.nameFrame.paragraphs[p];
                                 if (!para || para.characters.length === 0) continue;
-                                if (cardRegularFont) {
-                                    para.characterAttributes.textFont = cardRegularFont;
-                                }
-                                para.characterAttributes.size = 7.5;
-                                para.characterAttributes.leading = finalDetailsLeading;
-                                para.characterAttributes.tracking = -15;
-                                para.characterAttributes.horizontalScale = detailsHScale;
-                                para.characterAttributes.fillColor = finalDetailsColor;
+                                var paraAttr = para.characterAttributes;
+                                if (finalDetailsFont) paraAttr.textFont = finalDetailsFont;
+                                paraAttr.size = tplDetails.size;
+                                paraAttr.leading = finalDetailsLeading;
+                                paraAttr.tracking = tplDetails.tracking;
+                                paraAttr.horizontalScale = finalDetailsHScale;
+                                paraAttr.fillColor = finalDetailsColor;
+                                if (tplDetails.just !== null) para.paragraphAttributes.justification = tplDetails.just;
                                 para.paragraphAttributes.spaceBefore = 0;
                                 para.paragraphAttributes.spaceAfter = 0;
                             } catch(pe) {}
@@ -1676,16 +1741,21 @@ var CardAutoFiller = {
                     }
                 }
 
-                // 4. POPULATE BANI (if in keyring mode)
+                // --- STEP 5: POPULATE BANI (if in keyring mode) ---
                 if (fillBani && card.baniFrame && entry.bani) {
-                    card.baniFrame.contents = entry.bani.replace(/\r\n|\n/g, ' ');
-                    if (cardBoldFont) card.baniFrame.textRange.characterAttributes.textFont = cardBoldFont;
+                    card.baniFrame.contents = entry.bani.split('\r\n').join(' ').split('\n').join(' ');
+                    if (finalNameFont) card.baniFrame.textRange.characterAttributes.textFont = finalNameFont;
                     card.baniFrame.textRange.characterAttributes.size = 5;
-                    card.baniFrame.textRange.characterAttributes.leading = 6.1279;
+                    card.baniFrame.textRange.characterAttributes.fillColor = finalNameColor;
                 }
 
-                filledCount++;
-            } catch(cardErr) {}
+                // --- STEP 6: POPULATE QTY ---
+                if (card.qtyFrame && entry.qty) {
+                    card.qtyFrame.contents = entry.qty;
+                    if (finalDetailsFont) card.qtyFrame.textRange.characterAttributes.textFont = finalDetailsFont;
+                }
+            } catch (err) {}
+            filledCount++;
         }
 
         try { app.redraw(); } catch(e) {}
