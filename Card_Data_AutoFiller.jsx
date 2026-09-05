@@ -1305,6 +1305,19 @@ var CardAutoFiller = {
         return out.join("\r");
     },
 
+    getAdaptiveHScale: function(lineText, baseHScale, maxStandardChars) {
+        if (!lineText) return baseHScale;
+        var clean = lineText.replace(/^\s+|\s+$/g, '').replace(/\r|\n/g, '');
+        var len = clean.length;
+        var standardCapacity = maxStandardChars || 22;
+        if (len <= standardCapacity) {
+            return baseHScale;
+        }
+        var ratio = standardCapacity / len;
+        var calculated = baseHScale * ratio;
+        return Math.max(56, Math.min(baseHScale, Math.round(calculated * 10) / 10));
+    },
+
     populateCards: function(jsonPayload) {
         var doc = this.getActiveDoc();
         if (!doc) {
@@ -1517,35 +1530,35 @@ var CardAutoFiller = {
 
             // --- STEP 1: ANALYZE & EXTRACT EXACT TEMPLATE STYLES ---
             var tplName = { size: 9.1446, leading: 8.3936, tracking: -5, hScale: 80.0, font: cardBoldFont, color: null, just: null };
-            var tplDetails = { size: 6.639, leading: 8.3936, tracking: -5, hScale: 96.38, font: cardRegularFont, color: null, just: null };
+            var tplDetails = { size: 6.639, leading: 8.3936, tracking: -5, hScale: 96.38, font: cardRegularFont, color: null, just: null, hScaleArray: [] };
             var tplSerial = { size: 7.585, leading: 8.4, tracking: -5, hScale: 98.6, font: cardBoldFont, color: null, just: null };
             var tplForm = { size: 5.3181, leading: 5.5884, tracking: -50, hScale: 98.6, font: cardRegularFont, color: null, just: null };
 
             try {
                 if (card.nameFrame && card.nameFrame.characters && card.nameFrame.characters.length > 0) {
-                    if (card.nameFrame.paragraphs.length > 0) {
-                        var p0 = card.nameFrame.paragraphs[0];
-                        if (p0.characters.length > 0) {
-                            var c0 = p0.characters[0].characterAttributes;
-                            if (c0.size > 0) tplName.size = c0.size;
-                            if (c0.leading > 0) tplName.leading = c0.leading;
-                            if (c0.tracking !== undefined) tplName.tracking = c0.tracking;
-                            if (c0.horizontalScale > 0) tplName.hScale = c0.horizontalScale;
-                            if (c0.textFont) tplName.font = c0.textFont;
-                            if (c0.fillColor && c0.fillColor.typename !== 'NoColor') tplName.color = c0.fillColor;
-                            try { tplName.just = p0.paragraphAttributes.justification; } catch(j0e) {}
-                        }
-                    }
-                    if (card.nameFrame.paragraphs.length > 1) {
-                        var p1 = card.nameFrame.paragraphs[1];
-                        if (p1.characters.length > 0) {
-                            var c1 = p1.characters[0].characterAttributes;
-                            if (c1.size > 0) tplDetails.size = c1.size;
-                            if (c1.leading > 0) tplDetails.leading = c1.leading;
-                            if (c1.tracking !== undefined) tplDetails.tracking = c1.tracking;
-                            if (c1.horizontalScale > 0) tplDetails.hScale = c1.horizontalScale;
-                            if (c1.textFont) tplDetails.font = c1.textFont;
-                            try { tplDetails.just = p1.paragraphAttributes.justification; } catch(j1e) {}
+                    var numParas = card.nameFrame.paragraphs.length;
+                    for (var pr = 0; pr < numParas; pr++) {
+                        var pItem = card.nameFrame.paragraphs[pr];
+                        if (pItem.characters.length > 0) {
+                            var pCa = pItem.characters[0].characterAttributes;
+                            var pHs = pCa.horizontalScale;
+                            tplDetails.hScaleArray[pr] = (pHs > 0) ? pHs : 96.38;
+                            if (pr === 0) {
+                                if (pCa.size > 0) tplName.size = pCa.size;
+                                if (pCa.leading > 0) tplName.leading = pCa.leading;
+                                if (pCa.tracking !== undefined) tplName.tracking = pCa.tracking;
+                                if (pHs > 0) tplName.hScale = pHs;
+                                if (pCa.textFont) tplName.font = pCa.textFont;
+                                if (pCa.fillColor && pCa.fillColor.typename !== 'NoColor') tplName.color = pCa.fillColor;
+                                try { tplName.just = pItem.paragraphAttributes.justification; } catch(j0e) {}
+                            } else if (pr === 1) {
+                                if (pCa.size > 0) tplDetails.size = pCa.size;
+                                if (pCa.leading > 0) tplDetails.leading = pCa.leading;
+                                if (pCa.tracking !== undefined) tplDetails.tracking = pCa.tracking;
+                                if (pHs > 0) tplDetails.hScale = pHs;
+                                if (pCa.textFont) tplDetails.font = pCa.textFont;
+                                try { tplDetails.just = pItem.paragraphAttributes.justification; } catch(j1e) {}
+                            }
                         }
                     }
                 }
@@ -1584,8 +1597,8 @@ var CardAutoFiller = {
             var finalDetailsFont = cardRegularFont || tplDetails.font;
             var finalNameLeading = hasCustomNameLeading ? userNameLeading : tplName.leading;
             var finalDetailsLeading = hasCustomDetailsLeading ? userDetailsLeading : tplDetails.leading;
-            var finalNameHScale = (payload.nameHScale !== undefined && payload.nameHScale !== 100) ? nameHScale : tplName.hScale;
-            var finalDetailsHScale = (payload.detailsHScale !== undefined && payload.detailsHScale !== 85) ? detailsHScale : tplDetails.hScale;
+            var baseNameHScale = (payload.nameHScale !== undefined && payload.nameHScale !== 100) ? nameHScale : tplName.hScale;
+            var baseDetailsHScale = (payload.detailsHScale !== undefined && payload.detailsHScale !== 85) ? detailsHScale : tplDetails.hScale;
 
             // --- STEP 2: POPULATE SERIAL / KROMIK (Top-Right Pill) ---
             if (card.serialFrame && entry.serial) {
@@ -1662,6 +1675,9 @@ var CardAutoFiller = {
                         cleanDetails = entry.formNumber;
                     }
 
+                    // Adaptive horizontal scale for Name if long
+                    var adaptiveNameScale = this.getAdaptiveHScale(cleanName, baseNameHScale, 18);
+
                     if (card.detailsFrame) {
                         // Separate Name and Details frames
                         card.nameFrame.contents = cleanName;
@@ -1671,7 +1687,7 @@ var CardAutoFiller = {
                             nAttr.size = tplName.size;
                             nAttr.leading = finalNameLeading;
                             nAttr.tracking = tplName.tracking;
-                            nAttr.horizontalScale = finalNameHScale;
+                            nAttr.horizontalScale = adaptiveNameScale;
                             nAttr.fillColor = finalNameColor;
                             if (tplName.just !== null) card.nameFrame.textRange.paragraphAttributes.justification = tplName.just;
                             card.nameFrame.textRange.paragraphAttributes.spaceBefore = 0;
@@ -1680,18 +1696,27 @@ var CardAutoFiller = {
 
                         if (cleanDetails) {
                             card.detailsFrame.contents = cleanDetails;
-                            try {
-                                var dAttr = card.detailsFrame.textRange.characterAttributes;
-                                if (finalDetailsFont) dAttr.textFont = finalDetailsFont;
-                                dAttr.size = tplDetails.size;
-                                dAttr.leading = finalDetailsLeading;
-                                dAttr.tracking = tplDetails.tracking;
-                                dAttr.horizontalScale = finalDetailsHScale;
-                                dAttr.fillColor = finalDetailsColor;
-                                if (tplDetails.just !== null) card.detailsFrame.textRange.paragraphAttributes.justification = tplDetails.just;
-                                card.detailsFrame.textRange.paragraphAttributes.spaceBefore = 0;
-                                card.detailsFrame.textRange.paragraphAttributes.spaceAfter = 0;
-                            } catch(e) {}
+                            var dParas = card.detailsFrame.paragraphs;
+                            for (var dp = 0; dp < dParas.length; dp++) {
+                                try {
+                                    var dParaItem = dParas[dp];
+                                    if (!dParaItem || dParaItem.characters.length === 0) continue;
+                                    var dParaTxt = dParaItem.contents.replace(/^\s+|\s+$/g, '');
+                                    var dBaseHs = (tplDetails.hScaleArray[dp+1] > 0) ? tplDetails.hScaleArray[dp+1] : baseDetailsHScale;
+                                    var dAdaptiveHs = this.getAdaptiveHScale(dParaTxt, dBaseHs, 22);
+
+                                    var dpAttr = dParaItem.characterAttributes;
+                                    if (finalDetailsFont) dpAttr.textFont = finalDetailsFont;
+                                    dpAttr.size = tplDetails.size;
+                                    dpAttr.leading = finalDetailsLeading;
+                                    dpAttr.tracking = tplDetails.tracking;
+                                    dpAttr.horizontalScale = dAdaptiveHs;
+                                    dpAttr.fillColor = finalDetailsColor;
+                                    if (tplDetails.just !== null) dParaItem.paragraphAttributes.justification = tplDetails.just;
+                                    dParaItem.paragraphAttributes.spaceBefore = 0;
+                                    dParaItem.paragraphAttributes.spaceAfter = 0;
+                                } catch(dpe) {}
+                            }
                         }
                     } else {
                         // Single combined text frame (Name on line 1, details on lines 2..N)
@@ -1712,7 +1737,7 @@ var CardAutoFiller = {
                                 p0Attr.size = tplName.size;
                                 p0Attr.leading = finalNameLeading;
                                 p0Attr.tracking = tplName.tracking;
-                                p0Attr.horizontalScale = finalNameHScale;
+                                p0Attr.horizontalScale = adaptiveNameScale;
                                 p0Attr.fillColor = finalNameColor;
                                 if (tplName.just !== null) p0.paragraphAttributes.justification = tplName.just;
                                 p0.paragraphAttributes.spaceBefore = 0;
@@ -1720,18 +1745,25 @@ var CardAutoFiller = {
                             }
                         } catch(p0Err) {}
 
-                        // Lines 2..N: Details
+                        // Lines 2..N: Details (Per-Paragraph Adaptive Scaling for Address Lines)
                         var pLen = card.nameFrame.paragraphs.length;
                         for (var p = 1; p < pLen; p++) {
                             try {
                                 var para = card.nameFrame.paragraphs[p];
                                 if (!para || para.characters.length === 0) continue;
+                                var paraTxt = para.contents.replace(/^\s+|\s+$/g, '');
+                                
+                                // Base scale from template paragraph if present, else baseDetailsHScale
+                                var paraBaseHs = (tplDetails.hScaleArray[p] > 0) ? tplDetails.hScaleArray[p] : baseDetailsHScale;
+                                // Adaptively condense only if line is long (e.g. Village/Post/Thana/District)
+                                var paraAdaptiveHs = this.getAdaptiveHScale(paraTxt, paraBaseHs, 22);
+
                                 var paraAttr = para.characterAttributes;
                                 if (finalDetailsFont) paraAttr.textFont = finalDetailsFont;
                                 paraAttr.size = tplDetails.size;
                                 paraAttr.leading = finalDetailsLeading;
                                 paraAttr.tracking = tplDetails.tracking;
-                                paraAttr.horizontalScale = finalDetailsHScale;
+                                paraAttr.horizontalScale = paraAdaptiveHs;
                                 paraAttr.fillColor = finalDetailsColor;
                                 if (tplDetails.just !== null) para.paragraphAttributes.justification = tplDetails.just;
                                 para.paragraphAttributes.spaceBefore = 0;
