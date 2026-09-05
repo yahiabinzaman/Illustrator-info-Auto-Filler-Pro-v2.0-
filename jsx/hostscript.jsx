@@ -1634,9 +1634,10 @@ var CardAutoFiller = {
             totalEntries: entries.length,
             nextStartIndex: startIndex + filledCount
         });
-    },
+    }
+};
 
-    function openWebUrl(url) {
+function openWebUrl(url) {
     try {
         var isMac = (File.fs === "Macintosh" || (typeof $.os !== "undefined" && $.os.indexOf("Mac") !== -1));
         if (isMac) {

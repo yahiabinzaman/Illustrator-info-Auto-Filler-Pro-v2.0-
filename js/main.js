@@ -70,7 +70,7 @@
     var colorSwatches = document.querySelectorAll('.color-swatch');
 
     var currentKeyringColor = "#A22F10";
-    var currentDiaryColor = "#A22F10";
+    var currentDiaryColor = "#1E5AA8";
 
     // Diary Elements
     var rawTextInputDiary = document.getElementById('rawTextInputDiary');
@@ -966,7 +966,8 @@
             parseKeyringInput();
         }
 
-        var reloadJSX = "try { $.evalFile(new File(Folder.userData + '/../Application Support/Adobe/CEP/extensions/Name_Card_AutoFiller/jsx/hostscript.jsx')); } catch(e) {}";
+        var extPath = csInterface.getSystemPath(SystemPath.EXTENSION);
+        var reloadJSX = "try { $.evalFile(new File('" + extPath + "/jsx/hostscript.jsx')); } catch(e) {}";
         var scriptCall = reloadJSX + "; populateCards(" + JSON.stringify(JSON.stringify(payload)) + ")";
 
         csInterface.evalScript(scriptCall, function(resStr) {
@@ -1149,6 +1150,12 @@
             return;
         }
 
+        var chkSkipFilledD = document.getElementById('chkSkipFilledDiary');
+        var chkAutoRemoveD = document.getElementById('chkAutoRemoveFilledDiary');
+        var inputStartIndexD = document.getElementById('inputStartIndexDiary');
+        var skipFilled = chkSkipFilledD ? chkSkipFilledD.checked : true;
+        var autoRemove = chkAutoRemoveD ? chkAutoRemoveD.checked : true;
+
         var inputDetHScaleD = document.getElementById('inputDetailsHScaleDiary');
         var inputNmHScaleD = document.getElementById('inputNameHScaleDiary');
         var detHScaleD = inputDetHScaleD ? (parseFloat(inputDetHScaleD.value) || 85) : 85;
@@ -1169,6 +1176,8 @@
             fillQty: false,
             qtyFormat: "auto",
             nameColor: currentDiaryColor,
+            startIndex: currentDiaryStartIndex,
+            skipFilledCards: skipFilled,
             detailsHScale: detHScaleD,
             nameHScale: nmHScaleD,
             detailsLeading: detLeadD,
@@ -1182,7 +1191,8 @@
             parseDiaryInput();
         }
 
-        var reloadJSX = "try { $.evalFile(new File(Folder.userData + '/../Application Support/Adobe/CEP/extensions/Name_Card_AutoFiller/jsx/hostscript.jsx')); } catch(e) {}";
+        var extPath = csInterface.getSystemPath(SystemPath.EXTENSION);
+        var reloadJSX = "try { $.evalFile(new File('" + extPath + "/jsx/hostscript.jsx')); } catch(e) {}";
         var scriptCall = reloadJSX + "; populateCards(" + JSON.stringify(JSON.stringify(payload)) + ")";
 
         csInterface.evalScript(scriptCall, function(resStr) {
@@ -1192,12 +1202,32 @@
             try {
                 var res = JSON.parse(resStr);
                 if (res.status === 'success') {
-                    showToast(res.message, 'success');
+                    if (autoRemove) {
+                        var placedCount = res.filledCount || 0;
+                        var remaining = parsedDiaryEntries.slice(currentDiaryStartIndex + placedCount);
+                        var newText = remaining.map(function(e) { return e.rawText || e.name; }).join('
+
+');
+                        if (rawTextInputDiary) rawTextInputDiary.value = newText;
+                        currentDiaryStartIndex = 0;
+                        if (inputStartIndexDiary) inputStartIndexDiary.value = 1;
+                        parseDiaryInput();
+                        showToast('Populated ' + placedCount + ' diary card(s)! Remaining in queue: ' + remaining.length, 'success');
+                    } else {
+                        currentDiaryStartIndex = res.nextStartIndex;
+                        if (inputStartIndexDiary) inputStartIndexDiary.value = currentDiaryStartIndex + 1;
+                        renderDiaryPreview();
+                        showToast(res.message, 'success');
+                    }
                 } else {
                     showToast(res.message || 'Failed to populate diary names', 'error');
                 }
             } catch (e) {
-                showToast('Communication error', 'error');
+                if (resStr && String(resStr).indexOf("Error") !== -1) {
+                    showToast(String(resStr).substring(0, 80), 'error');
+                } else {
+                    showToast('Communication error', 'error');
+                }
             }
         });
     }
