@@ -156,6 +156,19 @@
     var btnResetIndexDiary = document.getElementById('btnResetIndexDiary');
 
     function init() {
+    window.onTabSwitched = function(targetTabId) {
+        if (targetTabId === 'tab-keyring') {
+            if (rawTextInputDiary && rawTextInputKeyring && rawTextInputDiary.value && !rawTextInputKeyring.value) {
+                rawTextInputKeyring.value = rawTextInputDiary.value;
+            }
+            parseKeyringInput();
+        } else if (targetTabId === 'tab-diary') {
+            if (rawTextInputKeyring && rawTextInputDiary && rawTextInputKeyring.value && !rawTextInputDiary.value) {
+                rawTextInputDiary.value = rawTextInputKeyring.value;
+            }
+            parseDiaryInput();
+        }
+    };
         // Clear Cache & Reload Panel
         var btnReloadPanel = document.getElementById('btnReloadPanel');
         if (btnReloadPanel) {

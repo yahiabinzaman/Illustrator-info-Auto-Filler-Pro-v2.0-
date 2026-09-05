@@ -5,16 +5,47 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Name & Card Auto-Filler Pro</title>
     <link rel="stylesheet" href="css/style.css?v=2.4.4">
+    <script>
+    function switchTab(tabId) {
+        if (!tabId) return;
+        var btns = document.querySelectorAll('.tab-btn');
+        for (var i = 0; i < btns.length; i++) {
+            if (btns[i].getAttribute('data-tab') === tabId) {
+                btns[i].classList.add('active');
+            } else if (btns[i].getAttribute('data-tab')) {
+                btns[i].classList.remove('active');
+            }
+        }
+        var panes = document.querySelectorAll('.tab-pane');
+        for (var j = 0; j < panes.length; j++) {
+            if (panes[j].id === tabId) {
+                panes[j].classList.add('active');
+                panes[j].style.display = 'flex';
+            } else {
+                panes[j].classList.remove('active');
+                panes[j].style.display = 'none';
+            }
+        }
+        try {
+            if (window.onTabSwitched) window.onTabSwitched(tabId);
+        } catch(e) {}
+    }
+    function forceReloadPanel() {
+        try { localStorage.clear(); } catch(e) {}
+        try { sessionStorage.clear(); } catch(e) {}
+        window.location.reload(true);
+    }
+    </script>
 </head>
 <body>
     <!-- Segmented Tab Bar -->
     <div class="tab-bar">
-        <button class="tab-btn active" data-tab="tab-keyring">Keyring</button>
-        <button class="tab-btn" data-tab="tab-diary">Diary</button>
-        <button class="tab-btn" data-tab="tab-canvas-move">Canvas Move</button>
-        <button class="tab-btn" data-tab="tab-badge">Badges</button>
-        <button class="tab-btn" data-tab="tab-duplicate">Duplicator</button>
-        <button id="btnReloadPanel" class="tab-btn" style="flex: 0 0 auto; padding: 4px 8px; font-size: 11px; background: rgba(255,255,255,0.08); color: #fbbf24; border-left: 1px solid #444;" title="Clear Cache & Reload Panel">Clear Cache</button>
+        <button class="tab-btn active" data-tab="tab-keyring" onclick="switchTab('tab-keyring')">Keyring</button>
+        <button class="tab-btn" data-tab="tab-diary" onclick="switchTab('tab-diary')">Diary</button>
+        <button class="tab-btn" data-tab="tab-canvas-move" onclick="switchTab('tab-canvas-move')">Canvas Move</button>
+        <button class="tab-btn" data-tab="tab-badge" onclick="switchTab('tab-badge')">Badges</button>
+        <button class="tab-btn" data-tab="tab-duplicate" onclick="switchTab('tab-duplicate')">Duplicator</button>
+        <button id="btnReloadPanel" class="tab-btn" onclick="forceReloadPanel()" style="flex: 0 0 auto; padding: 4px 8px; font-size: 11px; background: rgba(255,255,255,0.08); color: #fbbf24; border-left: 1px solid #444;" title="Clear Cache & Reload Panel">Clear Cache</button>
     </div>
 
     <!-- TAB 1: Keyring Filler -->
