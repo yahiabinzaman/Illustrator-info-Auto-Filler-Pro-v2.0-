@@ -1675,132 +1675,117 @@ var CardAutoFiller = {
                 } catch(ffErr) {}
             }
 
-            // --- STEP 4: POPULATE NAME & DETAILS ---
+            // --- STEP 4: POPULATE NAME & DETAILS (Bulletproof Per-Paragraph Formatting) ---
             try {
                 if (card.nameFrame && entry.name) {
                     var cleanName = (entry.name || '').replace(/^\s+|\s+$/g, '');
                     var cleanDetails = (entry.details || '').replace(/^\s+|\s+$/g, '');
                     cleanDetails = cleanDetails.split('\r\n').join('\r').split('\n').join('\r');
 
-                    // Only append form number to details if the card has NO dedicated formFrame
-                    if (entry.formNumber && !card.formFrame && !formHandled && cleanDetails) {
-                        cleanDetails += '\r' + entry.formNumber;
-                    } else if (entry.formNumber && !card.formFrame && !formHandled && !cleanDetails) {
-                        cleanDetails = entry.formNumber;
-                    }
-
-                    // Adaptive horizontal scale for Name if long
-                    var adaptiveNameScale = this.getAdaptiveHScale(cleanName, baseNameHScale, 18);
+                    var userNmScale = parseFloat(payload.nameHScale) || 80.0;
+                    var userAddrScale = parseFloat(payload.addressHScale) || 80.0;
+                    var userDetScale = parseFloat(payload.detailsHScale) || 96.0;
 
                     if (card.detailsFrame) {
                         // Separate Name and Details frames
                         card.nameFrame.contents = cleanName;
                         try {
-                            var nAttr = card.nameFrame.textRange.characterAttributes;
-                            if (finalNameFont) nAttr.textFont = finalNameFont;
-                            nAttr.size = tplName.size;
-                            nAttr.leading = finalNameLeading;
-                            nAttr.tracking = tplName.tracking;
-                            nAttr.horizontalScale = adaptiveNameScale;
-                            nAttr.fillColor = finalNameColor;
-                            if (tplName.just !== null) card.nameFrame.textRange.paragraphAttributes.justification = tplName.just;
-                            card.nameFrame.textRange.paragraphAttributes.spaceBefore = 0;
-                            card.nameFrame.textRange.paragraphAttributes.spaceAfter = 0;
-                        } catch(e) {}
+                            var nTr = card.nameFrame.textRange;
+                            if (finalNameFont) nTr.characterAttributes.textFont = finalNameFont;
+                            nTr.characterAttributes.size = tplName.size || 9.1446;
+                            nTr.characterAttributes.leading = finalNameLeading || 8.13;
+                            nTr.characterAttributes.tracking = tplName.tracking || -5;
+                            nTr.characterAttributes.horizontalScale = userNmScale;
+                            nTr.characterAttributes.fillColor = finalNameColor;
+                            if (tplName.just !== null) nTr.paragraphAttributes.justification = tplName.just;
+                            nTr.paragraphAttributes.spaceBefore = 0;
+                            nTr.paragraphAttributes.spaceAfter = 0;
+                        } catch(nErr) {}
 
                         if (cleanDetails) {
                             card.detailsFrame.contents = cleanDetails;
-                            var dParas = card.detailsFrame.paragraphs;
-                            for (var dp = 0; dp < dParas.length; dp++) {
-                                try {
-                                    var dParaItem = dParas[dp];
-                                    if (!dParaItem || dParaItem.characters.length === 0) continue;
-                                    var dParaTxt = dParaItem.contents.replace(/^\s+|\s+$/g, '');
-                                    var dBaseHs = (tplDetails.hScaleArray[dp+1] > 0) ? tplDetails.hScaleArray[dp+1] : baseDetailsHScale;
-                                    var dAdaptiveHs = this.getAdaptiveHScale(dParaTxt, dBaseHs, 22);
-
-                                    var dpAttr = dParaItem.characterAttributes;
-                                    if (finalDetailsFont) dpAttr.textFont = finalDetailsFont;
-                                    dpAttr.size = tplDetails.size;
-                                    dpAttr.leading = finalDetailsLeading;
-                                    dpAttr.tracking = tplDetails.tracking;
-                                    dpAttr.horizontalScale = dAdaptiveHs;
-                                    dpAttr.fillColor = finalDetailsColor;
-                                    if (tplDetails.just !== null) dParaItem.paragraphAttributes.justification = tplDetails.just;
-                                    dParaItem.paragraphAttributes.spaceBefore = 0;
-                                    dParaItem.paragraphAttributes.spaceAfter = 0;
-                                } catch(dpe) {}
-                            }
+                            try {
+                                var dLen = card.detailsFrame.paragraphs.length;
+                                for (var dp = 0; dp < dLen; dp++) {
+                                    try {
+                                        var dParaItem = card.detailsFrame.paragraphs[dp];
+                                        if (!dParaItem || dParaItem.characters.length === 0) continue;
+                                        var dParaTxt = dParaItem.contents.replace(/^\s+|\s+$/g, '');
+                                        var isDAddr = /^(গ্রাম|পোস্ট|থানা|জেলা)/.test(dParaTxt) || dp === 1 || dp === 2;
+                                        
+                                        if (finalDetailsFont) dParaItem.characterAttributes.textFont = finalDetailsFont;
+                                        dParaItem.characterAttributes.size = 7.0;
+                                        dParaItem.characterAttributes.leading = finalDetailsLeading || 8.13;
+                                        dParaItem.characterAttributes.tracking = tplDetails.tracking || -5;
+                                        dParaItem.characterAttributes.horizontalScale = isDAddr ? userAddrScale : userDetScale;
+                                        dParaItem.characterAttributes.fillColor = finalDetailsColor;
+                                        if (tplDetails.just !== null) dParaItem.paragraphAttributes.justification = tplDetails.just;
+                                        dParaItem.paragraphAttributes.spaceBefore = 0;
+                                        dParaItem.paragraphAttributes.spaceAfter = 0;
+                                    } catch(dpe) {}
+                                }
+                            } catch(e) {}
                         }
                     } else {
                         // Single combined text frame (Name on line 1, details on lines 2..N)
                         var fullInfo = cleanDetails ? (cleanName + '\r' + cleanDetails) : cleanName;
                         card.nameFrame.contents = fullInfo;
 
-                        try {
-                            card.nameFrame.textRange.paragraphAttributes.spaceBefore = 0;
-                            card.nameFrame.textRange.paragraphAttributes.spaceAfter = 0;
-                        } catch(e) {}
-
-                        // Line 1: Student Name
-                        try {
-                            if (card.nameFrame.paragraphs.length > 0) {
-                                var p0 = card.nameFrame.paragraphs[0];
-                                var p0Attr = p0.characterAttributes;
-                                if (finalNameFont) p0Attr.textFont = finalNameFont;
-                                p0Attr.size = tplName.size;
-                                p0Attr.leading = finalNameLeading;
-                                p0Attr.tracking = tplName.tracking;
-                                p0Attr.horizontalScale = adaptiveNameScale;
-                                p0Attr.fillColor = finalNameColor;
-                                if (tplName.just !== null) p0.paragraphAttributes.justification = tplName.just;
-                                p0.paragraphAttributes.spaceBefore = 0;
-                                p0.paragraphAttributes.spaceAfter = 0;
-                            }
-                        } catch(p0Err) {}
-
-                        // Lines 2..N: Details (Per-Paragraph Adaptive Scaling for Address Lines)
+                        // Explicitly style every single paragraph
                         var pLen = card.nameFrame.paragraphs.length;
-                        for (var p = 1; p < pLen; p++) {
+                        for (var p = 0; p < pLen; p++) {
                             try {
                                 var para = card.nameFrame.paragraphs[p];
                                 if (!para || para.characters.length === 0) continue;
-                                var paraTxt = para.contents.replace(/^\s+|\s+$/g, '');
-                                
-                                var isAddressLine = /^(গ্রাম|পোস্ট|থানা|জেলা)/.test(paraTxt) || p === 2 || p === 3;
-                                var userAddrScale = parseFloat(payload.addressHScale) || 80.0;
-                                var userDetScale = parseFloat(payload.detailsHScale) || 96.0;
-                                var paraAdaptiveHs = isAddressLine ? userAddrScale : userDetScale;
 
-                                var paraAttr = para.characterAttributes;
-                                if (finalDetailsFont) paraAttr.textFont = finalDetailsFont;
-                                paraAttr.size = tplDetails.size;
-                                paraAttr.leading = finalDetailsLeading;
-                                paraAttr.tracking = tplDetails.tracking;
-                                paraAttr.horizontalScale = paraAdaptiveHs;
-                                paraAttr.fillColor = finalDetailsColor;
-                                if (tplDetails.just !== null) para.paragraphAttributes.justification = tplDetails.just;
+                                if (p === 0) {
+                                    // Line 1: Student Name (Bold, 9.14pt, Name Scale)
+                                    if (finalNameFont) para.characterAttributes.textFont = finalNameFont;
+                                    para.characterAttributes.size = tplName.size || 9.1446;
+                                    para.characterAttributes.leading = finalNameLeading || 8.13;
+                                    para.characterAttributes.tracking = tplName.tracking || -5;
+                                    para.characterAttributes.horizontalScale = userNmScale;
+                                    para.characterAttributes.fillColor = finalNameColor;
+                                    if (tplName.just !== null) para.paragraphAttributes.justification = tplName.just;
+                                } else {
+                                    // Lines 2..N: Details (Regular, 7.0pt strictly)
+                                    var paraTxt = para.contents.replace(/^\s+|\s+$/g, '');
+                                    var isAddr = /^(গ্রাম|পোস্ট|থানা|জেলা)/.test(paraTxt) || p === 2 || p === 3;
+
+                                    if (finalDetailsFont) para.characterAttributes.textFont = finalDetailsFont;
+                                    para.characterAttributes.size = 7.0; // Strictly standard 7.0pt
+                                    para.characterAttributes.leading = finalDetailsLeading || 8.13;
+                                    para.characterAttributes.tracking = tplDetails.tracking || -5;
+                                    para.characterAttributes.horizontalScale = isAddr ? userAddrScale : userDetScale;
+                                    para.characterAttributes.fillColor = finalDetailsColor;
+                                    if (tplDetails.just !== null) para.paragraphAttributes.justification = tplDetails.just;
+                                }
                                 para.paragraphAttributes.spaceBefore = 0;
                                 para.paragraphAttributes.spaceAfter = 0;
                             } catch(pe) {}
                         }
                     }
                 }
+            } catch (err) {}
 
-                // --- STEP 5: POPULATE BANI (if in keyring mode) ---
+            // --- STEP 5: POPULATE BANI (if in keyring mode) ---
+            try {
                 if (fillBani && card.baniFrame && entry.bani) {
                     card.baniFrame.contents = entry.bani.split('\r\n').join(' ').split('\n').join(' ');
                     if (finalNameFont) card.baniFrame.textRange.characterAttributes.textFont = finalNameFont;
                     card.baniFrame.textRange.characterAttributes.size = 5;
                     card.baniFrame.textRange.characterAttributes.fillColor = finalNameColor;
                 }
+            } catch(e) {}
 
-                // --- STEP 6: POPULATE QTY ---
+            // --- STEP 6: POPULATE QTY ---
+            try {
                 if (card.qtyFrame && entry.qty) {
                     card.qtyFrame.contents = entry.qty;
                     if (finalDetailsFont) card.qtyFrame.textRange.characterAttributes.textFont = finalDetailsFont;
                 }
-            } catch (err) {}
+            } catch(e) {}
+
             filledCount++;
         }
 
