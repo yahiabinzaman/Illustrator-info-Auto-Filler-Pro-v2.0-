@@ -773,31 +773,9 @@ var CardAutoFiller = {
             return a.bounds[0] - b.bounds[0]; // Left to right within row (Col 1, Col 2, Col 3, Col 4...)
         });
         return cards;
-    }
-
-        if (order === "column") {
-            cards.sort(function(a, b) {
-                if (numABs > 1 && a.artboardIndex !== b.artboardIndex) return a.artboardIndex - b.artboardIndex;
-                var aLeft = a.bounds[0];
-                var bLeft = b.bounds[0];
-                if (Math.abs(aLeft - bLeft) > 60) return aLeft - bLeft; // Col 1 before Col 2
-                return b.bounds[1] - a.bounds[1]; // Top to bottom
-            });
-            return cards;
-        }
-
-        // Row by Row (zigzag)
-        cards.sort(function(a, b) {
-            if (numABs > 1 && a.artboardIndex !== b.artboardIndex) return a.artboardIndex - b.artboardIndex;
-            var bTop = b.bounds[1];
-            var aTop = a.bounds[1];
-            if (Math.abs(bTop - aTop) > 35) return bTop - aTop;
-            return a.bounds[0] - b.bounds[0];
-        });
-        return cards;
     },
 
-        _fontCache: {},
+    _fontCache: {},
 
     getBornomalaFonts: function() {
         if (this._fontCache["bornomala_default"]) return this._fontCache["bornomala_default"];
