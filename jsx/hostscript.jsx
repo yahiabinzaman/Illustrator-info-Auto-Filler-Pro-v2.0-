@@ -720,6 +720,7 @@ var CardAutoFiller = {
     },
 
     sortCards: function(cards, order) {
+        if (!cards || cards.length <= 1) return cards;
         var doc = app.activeDocument;
         var numABs = doc ? doc.artboards.length : 0;
 
@@ -752,25 +753,34 @@ var CardAutoFiller = {
             return cards;
         }
 
-        if (order === "column") {
-            // Sort by Artboard -> Column (Left to Right across 2, 3, 4, or N columns) -> Row (Top to Bottom)
+        if (order === "zigzag") {
+            // Row by Row (Row 1 [Left to Right], Row 2 [Left to Right]...)
             cards.sort(function(a, b) {
                 if (numABs > 1 && a.artboardIndex !== b.artboardIndex) return a.artboardIndex - b.artboardIndex;
-                var aLeft = a.bounds[0];
-                var bLeft = b.bounds[0];
-                if (Math.abs(aLeft - bLeft) > 50) return aLeft - bLeft; // Col 1 before Col 2, Col 3, Col 4...
-                return b.bounds[1] - a.bounds[1]; // Top to bottom within that column
+                var bTop = b.bounds[1];
+                var aTop = a.bounds[1];
+                if (Math.abs(bTop - aTop) > 25) return bTop - aTop; // Row 1 before Row 2
+                return a.bounds[0] - b.bounds[0]; // Left to right within row
             });
             return cards;
         }
 
-        // Row by Row (Row 1 [Col 1, 2, 3, 4...], then Row 2 [Col 1, 2, 3, 4...]...)
+        // Default: Column-wise / Page-wise Diary flow
+        // Smart handling: Checks for 2-page / diary sheet layout (Left Page vs Right Page)
         cards.sort(function(a, b) {
             if (numABs > 1 && a.artboardIndex !== b.artboardIndex) return a.artboardIndex - b.artboardIndex;
-            var bTop = b.bounds[1];
-            var aTop = a.bounds[1];
-            if (Math.abs(bTop - aTop) > 25) return bTop - aTop; // Row 1 before Row 2
-            return a.bounds[0] - b.bounds[0]; // Left to right within row (Col 1, Col 2, Col 3, Col 4...)
+
+            // Check if cards span a multi-page diary sheet (e.g. Page width ~200-240pt)
+            var aPage = Math.floor((a.bounds[0] + 10) / 215);
+            var bPage = Math.floor((b.bounds[0] + 10) / 215);
+            if (aPage !== bPage) return aPage - bPage; // Page 1 before Page 2
+
+            // Within same page / diary section: sort strictly top-to-bottom
+            // This naturally orders staggered cards: Row 1 (Col 1) -> Row 2 (Col 2) -> Row 3 (Col 1) -> Row 4 (Col 2)...
+            var yDiff = b.bounds[1] - a.bounds[1];
+            if (Math.abs(yDiff) > 15) return yDiff; // Top to bottom
+
+            return a.bounds[0] - b.bounds[0]; // Left to right if same Y
         });
         return cards;
     },
