@@ -1634,8 +1634,13 @@ var CardAutoFiller = {
                 try {
                     var rawForm = (entry.formNumber || "").replace(/^\s+|\s+$/g, '');
                     var mDigits = rawForm.match(/([০-৯0-9]+)/);
-                    var formDigits = mDigits ? mDigits[1] : rawForm;
-                    formDigits = this.toBengaliDigits(formDigits);
+                    var formDigits = "";
+                    if (mDigits) {
+                        formDigits = this.toBengaliDigits(mDigits[1]);
+                    } else {
+                        var cleanDigits = rawForm.replace(/^[^:\d]+[:\-\s]*/, '').replace(/^\s+|\s+$/g, '');
+                        formDigits = this.toBengaliDigits(cleanDigits);
+                    }
 
                     var formLabel = "ফরম";
                     if (/^(দাখেলা|রোল|Roll|Form)/i.test(rawForm)) {
@@ -1648,10 +1653,10 @@ var CardAutoFiller = {
                     try {
                         var fAttr = card.formFrame.textRange.characterAttributes;
                         if (finalDetailsFont) fAttr.textFont = finalDetailsFont;
-                        fAttr.size = tplForm.size;
-                        fAttr.leading = tplForm.leading;
-                        fAttr.tracking = tplForm.tracking;
-                        fAttr.horizontalScale = tplForm.hScale;
+                        fAttr.size = tplForm.size || 5.3181;
+                        fAttr.leading = tplForm.leading || 5.5884;
+                        fAttr.tracking = tplForm.tracking || -50;
+                        fAttr.horizontalScale = tplForm.hScale || 98.6;
                         fAttr.fillColor = solidBlackCMYK;
                         if (tplForm.just !== null) card.formFrame.textRange.paragraphAttributes.justification = tplForm.just;
                         card.formFrame.textRange.paragraphAttributes.spaceBefore = 0;
@@ -1661,10 +1666,10 @@ var CardAutoFiller = {
                         for (var fPi = 0; fPi < card.formFrame.paragraphs.length; fPi++) {
                             try {
                                 var fp = card.formFrame.paragraphs[fPi];
-                                fp.characterAttributes.size = tplForm.size;
-                                fp.characterAttributes.leading = tplForm.leading;
-                                fp.characterAttributes.tracking = tplForm.tracking;
-                                fp.characterAttributes.horizontalScale = tplForm.hScale;
+                                fp.characterAttributes.size = tplForm.size || 5.3181;
+                                fp.characterAttributes.leading = tplForm.leading || 5.5884;
+                                fp.characterAttributes.tracking = tplForm.tracking || -50;
+                                fp.characterAttributes.horizontalScale = tplForm.hScale || 98.6;
                                 fp.characterAttributes.fillColor = solidBlackCMYK;
                                 fp.paragraphAttributes.spaceBefore = 0;
                                 fp.paragraphAttributes.spaceAfter = 0;
@@ -1681,6 +1686,19 @@ var CardAutoFiller = {
                     var cleanName = (entry.name || '').replace(/^\s+|\s+$/g, '');
                     var cleanDetails = (entry.details || '').replace(/^\s+|\s+$/g, '');
                     cleanDetails = cleanDetails.split('\r\n').join('\r').split('\n').join('\r');
+
+                    // Filter out any form lines from cleanDetails so it never appears under phone number
+                    var rawLines = cleanDetails.split('\r');
+                    var nonFormLines = [];
+                    for (var rli = 0; rli < rawLines.length; rli++) {
+                        var rlText = rawLines[rli].replace(/^\s+|\s+$/g, '');
+                        if (!rlText) continue;
+                        if (/(?:ফরম|দাখেলা|রোল|Form|Roll|‡¶´|‡dvi|diBk|‡ivj)/i.test(rlText)) {
+                            continue; // Exclude form line completely from main card text frame
+                        }
+                        nonFormLines.push(rlText);
+                    }
+                    cleanDetails = nonFormLines.join('\r');
 
                     var userNmScale = parseFloat(payload.nameHScale) || 80.0;
                     var userAddrScale = parseFloat(payload.addressHScale) || 80.0;

@@ -779,7 +779,7 @@
         }
         if (curLines.length > 0) blocks.push(curLines);
 
-        var formRegex = /^(?:ফরম|ফরম\s*নম্বর|ফরম\s*নং|দাখেলা|রোল|Form|Roll|No\.?)\s*[:\-\s]?\s*([০-৯0-9A-Za-z\s]+)/i;
+        var formRegex = /^(?:ফরম|ফরম\s*নম্বর|ফরম\s*নং|দাখেলা|রোল|Form|Roll|No\.?|‡¶´|‡dvi|diBk|‡ivj)\s*[:\-\s]?\s*(.+)/i;
 
         var result = [];
         for (var b = 0; b < blocks.length; b++) {
@@ -817,8 +817,8 @@
                     item.qty = qm[1];
                     continue;
                 }
-                // Check for form number (e.g. "ফরম: ৯৯৮৪৯", "ফরম ৯৯৮৪৯", "রোল: ১২")
-                if (formRegex.test(lText) || /^ফরম\s*[০-৯0-9]+/i.test(lText)) {
+                // Check for form number (e.g. "ফরম: ৯৯৮৪৯", "ফরম ৯৯৮৪৯", "রোল: ১২", "‡¶´...")
+                if (formRegex.test(lText) || /^(?:ফরম|দাখেলা|রোল|Form|Roll|‡¶´|‡dvi|diBk|‡ivj)/i.test(lText)) {
                     item.formNumber = lText;
                     continue;
                 }
@@ -841,7 +841,17 @@
                     item.serial = spm[1];
                 }
                 item.cleanName = item.rawName.replace(serialPrefixRegex, '').trim();
-                item.details = nonMeta.slice(1).join('\n');
+                var dArr = nonMeta.slice(1);
+                var filteredDetails = [];
+                for (var dIdx = 0; dIdx < dArr.length; dIdx++) {
+                    var dLine = dArr[dIdx];
+                    if (/^(?:ফরম|দাখেলা|রোল|Form|Roll|‡¶´|‡dvi|diBk|‡ivj)/i.test(dLine)) {
+                        if (!item.formNumber) item.formNumber = dLine;
+                    } else {
+                        filteredDetails.push(dLine);
+                    }
+                }
+                item.details = filteredDetails.join('\n');
             }
 
             result.push(item);
