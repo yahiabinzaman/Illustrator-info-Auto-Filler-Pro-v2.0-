@@ -480,10 +480,24 @@ var CardAutoFiller = {
             if (tfs.length >= 1) {
                 var card = this.analyzeCardGroup(tfs, item);
                 if (card.nameFrame || card.namePlaceholderPath) {
-                    card.group = item;
-                    card.bounds = item.geometricBounds;
-                    outCards.push(card);
-                    return;
+                    // Ignore header / banner groups at top of artboard that don't have biodata
+                    var isHeaderPos = false;
+                    try {
+                        var doc = app.activeDocument;
+                        var ab = doc.artboards[doc.artboards.getActiveArtboardIndex()];
+                        var abH = Math.abs(ab.artboardRect[1] - ab.artboardRect[3]);
+                        var gb = item.geometricBounds;
+                        if (gb[1] > (ab.artboardRect[1] - abH * 0.25) && !hasBio && tfs.length <= 2) {
+                            isHeaderPos = true;
+                        }
+                    } catch(e) {}
+
+                    if (!isHeaderPos) {
+                        card.group = item;
+                        card.bounds = item.geometricBounds;
+                        outCards.push(card);
+                        return;
+                    }
                 }
             }
 
@@ -555,15 +569,13 @@ var CardAutoFiller = {
                 continue;
             }
 
-            // Title / Memorabilia / Back-side frame
-            if (this.isBackSideText(rawTxt) || /(?:দাওরায়ে|মাস্টার্স|স্মৃতি|সমাপনী|হিফ[জয]|তাকমীল|দস্তারবন্দী|বিদায়ী|স্মারক)/.test(rawTxt)) {
-                if (rawTxt.length < 90) {
-                    continue;
-                }
+            // Title / Memorabilia / Back-side frame / Header banners
+            if (this.isBackSideText(rawTxt) || /(?:দাওরায়ে|দাওরা|মাস্টার্স|স্মৃতি|সমাপনী|হিফ[জয]|তাকমীল|দস্তারবন্দী|বিদায়ী|স্মারক|ফারেগিন|পরিচিতি|বিভাগ|wnRwi|wLªóvã|`vIiv|nvw`m|cwiwP|fv‡iwMb)/i.test(rawTxt)) {
+                continue;
             }
 
             // Institution name frame
-            if (/gv`vwim|gv`ivmv|mZxNvUv|মাদ্রাসা|মাদরাসা|মারকায|জামিয়া|ইনস্টিটিউট|বিদ্যালয়|স্কুল|কলেজ/.test(rawTxt)) {
+            if (/gv`vwim|gv`ivmv|mZxNvUv|মাদ্রাসা|মাদরাসা|মারকায|জামিয়া|ইনস্টিটিউট|বিদ্যালয়|স্কুল|কলেজ|চট্টগ্রাম|ঢাকা|সিলেট|রাজশাহী|খুলনা|বরিশাল|রংপুর|ময়মনসিংহ|বিভাগ|জেলা/.test(rawTxt)) {
                 continue;
             }
 
