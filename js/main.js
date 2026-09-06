@@ -998,7 +998,7 @@
 
             var payload = {
                 entries: parsedKeyringEntries,
-                order: selectFillOrderKeyring ? selectFillOrderKeyring.value : "column",
+                order: selectFillOrderKeyring ? selectFillOrderKeyring.value : "zigzag",
                 scope: selectScopeKeyring ? selectScopeKeyring.value : "artboard",
                 makeBold: chkMakeBoldKeyring ? chkMakeBoldKeyring.checked : true,
                 stripNumber: chkStripNumberKeyring ? chkStripNumberKeyring.checked : true,
@@ -1229,7 +1229,7 @@
 
             var payload = {
                 entries: parsedDiaryEntries,
-                order: selectFillOrderDiary ? selectFillOrderDiary.value : "column",
+                order: selectFillOrderDiary ? selectFillOrderDiary.value : "zigzag",
                 scope: selectScopeDiary ? selectScopeDiary.value : "artboard",
                 makeBold: chkMakeBoldDiary ? chkMakeBoldDiary.checked : true,
                 stripNumber: false, // In Diary mode, keep formatted serial on Name

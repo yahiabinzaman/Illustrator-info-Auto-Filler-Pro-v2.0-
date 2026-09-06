@@ -355,7 +355,7 @@ var CardAutoFiller = {
         }
     },
 
-    detectCards: function(scope) {
+    detectCards: function(scope, order) {
         var doc = this.getActiveDoc();
         if (!doc) return [];
         var cardUnits = [];
@@ -493,7 +493,7 @@ var CardAutoFiller = {
             }
         }
 
-        return cardUnits;
+        return this.sortCards(cardUnits, order || "zigzag");
     },
 
     extractCardsFromItem: function(item, outCards) {
@@ -657,70 +657,145 @@ var CardAutoFiller = {
         return card;
     },
 
-    sortCards: function(cards, order) {
+                        sortCards: function(cards, order) {
         if (!cards || cards.length <= 1) return cards;
         var doc = app.activeDocument;
         var numABs = doc ? doc.artboards.length : 0;
 
-        // Tag each card with its artboard index if multiple artboards exist
-        if (numABs > 1) {
-            for (var i = 0; i < cards.length; i++) {
-                var c = cards[i];
-                var midX = (c.bounds[0] + c.bounds[2]) / 2;
-                var midY = (c.bounds[1] + c.bounds[3]) / 2;
-                c.artboardIndex = 0;
+        // Filter out header banners (width > 280 or height > 90)
+        var filtered = [];
+        for (var c = 0; c < cards.length; c++) {
+            var card = cards[c];
+            var gb = card.item ? card.item.geometricBounds : (card.group ? card.group.geometricBounds : card.bounds);
+            card.bounds = gb;
+            var w = Math.abs(gb[2] - gb[0]);
+            var h = Math.abs(gb[1] - gb[3]);
+            if (w > 280 || h > 90) continue;
+            card.artboardIndex = 0;
+            if (numABs > 1 && gb) {
+                var midX = (gb[0] + gb[2]) / 2;
+                var midY = (gb[1] + gb[3]) / 2;
                 for (var a = 0; a < numABs; a++) {
                     var r = doc.artboards[a].artboardRect;
                     if (midX >= r[0] && midX <= r[2] && midY <= r[1] && midY >= r[3]) {
-                        c.artboardIndex = a;
+                        card.artboardIndex = a;
                         break;
                     }
                 }
             }
+            filtered.push(card);
         }
 
-        if (order === "auto_badge") {
-            cards.sort(function(a, b) {
-                if (numABs > 1 && a.artboardIndex !== b.artboardIndex) return a.artboardIndex - b.artboardIndex;
-                if (a.badgeNumber > 0 && b.badgeNumber > 0) return a.badgeNumber - b.badgeNumber;
-                var bTop = b.bounds[1];
-                var aTop = a.bounds[1];
-                if (Math.abs(bTop - aTop) > 25) return bTop - aTop;
-                return a.bounds[0] - b.bounds[0];
-            });
-            return cards;
+        // Cluster cards by Sheet / Page block (X-span threshold ~500pt)
+        for (var i = 0; i < filtered.length - 1; i++) {
+            for (var j = i + 1; j < filtered.length; j++) {
+                if (filtered[j].artboardIndex < filtered[i].artboardIndex || 
+                   (filtered[j].artboardIndex === filtered[i].artboardIndex && filtered[j].bounds[0] < filtered[i].bounds[0])) {
+                    var tmp = filtered[i];
+                    filtered[i] = filtered[j];
+                    filtered[j] = tmp;
+                }
+            }
         }
 
-        if (order === "zigzag") {
-            // Row by Row (Row 1 [Left to Right], Row 2 [Left to Right]...)
-            cards.sort(function(a, b) {
-                if (numABs > 1 && a.artboardIndex !== b.artboardIndex) return a.artboardIndex - b.artboardIndex;
-                var bTop = b.bounds[1];
-                var aTop = a.bounds[1];
-                if (Math.abs(bTop - aTop) > 25) return bTop - aTop; // Row 1 before Row 2
-                return a.bounds[0] - b.bounds[0]; // Left to right within row
-            });
-            return cards;
+        var sheets = [];
+        for (var i = 0; i < filtered.length; i++) {
+            var c = filtered[i];
+            var placed = false;
+            for (var s = 0; s < sheets.length; s++) {
+                var sFirst = sheets[s][0];
+                if (sFirst.artboardIndex === c.artboardIndex && Math.abs(c.bounds[0] - sFirst.bounds[0]) < 500) {
+                    sheets[s].push(c);
+                    placed = true;
+                    break;
+                }
+            }
+            if (!placed) sheets.push([c]);
         }
 
-        // Default: Column-wise / Page-wise Diary flow
-        // Smart handling: Checks for 2-page / diary sheet layout (Left Page vs Right Page)
-        cards.sort(function(a, b) {
-            if (numABs > 1 && a.artboardIndex !== b.artboardIndex) return a.artboardIndex - b.artboardIndex;
+        var finalResult = [];
 
-            // Check if cards span a multi-page diary sheet (e.g. Page width ~200-240pt)
-            var aPage = Math.floor((a.bounds[0] + 10) / 215);
-            var bPage = Math.floor((b.bounds[0] + 10) / 215);
-            if (aPage !== bPage) return aPage - bPage; // Page 1 before Page 2
+        for (var s = 0; s < sheets.length; s++) {
+            var sheetCards = sheets[s];
 
-            // Within same page / diary section: sort strictly top-to-bottom
-            // This naturally orders staggered cards: Row 1 (Col 1) -> Row 2 (Col 2) -> Row 3 (Col 1) -> Row 4 (Col 2)...
-            var yDiff = b.bounds[1] - a.bounds[1];
-            if (Math.abs(yDiff) > 15) return yDiff; // Top to bottom
+            if (order === "column") {
+                // Column-by-Column within sheet: Col 1 (top to bottom), Col 2 (top to bottom)...
+                for (var i = 0; i < sheetCards.length - 1; i++) {
+                    for (var j = i + 1; j < sheetCards.length; j++) {
+                        if (sheetCards[j].bounds[0] < sheetCards[i].bounds[0]) {
+                            var tmp = sheetCards[i];
+                            sheetCards[i] = sheetCards[j];
+                            sheetCards[j] = tmp;
+                        }
+                    }
+                }
+                var cols = [];
+                for (var i = 0; i < sheetCards.length; i++) {
+                    var c = sheetCards[i];
+                    var placed = false;
+                    for (var k = 0; k < cols.length; k++) {
+                        if (Math.abs(cols[k][0].bounds[0] - c.bounds[0]) < 30) {
+                            cols[k].push(c);
+                            placed = true;
+                            break;
+                        }
+                    }
+                    if (!placed) cols.push([c]);
+                }
+                for (var k = 0; k < cols.length; k++) {
+                    var col = cols[k];
+                    for (var i = 0; i < col.length - 1; i++) {
+                        for (var j = i + 1; j < col.length; j++) {
+                            if (col[j].bounds[1] > col[i].bounds[1]) {
+                                var tmp = col[i];
+                                col[i] = col[j];
+                                col[j] = tmp;
+                            }
+                        }
+                    }
+                    for (var i = 0; i < col.length; i++) finalResult.push(col[i]);
+                }
+            } else {
+                // Default: Row-by-Row ("zigzag") -> 1 - 2 - 3 - 4 | 5 - 6 - 7 - 8
+                for (var i = 0; i < sheetCards.length - 1; i++) {
+                    for (var j = i + 1; j < sheetCards.length; j++) {
+                        if (sheetCards[j].bounds[1] > sheetCards[i].bounds[1]) {
+                            var tmp = sheetCards[i];
+                            sheetCards[i] = sheetCards[j];
+                            sheetCards[j] = tmp;
+                        }
+                    }
+                }
+                var rows = [];
+                for (var i = 0; i < sheetCards.length; i++) {
+                    var c = sheetCards[i];
+                    var placed = false;
+                    for (var k = 0; k < rows.length; k++) {
+                        if (Math.abs(rows[k][0].bounds[1] - c.bounds[1]) < 20) {
+                            rows[k].push(c);
+                            placed = true;
+                            break;
+                        }
+                    }
+                    if (!placed) rows.push([c]);
+                }
+                for (var k = 0; k < rows.length; k++) {
+                    var row = rows[k];
+                    for (var i = 0; i < row.length - 1; i++) {
+                        for (var j = i + 1; j < row.length; j++) {
+                            if (row[j].bounds[0] < row[i].bounds[0]) {
+                                var tmp = row[i];
+                                row[i] = row[j];
+                                row[j] = tmp;
+                            }
+                        }
+                    }
+                    for (var i = 0; i < row.length; i++) finalResult.push(row[i]);
+                }
+            }
+        }
 
-            return a.bounds[0] - b.bounds[0]; // Left to right if same Y
-        });
-        return cards;
+        return finalResult;
     },
 
     _fontCache: {},
@@ -1454,9 +1529,12 @@ var CardAutoFiller = {
             try {
                 if (sampleCard.nameFrame && sampleCard.nameFrame.textRange) {
                     var sTr = sampleCard.nameFrame.textRange;
-                    if (sTr.characterAttributes.size > 0) masterTplName.size = sTr.characterAttributes.size;
-                    if (sTr.characterAttributes.leading > 0) masterTplName.leading = sTr.characterAttributes.leading;
-                    if (sTr.characterAttributes.horizontalScale > 0) masterTplName.hScale = sTr.characterAttributes.horizontalScale;
+                    var sz = sTr.characterAttributes.size;
+                    if (sz >= 7.0 && sz <= 10.5) masterTplName.size = sz;
+                    else masterTplName.size = 8.5358;
+                    if (sTr.characterAttributes.leading >= 6.0 && sTr.characterAttributes.leading <= 12.0) masterTplName.leading = sTr.characterAttributes.leading;
+                    else masterTplName.leading = 8.3936;
+                    if (sTr.characterAttributes.horizontalScale > 0 && sTr.characterAttributes.horizontalScale <= 100) masterTplName.hScale = sTr.characterAttributes.horizontalScale;
                     if (sTr.characterAttributes.textFont) masterTplName.font = sTr.characterAttributes.textFont;
                     try { masterTplName.just = sTr.paragraphAttributes.justification; } catch(j0e) {}
                 }
