@@ -469,11 +469,15 @@ var CardAutoFiller = {
                     var dx = dtgb[0] - cLeft;
                     var dy = cTop - dtgb[1]; // positive downwards
 
-                    if (!cCard.serialFrame && dx >= 45 && dx <= 92 && dy >= -8 && dy <= 22) {
-                        var dRawS = dtf.contents.replace(/^\s+|\s+$/g, '');
-                        if (/^[০-৯0-9]+$/.test(dRawS.replace(/\s+/g, '')) || dtf.lines.length === 1 || /^[০-৯0-9\-]+$/.test(dRawS)) {
-                            var sDist = Math.abs(dx - 70) + Math.abs(dy - 5);
-                            if (sDist < minSerialDist) {
+                    if (!cCard.serialFrame) {
+                        var dRawS = dtf.contents.replace(/^\s+|\s+$/g, "");
+                        if (/^[০-৯0-9]+$/.test(dRawS.replace(/\s+/g, "")) && dRawS.length <= 4) {
+                            var nCenterX = (cgb[0] + cgb[2]) / 2;
+                            var nCenterY = (cgb[1] + cgb[3]) / 2;
+                            var sCenterX = (dtgb[0] + dtgb[2]) / 2;
+                            var sCenterY = (dtgb[1] + dtgb[3]) / 2;
+                            var sDist = Math.sqrt((sCenterX - nCenterX)*(sCenterX - nCenterX) + (sCenterY - nCenterY)*(sCenterY - nCenterY));
+                            if (sDist < minSerialDist && sDist < 130) {
                                 minSerialDist = sDist;
                                 bestSerial = dtf;
                             }
@@ -502,6 +506,28 @@ var CardAutoFiller = {
 
     extractCardsFromItem: function(item, outCards) {
         if (!item || this.isItemHidden(item)) return;
+
+        if (item.typename === "TextFrame") {
+            if (this.isBackSideText(item.contents)) return;
+            var cTxt = item.contents;
+            if (this.hasStudentBiodata(cTxt) || item.lines.length >= 2) {
+                var card = {
+                    nameFrame: item,
+                    detailsFrame: null,
+                    baniFrame: null,
+                    qtyFrame: null,
+                    badgeFrame: null,
+                    serialFrame: null,
+                    formFrame: null,
+                    namePlaceholderPath: null,
+                    group: item,
+                    bounds: item.geometricBounds,
+                    artboardIndex: 0
+                };
+                outCards.push(card);
+            }
+            return;
+        }
 
         if (item.typename === "GroupItem") {
             var tfs = [];
