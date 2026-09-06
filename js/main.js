@@ -10,6 +10,22 @@
     var csInterface = new CSInterface();
     var bnDigits = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
 
+    function evalHostScript(code, callback) {
+        var extPath = '';
+        try {
+            extPath = csInterface.getSystemPath(SystemPath.EXTENSION).replace(/\/g, '/');
+        } catch(e) {}
+        
+        var fullCode = '';
+        if (extPath) {
+            fullCode = 'try { $.evalFile(new File("' + extPath + '/jsx/hostscript.jsx")); } catch(e) {}; ' + code;
+        } else {
+            fullCode = code;
+        }
+        
+        csInterface.evalScript(fullCode, callback);
+    }
+
     function intToBengali(num, pad2) {
         var str = String(num);
         if (pad2 && num < 10) str = "0" + str;
@@ -177,7 +193,8 @@
                 try { sessionStorage.clear(); } catch(e) {}
                 showToast('Cache cleared! Reloading...', 'info');
                 try {
-                    var loadScript = "try { $.evalFile(new File(Folder.userData + '/../Application Support/Adobe/CEP/extensions/Name_Card_AutoFiller/jsx/hostscript.jsx')); } catch(e) {}";
+                    var extPath = csInterface.getSystemPath(SystemPath.EXTENSION).replace(/\/g, '/');
+                    var loadScript = "try { $.evalFile(new File('" + extPath + "/jsx/hostscript.jsx')); } catch(e) {}";
                     csInterface.evalScript(loadScript, function() {
                         setTimeout(function() {
                             window.location.reload(true);
@@ -191,8 +208,11 @@
 
         // Force ExtendScript to load the latest hostscript.jsx from disk
         try {
-            var loadScript = "try { $.evalFile(new File(Folder.userData + '/../Application Support/Adobe/CEP/extensions/Name_Card_AutoFiller/jsx/hostscript.jsx')); } catch(e) {}";
-            csInterface.evalScript(loadScript);
+            var extPath = csInterface.getSystemPath(SystemPath.EXTENSION).replace(/\/g, '/');
+            if (extPath) {
+                var loadScript = "try { $.evalFile(new File('" + extPath + "/jsx/hostscript.jsx')); } catch(e) {}";
+                csInterface.evalScript(loadScript);
+            }
         } catch(e) {}
 
         // Re-query Tab Buttons & Panes inside init()
@@ -434,7 +454,7 @@
         if (btnMeasureCard) {
             btnMeasureCard.addEventListener('click', function() {
                 btnMeasureCard.textContent = 'Measuring...';
-                csInterface.evalScript('getSelectionCardSize()', function(resStr) {
+                evalHostScript('getSelectionCardSize()', function(resStr) {
                     btnMeasureCard.textContent = 'Auto Measure';
                     try {
                         var res = JSON.parse(resStr);
@@ -522,7 +542,7 @@
                 btnRunDuplicate.textContent = 'Generating Templates & Artboards...';
 
                 var scriptCall = 'duplicateCardTemplates(' + JSON.stringify(JSON.stringify(payload)) + ')';
-                csInterface.evalScript(scriptCall, function(resStr) {
+                evalHostScript(scriptCall, function(resStr) {
                     btnRunDuplicate.disabled = false;
                     btnRunDuplicate.textContent = 'Auto Duplicate Templates & Create Artboards';
 
@@ -671,7 +691,7 @@
 
         // Pick from Canvas
         function pickColorFromCanvas(picker, hexInput, label, isKeyring) {
-            csInterface.evalScript('getSelectedCanvasColor()', function(resStr) {
+            evalHostScript('getSelectedCanvasColor()', function(resStr) {
                 try {
                     var res = JSON.parse(resStr);
                     if (res.status === 'success' && res.hex) {
@@ -1023,7 +1043,7 @@
 
             var scriptCall = "populateCards(" + JSON.stringify(JSON.stringify(payload)) + ")";
 
-            csInterface.evalScript(scriptCall, function(resStr) {
+            evalHostScript(scriptCall, function(resStr) {
                 btnAutoFillKeyring.disabled = false;
                 btnAutoFillKeyring.textContent = 'Auto Fill Keyring Cards';
 
@@ -1255,7 +1275,7 @@
 
             var scriptCall = "populateCards(" + JSON.stringify(JSON.stringify(payload)) + ")";
 
-            csInterface.evalScript(scriptCall, function(resStr) {
+            evalHostScript(scriptCall, function(resStr) {
                 btnAutoFillDiary.disabled = false;
                 btnAutoFillDiary.textContent = 'Auto Fill Diary Names';
 
@@ -1299,7 +1319,7 @@
     // Canvas Selection Loader
     // ==========================================
     function loadFromCanvasSelection(targetTextarea, callback) {
-        csInterface.evalScript('getSelectedCanvasText()', function(resStr) {
+        evalHostScript('getSelectedCanvasText()', function(resStr) {
             try {
                 var res = JSON.parse(resStr);
                 if (res.status === 'success' && res.text) {
@@ -1332,7 +1352,7 @@
         };
 
         var scriptCall = 'placeTextBlocksIntoCards(' + JSON.stringify(JSON.stringify(payload)) + ')';
-        csInterface.evalScript(scriptCall, function(resStr) {
+        evalHostScript(scriptCall, function(resStr) {
             btnPlaceCanvasText.disabled = false;
             btnPlaceCanvasText.textContent = 'Move & Place Text into Cards';
             try {
@@ -1357,7 +1377,7 @@
         };
 
         var scriptCall = 'renumberBadges(' + JSON.stringify(JSON.stringify(payload)) + ')';
-        csInterface.evalScript(scriptCall, function(resStr) {
+        evalHostScript(scriptCall, function(resStr) {
             btnRenumberBadges.disabled = false;
             btnRenumberBadges.textContent = 'Renumber Selected Badges';
             try {

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Name & Card Auto-Filler Pro</title>
-    <link rel="stylesheet" href="css/style.css?v=2.4.4">
+    <link rel="stylesheet" href="css/style.css?v=2.6.0">
     <script>
     function switchTab(tabId) {
         if (!tabId) return;
@@ -33,7 +33,16 @@
     function forceReloadPanel() {
         try { localStorage.clear(); } catch(e) {}
         try { sessionStorage.clear(); } catch(e) {}
-        window.location.reload(true);
+        try {
+            var cs = new CSInterface();
+            var extPath = cs.getSystemPath(SystemPath.EXTENSION).replace(/\/g, '/');
+            var loadScript = "try { $.evalFile(new File('" + extPath + "/jsx/hostscript.jsx')); } catch(e) {}";
+            cs.evalScript(loadScript, function() {
+                window.location.reload(true);
+            });
+        } catch(e) {
+            window.location.reload(true);
+        }
     }
     </script>
 </head>
@@ -668,12 +677,12 @@ Example:
         <a href="https://github.com/yahiabinzaman" id="btn-author-link" class="footer-author-link" title="Visit GitHub Profile" onclick="openAuthorProfile(event); return false;" style="color: #9e9e9e; text-decoration: none; cursor: pointer;">
             Developed by <strong style="color: #4a90e2; text-decoration: underline; font-weight: 600;">Yahia Bin Zaman</strong>
         </a>
-        <span class="footer-version" style="font-size: 10px; color: #666666; font-family: monospace;">v2.4.4</span>
+        <span class="footer-version" style="font-size: 10px; color: #666666; font-family: monospace;">v2.6.0 (Live JSX Engine)</span>
     </footer>
 
     <!-- Scripts -->
     <script src="js/CSInterface.js"></script>
-    <script src="js/main.js?v=2.4.4"></script>
+    <script src="js/main.js?v=2.6.0"></script>
 <script>
 function openAuthorProfile(e) {
     if (e) { e.preventDefault(); e.stopPropagation(); }
