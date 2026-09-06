@@ -13,7 +13,7 @@
     function evalHostScript(code, callback) {
         var extPath = '';
         try {
-            extPath = csInterface.getSystemPath(SystemPath.EXTENSION).replace(/\/g, '/');
+            extPath = csInterface.getSystemPath(SystemPath.EXTENSION).replace(/\\/g, '/');
         } catch(e) {}
         
         var fullCode = '';
@@ -193,7 +193,7 @@
                 try { sessionStorage.clear(); } catch(e) {}
                 showToast('Cache cleared! Reloading...', 'info');
                 try {
-                    var extPath = csInterface.getSystemPath(SystemPath.EXTENSION).replace(/\/g, '/');
+                    var extPath = csInterface.getSystemPath(SystemPath.EXTENSION).replace(/\\/g, '/');
                     var loadScript = "try { $.evalFile(new File('" + extPath + "/jsx/hostscript.jsx')); } catch(e) {}";
                     csInterface.evalScript(loadScript, function() {
                         setTimeout(function() {
@@ -208,7 +208,7 @@
 
         // Force ExtendScript to load the latest hostscript.jsx from disk
         try {
-            var extPath = csInterface.getSystemPath(SystemPath.EXTENSION).replace(/\/g, '/');
+            var extPath = csInterface.getSystemPath(SystemPath.EXTENSION).replace(/\\/g, '/');
             if (extPath) {
                 var loadScript = "try { $.evalFile(new File('" + extPath + "/jsx/hostscript.jsx')); } catch(e) {}";
                 csInterface.evalScript(loadScript);

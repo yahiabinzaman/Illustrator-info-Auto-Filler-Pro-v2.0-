@@ -35,7 +35,7 @@
         try { sessionStorage.clear(); } catch(e) {}
         try {
             var cs = new CSInterface();
-            var extPath = cs.getSystemPath(SystemPath.EXTENSION).replace(/\/g, '/');
+            var extPath = cs.getSystemPath(SystemPath.EXTENSION).replace(/\\/g, '/');
             var loadScript = "try { $.evalFile(new File('" + extPath + "/jsx/hostscript.jsx')); } catch(e) {}";
             cs.evalScript(loadScript, function() {
                 window.location.reload(true);
