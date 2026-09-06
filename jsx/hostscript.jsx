@@ -1513,29 +1513,13 @@ var CardAutoFiller = {
         var solidWhiteCMYK = new CMYKColor();
         solidWhiteCMYK.cyan = 0; solidWhiteCMYK.magenta = 0; solidWhiteCMYK.yellow = 0; solidWhiteCMYK.black = 0;
 
-        var isCMYK = (doc.documentColorSpace === DocumentColorSpace.CMYK);
-        var userChosenColor = null;
-        if (payload.nameColor && payload.nameColor !== "#000000" && payload.nameColor !== "#000" && !isSingleColor) {
-            try {
-                var sw = doc.swatches.getByName(payload.nameColor);
-                if (sw) userChosenColor = sw.color;
-            } catch(e) {}
-
-            if (!userChosenColor && /^#?[0-9A-Fa-f]{3,6}$/.test(payload.nameColor)) {
-                userChosenColor = this.hexToColor(payload.nameColor, isCMYK);
-            }
-        }
-
-        var finalNameColor = (isSingleColor || payload.nameColor === "#000000") ? solidBlackCMYK : (userChosenColor || docNameColor || solidBlackCMYK);
-        var finalDetailsColor = solidBlackCMYK;
-
         var globalBoldFont = docBoldFont;
         var globalRegularFont = docRegularFont || docBoldFont;
 
         // Master template styles matching original cards perfectly
-        var masterTplName = { size: 8.5358, leading: 8.3936, tracking: -5, hScale: 80.0, font: globalBoldFont, color: null, just: null };
-        var masterTplDetails = { size: 6.639, leading: 8.3936, tracking: -5, hScale: 96.38, font: globalRegularFont, color: null, just: null };
-        var masterTplSerial = { size: 7.585, leading: 8.4, tracking: -5, hScale: 98.6, font: globalBoldFont, color: null, just: null };
+        var masterTplName = { size: 13.0, leading: 6.46, tracking: -5, hScale: 80.0, font: globalBoldFont, color: null, just: null };
+        var masterTplDetails = { size: 10.0, leading: 13.0, tracking: 0, hScale: 95.0, font: globalRegularFont, color: null, just: null };
+        var masterTplSerial = { size: 8.1956, leading: 8.4, tracking: 0, hScale: 90.3, font: globalBoldFont, color: null, just: null };
         var masterTplForm = { size: 5.3181, leading: 5.5884, tracking: -50, hScale: 98.6, font: globalRegularFont, color: null, just: null };
 
         for (var tci = 0; tci < targetCards.length; tci++) {
@@ -1548,6 +1532,7 @@ var CardAutoFiller = {
                     if (sTr.characterAttributes.leading > 0) masterTplName.leading = sTr.characterAttributes.leading;
                     if (sTr.characterAttributes.horizontalScale > 0 && sTr.characterAttributes.horizontalScale <= 100) masterTplName.hScale = sTr.characterAttributes.horizontalScale;
                     if (sTr.characterAttributes.textFont) masterTplName.font = sTr.characterAttributes.textFont;
+                    if (sTr.characterAttributes.fillColor && sTr.characterAttributes.fillColor.typename !== "NoColor") masterTplName.color = sTr.characterAttributes.fillColor;
                     try { masterTplName.just = sTr.paragraphAttributes.justification; } catch(j0e) {}
                 }
                 if (sampleCard.detailsFrame && sampleCard.detailsFrame.textRange) {
@@ -1576,6 +1561,22 @@ var CardAutoFiller = {
                 break;
             } catch(e) {}
         }
+
+        var isCMYK = (doc.documentColorSpace === DocumentColorSpace.CMYK);
+        var userChosenColor = null;
+        if (payload.nameColor && payload.nameColor !== "#000000" && payload.nameColor !== "#000" && !isSingleColor) {
+            try {
+                var sw = doc.swatches.getByName(payload.nameColor);
+                if (sw) userChosenColor = sw.color;
+            } catch(e) {}
+
+            if (!userChosenColor && /^#?[0-9A-Fa-f]{3,6}$/.test(payload.nameColor)) {
+                userChosenColor = this.hexToColor(payload.nameColor, isCMYK);
+            }
+        }
+
+        var finalNameColor = isSingleColor ? solidBlackCMYK : (userChosenColor || masterTplName.color || docNameColor || solidBlackCMYK);
+        var finalDetailsColor = masterTplDetails.color || solidBlackCMYK;
 
         var filledCount = 0;
         var fillLimit = Math.min(targetCards.length, activeEntries.length);
@@ -1715,10 +1716,10 @@ var CardAutoFiller = {
                         try {
                             var nTr = card.nameFrame.textRange;
                             if (finalNameFont) nTr.characterAttributes.textFont = finalNameFont;
-                            nTr.characterAttributes.size = tplName.size || 9.1446;
-                            nTr.characterAttributes.leading = finalNameLeading || 8.13;
+                            nTr.characterAttributes.size = tplName.size || 13.0;
+                            nTr.characterAttributes.leading = finalNameLeading || tplName.leading || 6.46;
                             nTr.characterAttributes.tracking = tplName.tracking || -5;
-                            nTr.characterAttributes.horizontalScale = userNmScale;
+                            nTr.characterAttributes.horizontalScale = (payload.nameHScale !== undefined && payload.nameHScale !== 100) ? userNmScale : (tplName.hScale || 80.0);
                             nTr.characterAttributes.fillColor = finalNameColor;
                             if (tplName.just !== null) nTr.paragraphAttributes.justification = tplName.just;
                             nTr.paragraphAttributes.spaceBefore = 0;
