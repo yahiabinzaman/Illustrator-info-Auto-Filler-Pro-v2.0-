@@ -484,11 +484,16 @@ var CardAutoFiller = {
                         }
                     }
 
-                    if (!cCard.formFrame && dx >= 45 && dx <= 78 && dy >= 32 && dy <= 58) {
-                        var dRawF = dtf.contents.replace(/^\s+|\s+$/g, '');
-                        if (/(?:ফরম|দাখেলা|রোল|Form|Roll)/i.test(dRawF) || dtf.lines.length <= 2) {
-                            var fDist = Math.abs(dx - 60) + Math.abs(dy - 45);
-                            if (fDist < minFormDist) {
+                    if (!cCard.formFrame) {
+                        var dRawF = dtf.contents.replace(/^\s+|\s+$/g, "");
+                        var isFormLabel = /(?:ফরম|দাখেলা|রোল|Form|Roll|‡¶´|‡dvi|diBk|‡ivj)/i.test(dRawF);
+                        var isFormDigits = /^[০-৯0-9\s\-\/]+$/.test(dRawF) && dRawF.length <= 10;
+                        var isSmallTF = dtf.lines.length <= 2 && dtf.contents.length <= 25;
+                        
+                        // Form frame is typically in bottom-right quadrant relative to name frame
+                        if (dx > 20 && dy > 10 && (isFormLabel || isFormDigits || isSmallTF)) {
+                            var fDist = Math.sqrt((dx - 65)*(dx - 65) + (dy - 45)*(dy - 45));
+                            if (fDist < minFormDist && fDist < 160) {
                                 minFormDist = fDist;
                                 bestForm = dtf;
                             }
@@ -648,7 +653,9 @@ var CardAutoFiller = {
             var relY = groupHeight > 0 ? (groupTop - tfTop) : 0;
 
             // 1. Form number frame (contains "ফরম", "দাখেলা", "রোল", "Form" or sits near bottom-right)
-            if (/(?:ফরম|দাখেলা|রোল|Form|Roll)/i.test(rawTxt) || (relX > groupWidth * 0.60 && relY > groupHeight * 0.50 && tfW < 45 && tfH < 30)) {
+            var isFormText = /(?:ফরম|দাখেলা|রোল|Form|Roll|‡¶´|‡dvi|diBk|‡ivj)/i.test(rawTxt) || 
+                             (/^[০-৯0-9\s\-\/]+$/.test(cleanTxt) && cleanTxt.length >= 4 && cleanTxt.length <= 8 && relY > groupHeight * 0.45);
+            if (isFormText || (relX > groupWidth * 0.40 && relY > groupHeight * 0.40 && tfW < 60 && tfH < 45)) {
                 card.formFrame = tf;
                 continue;
             }
@@ -1719,7 +1726,7 @@ var CardAutoFiller = {
                     var sFont = cardSerialStyle.font || cardNameStyle.font;
                     var isAnsiFont = (sFont && /sutonny|bornomala/i.test(sFont.name));
                     if (isAnsiFont && /sutonny/i.test(sFont.name)) {
-                        var bnToAscii = {u09e6:0,u09e7:1,u09e8:2,u09e9:3,u09ea:4,u09eb:5,u09ec:6,u09ed:7,u09ee:8,u09ef:9};
+                        var bnToAscii = {"০":"0","১":"1","২":"2","৩":"3","৪":"4","৫":"5","৬":"6","৭":"7","৮":"8","৯":"9"};
                         sVal = String(sVal).replace(/[০-৯]/g, function(d) { return bnToAscii[d] || d; });
                     }
                     card.serialFrame.contents = sVal;
@@ -1738,9 +1745,10 @@ var CardAutoFiller = {
                 } catch(serErr) {}
             }
 
-            // --- STEP 3: POPULATE FORM NUMBER ---
+            // --- STEP 3: POPULATE FORM NUMBER (Bottom-Right Box - Strictly 2 Lines) ---
             var formHandled = false;
-            if (card.formFrame && (entry.formNumber || entry.form)) {
+            var shouldFillForm = (payload.fillForm !== false);
+            if (card.formFrame && shouldFillForm && (entry.formNumber || entry.form)) {
                 try {
                     var rawForm = (entry.formNumber || entry.form || "").replace(/^\s+|\s+$/g, "");
                     var mDigits = rawForm.match(/([০-৯0-9]+)/);
@@ -1752,37 +1760,57 @@ var CardAutoFiller = {
                         formDigits = this.toBengaliDigits(cleanDigits);
                     }
 
+                    // Detect original label from existing formFrame text if available
                     var formLabel = "ফরম";
-                    if (/^(দাখেলা|রোল|Roll|Form)/i.test(rawForm)) {
+                    var existingFormTxt = card.formFrame.contents.replace(/^\s+|\s+$/g, "");
+                    if (/(?:দাখেলা|ডাকো|‡`v‡Ljv)/i.test(existingFormTxt) || /^(দাখেলা|রোল|Roll|Form)/i.test(rawForm)) {
+                        formLabel = "দাখেলা";
+                    } else if (/^(দাখেলা|রোল|Roll|Form)/i.test(rawForm)) {
                         var mLabel = rawForm.match(/^([^:\d]+)/);
                         if (mLabel) formLabel = mLabel[1].replace(/[:\s]+$/, "");
                     }
-                    var fDigitsOut = formDigits;
+
+                    // Read existing form frame styling
+                    var formFont = globalRegularFont;
+                    var formSize = tplForm.size || 5.3181;
+                    var formLeading = tplForm.leading || 5.5884;
+                    var formHScale = tplForm.hScale || 98.6;
+                    var formTracking = tplForm.tracking || -50;
+                    var formJust = tplForm.just || null;
 
                     try {
-                        if (globalRegularFont) card.formFrame.textRange.characterAttributes.textFont = globalRegularFont;
+                        if (card.formFrame.characters.length > 0) {
+                            var fca = card.formFrame.characters[0].characterAttributes;
+                            if (fca.textFont) formFont = fca.textFont;
+                            if (fca.size > 0) formSize = fca.size;
+                            if (fca.leading > 0) formLeading = fca.leading;
+                            if (fca.horizontalScale > 0) formHScale = fca.horizontalScale;
+                            formTracking = fca.tracking;
+                            try { formJust = card.formFrame.paragraphs[0].paragraphAttributes.justification; } catch(fj) {}
+                        }
                     } catch(f0e) {}
 
-                    card.formFrame.contents = formLabel + "\r" + fDigitsOut;
+                    // Write 2 lines strictly: Label on Line 1, Number on Line 2
+                    card.formFrame.contents = formLabel + "\r" + formDigits;
                     try {
                         var fAttr = card.formFrame.textRange.characterAttributes;
-                        if (globalRegularFont) fAttr.textFont = globalRegularFont;
-                        fAttr.size = tplForm.size || 5.3181;
-                        fAttr.leading = tplForm.leading || 5.5884;
-                        fAttr.tracking = tplForm.tracking || -50;
-                        fAttr.horizontalScale = tplForm.hScale || 98.6;
+                        if (formFont) fAttr.textFont = formFont;
+                        fAttr.size = formSize;
+                        fAttr.leading = formLeading;
+                        fAttr.tracking = formTracking;
+                        fAttr.horizontalScale = formHScale;
                         fAttr.fillColor = solidBlackCMYK;
-                        if (tplForm.just !== null) card.formFrame.textRange.paragraphAttributes.justification = tplForm.just;
+                        if (formJust !== null) card.formFrame.textRange.paragraphAttributes.justification = formJust;
                         card.formFrame.textRange.paragraphAttributes.spaceBefore = 0;
                         card.formFrame.textRange.paragraphAttributes.spaceAfter = 0;
 
                         for (var fPi = 0; fPi < card.formFrame.paragraphs.length; fPi++) {
                             try {
                                 var fp = card.formFrame.paragraphs[fPi];
-                                fp.characterAttributes.size = tplForm.size || 5.3181;
-                                fp.characterAttributes.leading = tplForm.leading || 5.5884;
-                                fp.characterAttributes.tracking = tplForm.tracking || -50;
-                                fp.characterAttributes.horizontalScale = tplForm.hScale || 98.6;
+                                fp.characterAttributes.size = formSize;
+                                fp.characterAttributes.leading = formLeading;
+                                fp.characterAttributes.tracking = formTracking;
+                                fp.characterAttributes.horizontalScale = formHScale;
                                 fp.characterAttributes.fillColor = solidBlackCMYK;
                                 fp.paragraphAttributes.spaceBefore = 0;
                                 fp.paragraphAttributes.spaceAfter = 0;

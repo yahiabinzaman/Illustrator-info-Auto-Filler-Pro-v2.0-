@@ -1847,6 +1847,7 @@
                 scope: selectScopeDiary ? selectScopeDiary.value : "artboard",
                 makeBold: chkMakeBoldDiary ? chkMakeBoldDiary.checked : true,
                 stripNumber: false, // In Diary mode, keep formatted serial on Name
+                fillForm: document.getElementById("chkFillFormNumberDiary") ? document.getElementById("chkFillFormNumberDiary").checked : true,
                 fillBani: false,
                 fillQty: false,
                 qtyFormat: "auto",
