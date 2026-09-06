@@ -462,6 +462,105 @@
                             if (inputCardW) inputCardW.value = res.width;
                             if (inputCardH) inputCardH.value = res.height;
                             updateDuplicatorSummary();
+
+        // Setup Grid / Layout Presets
+        function setupLayoutPresets(btn2Id, btn4Id, badgeId, selectOrder) {
+            var btn2 = document.getElementById(btn2Id);
+            var btn4 = document.getElementById(btn4Id);
+            var badge = document.getElementById(badgeId);
+            if (!btn2 || !btn4) return;
+
+            function setActiveLayout(layout) {
+                if (layout === '2col') {
+                    btn2.classList.add('active');
+                    btn2.style.borderColor = '#2563eb';
+                    btn2.style.background = 'rgba(37, 99, 235, 0.25)';
+                    if (btn2.querySelector('span:first-child')) btn2.querySelector('span:first-child').style.color = '#60a5fa';
+                    if (btn2.querySelector('span:last-child')) btn2.querySelector('span:last-child').style.color = '#93c5fd';
+
+                    btn4.classList.remove('active');
+                    btn4.style.borderColor = '#444';
+                    btn4.style.background = '#222';
+                    if (btn4.querySelector('span:first-child')) btn4.querySelector('span:first-child').style.color = '#e2e8f0';
+                    if (btn4.querySelector('span:last-child')) btn4.querySelector('span:last-child').style.color = '#94a3b8';
+
+                    if (badge) {
+                        badge.textContent = '2-Col (1-2)';
+                        badge.style.color = '#fbbf24';
+                        badge.style.borderColor = '#d97706';
+                        badge.style.background = 'rgba(217, 119, 6, 0.2)';
+                    }
+                    if (selectOrder) selectOrder.value = 'zigzag';
+                    showToast('Layout set: 10 Cards / 2 Columns (1-2 | 3-4)!', 'info');
+                } else {
+                    btn4.classList.add('active');
+                    btn4.style.borderColor = '#2563eb';
+                    btn4.style.background = 'rgba(37, 99, 235, 0.25)';
+                    if (btn4.querySelector('span:first-child')) btn4.querySelector('span:first-child').style.color = '#60a5fa';
+                    if (btn4.querySelector('span:last-child')) btn4.querySelector('span:last-child').style.color = '#93c5fd';
+
+                    btn2.classList.remove('active');
+                    btn2.style.borderColor = '#444';
+                    btn2.style.background = '#222';
+                    if (btn2.querySelector('span:first-child')) btn2.querySelector('span:first-child').style.color = '#e2e8f0';
+                    if (btn2.querySelector('span:last-child')) btn2.querySelector('span:last-child').style.color = '#94a3b8';
+
+                    if (badge) {
+                        badge.textContent = '4-Col (1-2-3-4)';
+                        badge.style.color = '#60a5fa';
+                        badge.style.borderColor = '#2563eb';
+                        badge.style.background = 'rgba(37, 99, 235, 0.2)';
+                    }
+                    if (selectOrder) selectOrder.value = 'zigzag';
+                    showToast('Layout set: 28 Cards / 4 Columns (1-2-3-4 | 5-6-7-8)!', 'info');
+                }
+            }
+
+            btn2.addEventListener('click', function() { setActiveLayout('2col'); });
+            btn4.addEventListener('click', function() { setActiveLayout('4col'); });
+        }
+
+        setupLayoutPresets('btnPreset2ColDiary', 'btnPreset4ColDiary', 'activeLayoutBadgeDiary', selectFillOrderDiary);
+        setupLayoutPresets('btnPreset2ColKeyring', 'btnPreset4ColKeyring', 'activeLayoutBadgeKeyring', selectFillOrderKeyring);
+
+        // Duplicator Presets
+        var btnDupPreset10 = document.getElementById('btnDupPreset10');
+        var btnDupPreset28 = document.getElementById('btnDupPreset28');
+        if (btnDupPreset10 && btnDupPreset28) {
+            btnDupPreset10.addEventListener('click', function() {
+                if (inputCardsPerAB) inputCardsPerAB.value = 10;
+                if (inputGridCols) inputGridCols.value = 2;
+                btnDupPreset10.style.borderColor = '#2563eb';
+                btnDupPreset10.style.background = 'rgba(37, 99, 235, 0.25)';
+                if (btnDupPreset10.querySelector('span:first-child')) btnDupPreset10.querySelector('span:first-child').style.color = '#60a5fa';
+                if (btnDupPreset10.querySelector('span:last-child')) btnDupPreset10.querySelector('span:last-child').style.color = '#93c5fd';
+
+                btnDupPreset28.style.borderColor = '#444';
+                btnDupPreset28.style.background = '#222';
+                if (btnDupPreset28.querySelector('span:first-child')) btnDupPreset28.querySelector('span:first-child').style.color = '#e2e8f0';
+                if (btnDupPreset28.querySelector('span:last-child')) btnDupPreset28.querySelector('span:last-child').style.color = '#94a3b8';
+
+                updateDuplicatorSummary();
+                showToast('Duplicator Preset: 10 Cards (2 Columns × 5 Rows)!', 'info');
+            });
+
+            btnDupPreset28.addEventListener('click', function() {
+                if (inputCardsPerAB) inputCardsPerAB.value = 28;
+                if (inputGridCols) inputGridCols.value = 4;
+                btnDupPreset28.style.borderColor = '#2563eb';
+                btnDupPreset28.style.background = 'rgba(37, 99, 235, 0.25)';
+                if (btnDupPreset28.querySelector('span:first-child')) btnDupPreset28.querySelector('span:first-child').style.color = '#60a5fa';
+                if (btnDupPreset28.querySelector('span:last-child')) btnDupPreset28.querySelector('span:last-child').style.color = '#93c5fd';
+
+                btnDupPreset10.style.borderColor = '#444';
+                btnDupPreset10.style.background = '#222';
+                if (btnDupPreset10.querySelector('span:first-child')) btnDupPreset10.querySelector('span:first-child').style.color = '#e2e8f0';
+                if (btnDupPreset10.querySelector('span:last-child')) btnDupPreset10.querySelector('span:last-child').style.color = '#94a3b8';
+
+                updateDuplicatorSummary();
+                showToast('Duplicator Preset: 28 Cards (4 Columns × 7 Rows)!', 'info');
+            });
+        }
                             showToast('Measured Card: ' + res.width + ' × ' + res.height + ' pt', 'success');
                         } else {
                             showToast(res.message || 'Please select a card first', 'error');
@@ -480,6 +579,105 @@
                 if (inputGapX) inputGapX.value = gx;
                 if (inputGapY) inputGapY.value = gy;
                 updateDuplicatorSummary();
+
+        // Setup Grid / Layout Presets
+        function setupLayoutPresets(btn2Id, btn4Id, badgeId, selectOrder) {
+            var btn2 = document.getElementById(btn2Id);
+            var btn4 = document.getElementById(btn4Id);
+            var badge = document.getElementById(badgeId);
+            if (!btn2 || !btn4) return;
+
+            function setActiveLayout(layout) {
+                if (layout === '2col') {
+                    btn2.classList.add('active');
+                    btn2.style.borderColor = '#2563eb';
+                    btn2.style.background = 'rgba(37, 99, 235, 0.25)';
+                    if (btn2.querySelector('span:first-child')) btn2.querySelector('span:first-child').style.color = '#60a5fa';
+                    if (btn2.querySelector('span:last-child')) btn2.querySelector('span:last-child').style.color = '#93c5fd';
+
+                    btn4.classList.remove('active');
+                    btn4.style.borderColor = '#444';
+                    btn4.style.background = '#222';
+                    if (btn4.querySelector('span:first-child')) btn4.querySelector('span:first-child').style.color = '#e2e8f0';
+                    if (btn4.querySelector('span:last-child')) btn4.querySelector('span:last-child').style.color = '#94a3b8';
+
+                    if (badge) {
+                        badge.textContent = '2-Col (1-2)';
+                        badge.style.color = '#fbbf24';
+                        badge.style.borderColor = '#d97706';
+                        badge.style.background = 'rgba(217, 119, 6, 0.2)';
+                    }
+                    if (selectOrder) selectOrder.value = 'zigzag';
+                    showToast('Layout set: 10 Cards / 2 Columns (1-2 | 3-4)!', 'info');
+                } else {
+                    btn4.classList.add('active');
+                    btn4.style.borderColor = '#2563eb';
+                    btn4.style.background = 'rgba(37, 99, 235, 0.25)';
+                    if (btn4.querySelector('span:first-child')) btn4.querySelector('span:first-child').style.color = '#60a5fa';
+                    if (btn4.querySelector('span:last-child')) btn4.querySelector('span:last-child').style.color = '#93c5fd';
+
+                    btn2.classList.remove('active');
+                    btn2.style.borderColor = '#444';
+                    btn2.style.background = '#222';
+                    if (btn2.querySelector('span:first-child')) btn2.querySelector('span:first-child').style.color = '#e2e8f0';
+                    if (btn2.querySelector('span:last-child')) btn2.querySelector('span:last-child').style.color = '#94a3b8';
+
+                    if (badge) {
+                        badge.textContent = '4-Col (1-2-3-4)';
+                        badge.style.color = '#60a5fa';
+                        badge.style.borderColor = '#2563eb';
+                        badge.style.background = 'rgba(37, 99, 235, 0.2)';
+                    }
+                    if (selectOrder) selectOrder.value = 'zigzag';
+                    showToast('Layout set: 28 Cards / 4 Columns (1-2-3-4 | 5-6-7-8)!', 'info');
+                }
+            }
+
+            btn2.addEventListener('click', function() { setActiveLayout('2col'); });
+            btn4.addEventListener('click', function() { setActiveLayout('4col'); });
+        }
+
+        setupLayoutPresets('btnPreset2ColDiary', 'btnPreset4ColDiary', 'activeLayoutBadgeDiary', selectFillOrderDiary);
+        setupLayoutPresets('btnPreset2ColKeyring', 'btnPreset4ColKeyring', 'activeLayoutBadgeKeyring', selectFillOrderKeyring);
+
+        // Duplicator Presets
+        var btnDupPreset10 = document.getElementById('btnDupPreset10');
+        var btnDupPreset28 = document.getElementById('btnDupPreset28');
+        if (btnDupPreset10 && btnDupPreset28) {
+            btnDupPreset10.addEventListener('click', function() {
+                if (inputCardsPerAB) inputCardsPerAB.value = 10;
+                if (inputGridCols) inputGridCols.value = 2;
+                btnDupPreset10.style.borderColor = '#2563eb';
+                btnDupPreset10.style.background = 'rgba(37, 99, 235, 0.25)';
+                if (btnDupPreset10.querySelector('span:first-child')) btnDupPreset10.querySelector('span:first-child').style.color = '#60a5fa';
+                if (btnDupPreset10.querySelector('span:last-child')) btnDupPreset10.querySelector('span:last-child').style.color = '#93c5fd';
+
+                btnDupPreset28.style.borderColor = '#444';
+                btnDupPreset28.style.background = '#222';
+                if (btnDupPreset28.querySelector('span:first-child')) btnDupPreset28.querySelector('span:first-child').style.color = '#e2e8f0';
+                if (btnDupPreset28.querySelector('span:last-child')) btnDupPreset28.querySelector('span:last-child').style.color = '#94a3b8';
+
+                updateDuplicatorSummary();
+                showToast('Duplicator Preset: 10 Cards (2 Columns × 5 Rows)!', 'info');
+            });
+
+            btnDupPreset28.addEventListener('click', function() {
+                if (inputCardsPerAB) inputCardsPerAB.value = 28;
+                if (inputGridCols) inputGridCols.value = 4;
+                btnDupPreset28.style.borderColor = '#2563eb';
+                btnDupPreset28.style.background = 'rgba(37, 99, 235, 0.25)';
+                if (btnDupPreset28.querySelector('span:first-child')) btnDupPreset28.querySelector('span:first-child').style.color = '#60a5fa';
+                if (btnDupPreset28.querySelector('span:last-child')) btnDupPreset28.querySelector('span:last-child').style.color = '#93c5fd';
+
+                btnDupPreset10.style.borderColor = '#444';
+                btnDupPreset10.style.background = '#222';
+                if (btnDupPreset10.querySelector('span:first-child')) btnDupPreset10.querySelector('span:first-child').style.color = '#e2e8f0';
+                if (btnDupPreset10.querySelector('span:last-child')) btnDupPreset10.querySelector('span:last-child').style.color = '#94a3b8';
+
+                updateDuplicatorSummary();
+                showToast('Duplicator Preset: 28 Cards (4 Columns × 7 Rows)!', 'info');
+            });
+        }
                 showToast('Set Gap to X=' + gx + 'pt, Y=' + gy + 'pt', 'info');
             });
         });
@@ -489,6 +687,105 @@
                 if (inputCardsPerAB) {
                     inputCardsPerAB.value = this.getAttribute('data-val');
                     updateDuplicatorSummary();
+
+        // Setup Grid / Layout Presets
+        function setupLayoutPresets(btn2Id, btn4Id, badgeId, selectOrder) {
+            var btn2 = document.getElementById(btn2Id);
+            var btn4 = document.getElementById(btn4Id);
+            var badge = document.getElementById(badgeId);
+            if (!btn2 || !btn4) return;
+
+            function setActiveLayout(layout) {
+                if (layout === '2col') {
+                    btn2.classList.add('active');
+                    btn2.style.borderColor = '#2563eb';
+                    btn2.style.background = 'rgba(37, 99, 235, 0.25)';
+                    if (btn2.querySelector('span:first-child')) btn2.querySelector('span:first-child').style.color = '#60a5fa';
+                    if (btn2.querySelector('span:last-child')) btn2.querySelector('span:last-child').style.color = '#93c5fd';
+
+                    btn4.classList.remove('active');
+                    btn4.style.borderColor = '#444';
+                    btn4.style.background = '#222';
+                    if (btn4.querySelector('span:first-child')) btn4.querySelector('span:first-child').style.color = '#e2e8f0';
+                    if (btn4.querySelector('span:last-child')) btn4.querySelector('span:last-child').style.color = '#94a3b8';
+
+                    if (badge) {
+                        badge.textContent = '2-Col (1-2)';
+                        badge.style.color = '#fbbf24';
+                        badge.style.borderColor = '#d97706';
+                        badge.style.background = 'rgba(217, 119, 6, 0.2)';
+                    }
+                    if (selectOrder) selectOrder.value = 'zigzag';
+                    showToast('Layout set: 10 Cards / 2 Columns (1-2 | 3-4)!', 'info');
+                } else {
+                    btn4.classList.add('active');
+                    btn4.style.borderColor = '#2563eb';
+                    btn4.style.background = 'rgba(37, 99, 235, 0.25)';
+                    if (btn4.querySelector('span:first-child')) btn4.querySelector('span:first-child').style.color = '#60a5fa';
+                    if (btn4.querySelector('span:last-child')) btn4.querySelector('span:last-child').style.color = '#93c5fd';
+
+                    btn2.classList.remove('active');
+                    btn2.style.borderColor = '#444';
+                    btn2.style.background = '#222';
+                    if (btn2.querySelector('span:first-child')) btn2.querySelector('span:first-child').style.color = '#e2e8f0';
+                    if (btn2.querySelector('span:last-child')) btn2.querySelector('span:last-child').style.color = '#94a3b8';
+
+                    if (badge) {
+                        badge.textContent = '4-Col (1-2-3-4)';
+                        badge.style.color = '#60a5fa';
+                        badge.style.borderColor = '#2563eb';
+                        badge.style.background = 'rgba(37, 99, 235, 0.2)';
+                    }
+                    if (selectOrder) selectOrder.value = 'zigzag';
+                    showToast('Layout set: 28 Cards / 4 Columns (1-2-3-4 | 5-6-7-8)!', 'info');
+                }
+            }
+
+            btn2.addEventListener('click', function() { setActiveLayout('2col'); });
+            btn4.addEventListener('click', function() { setActiveLayout('4col'); });
+        }
+
+        setupLayoutPresets('btnPreset2ColDiary', 'btnPreset4ColDiary', 'activeLayoutBadgeDiary', selectFillOrderDiary);
+        setupLayoutPresets('btnPreset2ColKeyring', 'btnPreset4ColKeyring', 'activeLayoutBadgeKeyring', selectFillOrderKeyring);
+
+        // Duplicator Presets
+        var btnDupPreset10 = document.getElementById('btnDupPreset10');
+        var btnDupPreset28 = document.getElementById('btnDupPreset28');
+        if (btnDupPreset10 && btnDupPreset28) {
+            btnDupPreset10.addEventListener('click', function() {
+                if (inputCardsPerAB) inputCardsPerAB.value = 10;
+                if (inputGridCols) inputGridCols.value = 2;
+                btnDupPreset10.style.borderColor = '#2563eb';
+                btnDupPreset10.style.background = 'rgba(37, 99, 235, 0.25)';
+                if (btnDupPreset10.querySelector('span:first-child')) btnDupPreset10.querySelector('span:first-child').style.color = '#60a5fa';
+                if (btnDupPreset10.querySelector('span:last-child')) btnDupPreset10.querySelector('span:last-child').style.color = '#93c5fd';
+
+                btnDupPreset28.style.borderColor = '#444';
+                btnDupPreset28.style.background = '#222';
+                if (btnDupPreset28.querySelector('span:first-child')) btnDupPreset28.querySelector('span:first-child').style.color = '#e2e8f0';
+                if (btnDupPreset28.querySelector('span:last-child')) btnDupPreset28.querySelector('span:last-child').style.color = '#94a3b8';
+
+                updateDuplicatorSummary();
+                showToast('Duplicator Preset: 10 Cards (2 Columns × 5 Rows)!', 'info');
+            });
+
+            btnDupPreset28.addEventListener('click', function() {
+                if (inputCardsPerAB) inputCardsPerAB.value = 28;
+                if (inputGridCols) inputGridCols.value = 4;
+                btnDupPreset28.style.borderColor = '#2563eb';
+                btnDupPreset28.style.background = 'rgba(37, 99, 235, 0.25)';
+                if (btnDupPreset28.querySelector('span:first-child')) btnDupPreset28.querySelector('span:first-child').style.color = '#60a5fa';
+                if (btnDupPreset28.querySelector('span:last-child')) btnDupPreset28.querySelector('span:last-child').style.color = '#93c5fd';
+
+                btnDupPreset10.style.borderColor = '#444';
+                btnDupPreset10.style.background = '#222';
+                if (btnDupPreset10.querySelector('span:first-child')) btnDupPreset10.querySelector('span:first-child').style.color = '#e2e8f0';
+                if (btnDupPreset10.querySelector('span:last-child')) btnDupPreset10.querySelector('span:last-child').style.color = '#94a3b8';
+
+                updateDuplicatorSummary();
+                showToast('Duplicator Preset: 28 Cards (4 Columns × 7 Rows)!', 'info');
+            });
+        }
                 }
             });
         });
@@ -499,6 +796,105 @@
                 if (inputTotalCopies) {
                     inputTotalCopies.value = count;
                     updateDuplicatorSummary();
+
+        // Setup Grid / Layout Presets
+        function setupLayoutPresets(btn2Id, btn4Id, badgeId, selectOrder) {
+            var btn2 = document.getElementById(btn2Id);
+            var btn4 = document.getElementById(btn4Id);
+            var badge = document.getElementById(badgeId);
+            if (!btn2 || !btn4) return;
+
+            function setActiveLayout(layout) {
+                if (layout === '2col') {
+                    btn2.classList.add('active');
+                    btn2.style.borderColor = '#2563eb';
+                    btn2.style.background = 'rgba(37, 99, 235, 0.25)';
+                    if (btn2.querySelector('span:first-child')) btn2.querySelector('span:first-child').style.color = '#60a5fa';
+                    if (btn2.querySelector('span:last-child')) btn2.querySelector('span:last-child').style.color = '#93c5fd';
+
+                    btn4.classList.remove('active');
+                    btn4.style.borderColor = '#444';
+                    btn4.style.background = '#222';
+                    if (btn4.querySelector('span:first-child')) btn4.querySelector('span:first-child').style.color = '#e2e8f0';
+                    if (btn4.querySelector('span:last-child')) btn4.querySelector('span:last-child').style.color = '#94a3b8';
+
+                    if (badge) {
+                        badge.textContent = '2-Col (1-2)';
+                        badge.style.color = '#fbbf24';
+                        badge.style.borderColor = '#d97706';
+                        badge.style.background = 'rgba(217, 119, 6, 0.2)';
+                    }
+                    if (selectOrder) selectOrder.value = 'zigzag';
+                    showToast('Layout set: 10 Cards / 2 Columns (1-2 | 3-4)!', 'info');
+                } else {
+                    btn4.classList.add('active');
+                    btn4.style.borderColor = '#2563eb';
+                    btn4.style.background = 'rgba(37, 99, 235, 0.25)';
+                    if (btn4.querySelector('span:first-child')) btn4.querySelector('span:first-child').style.color = '#60a5fa';
+                    if (btn4.querySelector('span:last-child')) btn4.querySelector('span:last-child').style.color = '#93c5fd';
+
+                    btn2.classList.remove('active');
+                    btn2.style.borderColor = '#444';
+                    btn2.style.background = '#222';
+                    if (btn2.querySelector('span:first-child')) btn2.querySelector('span:first-child').style.color = '#e2e8f0';
+                    if (btn2.querySelector('span:last-child')) btn2.querySelector('span:last-child').style.color = '#94a3b8';
+
+                    if (badge) {
+                        badge.textContent = '4-Col (1-2-3-4)';
+                        badge.style.color = '#60a5fa';
+                        badge.style.borderColor = '#2563eb';
+                        badge.style.background = 'rgba(37, 99, 235, 0.2)';
+                    }
+                    if (selectOrder) selectOrder.value = 'zigzag';
+                    showToast('Layout set: 28 Cards / 4 Columns (1-2-3-4 | 5-6-7-8)!', 'info');
+                }
+            }
+
+            btn2.addEventListener('click', function() { setActiveLayout('2col'); });
+            btn4.addEventListener('click', function() { setActiveLayout('4col'); });
+        }
+
+        setupLayoutPresets('btnPreset2ColDiary', 'btnPreset4ColDiary', 'activeLayoutBadgeDiary', selectFillOrderDiary);
+        setupLayoutPresets('btnPreset2ColKeyring', 'btnPreset4ColKeyring', 'activeLayoutBadgeKeyring', selectFillOrderKeyring);
+
+        // Duplicator Presets
+        var btnDupPreset10 = document.getElementById('btnDupPreset10');
+        var btnDupPreset28 = document.getElementById('btnDupPreset28');
+        if (btnDupPreset10 && btnDupPreset28) {
+            btnDupPreset10.addEventListener('click', function() {
+                if (inputCardsPerAB) inputCardsPerAB.value = 10;
+                if (inputGridCols) inputGridCols.value = 2;
+                btnDupPreset10.style.borderColor = '#2563eb';
+                btnDupPreset10.style.background = 'rgba(37, 99, 235, 0.25)';
+                if (btnDupPreset10.querySelector('span:first-child')) btnDupPreset10.querySelector('span:first-child').style.color = '#60a5fa';
+                if (btnDupPreset10.querySelector('span:last-child')) btnDupPreset10.querySelector('span:last-child').style.color = '#93c5fd';
+
+                btnDupPreset28.style.borderColor = '#444';
+                btnDupPreset28.style.background = '#222';
+                if (btnDupPreset28.querySelector('span:first-child')) btnDupPreset28.querySelector('span:first-child').style.color = '#e2e8f0';
+                if (btnDupPreset28.querySelector('span:last-child')) btnDupPreset28.querySelector('span:last-child').style.color = '#94a3b8';
+
+                updateDuplicatorSummary();
+                showToast('Duplicator Preset: 10 Cards (2 Columns × 5 Rows)!', 'info');
+            });
+
+            btnDupPreset28.addEventListener('click', function() {
+                if (inputCardsPerAB) inputCardsPerAB.value = 28;
+                if (inputGridCols) inputGridCols.value = 4;
+                btnDupPreset28.style.borderColor = '#2563eb';
+                btnDupPreset28.style.background = 'rgba(37, 99, 235, 0.25)';
+                if (btnDupPreset28.querySelector('span:first-child')) btnDupPreset28.querySelector('span:first-child').style.color = '#60a5fa';
+                if (btnDupPreset28.querySelector('span:last-child')) btnDupPreset28.querySelector('span:last-child').style.color = '#93c5fd';
+
+                btnDupPreset10.style.borderColor = '#444';
+                btnDupPreset10.style.background = '#222';
+                if (btnDupPreset10.querySelector('span:first-child')) btnDupPreset10.querySelector('span:first-child').style.color = '#e2e8f0';
+                if (btnDupPreset10.querySelector('span:last-child')) btnDupPreset10.querySelector('span:last-child').style.color = '#94a3b8';
+
+                updateDuplicatorSummary();
+                showToast('Duplicator Preset: 28 Cards (4 Columns × 7 Rows)!', 'info');
+            });
+        }
                     showToast('Matched list count: ' + count + ' copies', 'info');
                 }
             });
@@ -512,6 +908,105 @@
                 if (inputTotalCopies && parsedKeyringEntries.length > 0) {
                     inputTotalCopies.value = parsedKeyringEntries.length;
                     updateDuplicatorSummary();
+
+        // Setup Grid / Layout Presets
+        function setupLayoutPresets(btn2Id, btn4Id, badgeId, selectOrder) {
+            var btn2 = document.getElementById(btn2Id);
+            var btn4 = document.getElementById(btn4Id);
+            var badge = document.getElementById(badgeId);
+            if (!btn2 || !btn4) return;
+
+            function setActiveLayout(layout) {
+                if (layout === '2col') {
+                    btn2.classList.add('active');
+                    btn2.style.borderColor = '#2563eb';
+                    btn2.style.background = 'rgba(37, 99, 235, 0.25)';
+                    if (btn2.querySelector('span:first-child')) btn2.querySelector('span:first-child').style.color = '#60a5fa';
+                    if (btn2.querySelector('span:last-child')) btn2.querySelector('span:last-child').style.color = '#93c5fd';
+
+                    btn4.classList.remove('active');
+                    btn4.style.borderColor = '#444';
+                    btn4.style.background = '#222';
+                    if (btn4.querySelector('span:first-child')) btn4.querySelector('span:first-child').style.color = '#e2e8f0';
+                    if (btn4.querySelector('span:last-child')) btn4.querySelector('span:last-child').style.color = '#94a3b8';
+
+                    if (badge) {
+                        badge.textContent = '2-Col (1-2)';
+                        badge.style.color = '#fbbf24';
+                        badge.style.borderColor = '#d97706';
+                        badge.style.background = 'rgba(217, 119, 6, 0.2)';
+                    }
+                    if (selectOrder) selectOrder.value = 'zigzag';
+                    showToast('Layout set: 10 Cards / 2 Columns (1-2 | 3-4)!', 'info');
+                } else {
+                    btn4.classList.add('active');
+                    btn4.style.borderColor = '#2563eb';
+                    btn4.style.background = 'rgba(37, 99, 235, 0.25)';
+                    if (btn4.querySelector('span:first-child')) btn4.querySelector('span:first-child').style.color = '#60a5fa';
+                    if (btn4.querySelector('span:last-child')) btn4.querySelector('span:last-child').style.color = '#93c5fd';
+
+                    btn2.classList.remove('active');
+                    btn2.style.borderColor = '#444';
+                    btn2.style.background = '#222';
+                    if (btn2.querySelector('span:first-child')) btn2.querySelector('span:first-child').style.color = '#e2e8f0';
+                    if (btn2.querySelector('span:last-child')) btn2.querySelector('span:last-child').style.color = '#94a3b8';
+
+                    if (badge) {
+                        badge.textContent = '4-Col (1-2-3-4)';
+                        badge.style.color = '#60a5fa';
+                        badge.style.borderColor = '#2563eb';
+                        badge.style.background = 'rgba(37, 99, 235, 0.2)';
+                    }
+                    if (selectOrder) selectOrder.value = 'zigzag';
+                    showToast('Layout set: 28 Cards / 4 Columns (1-2-3-4 | 5-6-7-8)!', 'info');
+                }
+            }
+
+            btn2.addEventListener('click', function() { setActiveLayout('2col'); });
+            btn4.addEventListener('click', function() { setActiveLayout('4col'); });
+        }
+
+        setupLayoutPresets('btnPreset2ColDiary', 'btnPreset4ColDiary', 'activeLayoutBadgeDiary', selectFillOrderDiary);
+        setupLayoutPresets('btnPreset2ColKeyring', 'btnPreset4ColKeyring', 'activeLayoutBadgeKeyring', selectFillOrderKeyring);
+
+        // Duplicator Presets
+        var btnDupPreset10 = document.getElementById('btnDupPreset10');
+        var btnDupPreset28 = document.getElementById('btnDupPreset28');
+        if (btnDupPreset10 && btnDupPreset28) {
+            btnDupPreset10.addEventListener('click', function() {
+                if (inputCardsPerAB) inputCardsPerAB.value = 10;
+                if (inputGridCols) inputGridCols.value = 2;
+                btnDupPreset10.style.borderColor = '#2563eb';
+                btnDupPreset10.style.background = 'rgba(37, 99, 235, 0.25)';
+                if (btnDupPreset10.querySelector('span:first-child')) btnDupPreset10.querySelector('span:first-child').style.color = '#60a5fa';
+                if (btnDupPreset10.querySelector('span:last-child')) btnDupPreset10.querySelector('span:last-child').style.color = '#93c5fd';
+
+                btnDupPreset28.style.borderColor = '#444';
+                btnDupPreset28.style.background = '#222';
+                if (btnDupPreset28.querySelector('span:first-child')) btnDupPreset28.querySelector('span:first-child').style.color = '#e2e8f0';
+                if (btnDupPreset28.querySelector('span:last-child')) btnDupPreset28.querySelector('span:last-child').style.color = '#94a3b8';
+
+                updateDuplicatorSummary();
+                showToast('Duplicator Preset: 10 Cards (2 Columns × 5 Rows)!', 'info');
+            });
+
+            btnDupPreset28.addEventListener('click', function() {
+                if (inputCardsPerAB) inputCardsPerAB.value = 28;
+                if (inputGridCols) inputGridCols.value = 4;
+                btnDupPreset28.style.borderColor = '#2563eb';
+                btnDupPreset28.style.background = 'rgba(37, 99, 235, 0.25)';
+                if (btnDupPreset28.querySelector('span:first-child')) btnDupPreset28.querySelector('span:first-child').style.color = '#60a5fa';
+                if (btnDupPreset28.querySelector('span:last-child')) btnDupPreset28.querySelector('span:last-child').style.color = '#93c5fd';
+
+                btnDupPreset10.style.borderColor = '#444';
+                btnDupPreset10.style.background = '#222';
+                if (btnDupPreset10.querySelector('span:first-child')) btnDupPreset10.querySelector('span:first-child').style.color = '#e2e8f0';
+                if (btnDupPreset10.querySelector('span:last-child')) btnDupPreset10.querySelector('span:last-child').style.color = '#94a3b8';
+
+                updateDuplicatorSummary();
+                showToast('Duplicator Preset: 28 Cards (4 Columns × 7 Rows)!', 'info');
+            });
+        }
                 }
             });
         }
@@ -567,6 +1062,105 @@
         }
 
         updateDuplicatorSummary();
+
+        // Setup Grid / Layout Presets
+        function setupLayoutPresets(btn2Id, btn4Id, badgeId, selectOrder) {
+            var btn2 = document.getElementById(btn2Id);
+            var btn4 = document.getElementById(btn4Id);
+            var badge = document.getElementById(badgeId);
+            if (!btn2 || !btn4) return;
+
+            function setActiveLayout(layout) {
+                if (layout === '2col') {
+                    btn2.classList.add('active');
+                    btn2.style.borderColor = '#2563eb';
+                    btn2.style.background = 'rgba(37, 99, 235, 0.25)';
+                    if (btn2.querySelector('span:first-child')) btn2.querySelector('span:first-child').style.color = '#60a5fa';
+                    if (btn2.querySelector('span:last-child')) btn2.querySelector('span:last-child').style.color = '#93c5fd';
+
+                    btn4.classList.remove('active');
+                    btn4.style.borderColor = '#444';
+                    btn4.style.background = '#222';
+                    if (btn4.querySelector('span:first-child')) btn4.querySelector('span:first-child').style.color = '#e2e8f0';
+                    if (btn4.querySelector('span:last-child')) btn4.querySelector('span:last-child').style.color = '#94a3b8';
+
+                    if (badge) {
+                        badge.textContent = '2-Col (1-2)';
+                        badge.style.color = '#fbbf24';
+                        badge.style.borderColor = '#d97706';
+                        badge.style.background = 'rgba(217, 119, 6, 0.2)';
+                    }
+                    if (selectOrder) selectOrder.value = 'zigzag';
+                    showToast('Layout set: 10 Cards / 2 Columns (1-2 | 3-4)!', 'info');
+                } else {
+                    btn4.classList.add('active');
+                    btn4.style.borderColor = '#2563eb';
+                    btn4.style.background = 'rgba(37, 99, 235, 0.25)';
+                    if (btn4.querySelector('span:first-child')) btn4.querySelector('span:first-child').style.color = '#60a5fa';
+                    if (btn4.querySelector('span:last-child')) btn4.querySelector('span:last-child').style.color = '#93c5fd';
+
+                    btn2.classList.remove('active');
+                    btn2.style.borderColor = '#444';
+                    btn2.style.background = '#222';
+                    if (btn2.querySelector('span:first-child')) btn2.querySelector('span:first-child').style.color = '#e2e8f0';
+                    if (btn2.querySelector('span:last-child')) btn2.querySelector('span:last-child').style.color = '#94a3b8';
+
+                    if (badge) {
+                        badge.textContent = '4-Col (1-2-3-4)';
+                        badge.style.color = '#60a5fa';
+                        badge.style.borderColor = '#2563eb';
+                        badge.style.background = 'rgba(37, 99, 235, 0.2)';
+                    }
+                    if (selectOrder) selectOrder.value = 'zigzag';
+                    showToast('Layout set: 28 Cards / 4 Columns (1-2-3-4 | 5-6-7-8)!', 'info');
+                }
+            }
+
+            btn2.addEventListener('click', function() { setActiveLayout('2col'); });
+            btn4.addEventListener('click', function() { setActiveLayout('4col'); });
+        }
+
+        setupLayoutPresets('btnPreset2ColDiary', 'btnPreset4ColDiary', 'activeLayoutBadgeDiary', selectFillOrderDiary);
+        setupLayoutPresets('btnPreset2ColKeyring', 'btnPreset4ColKeyring', 'activeLayoutBadgeKeyring', selectFillOrderKeyring);
+
+        // Duplicator Presets
+        var btnDupPreset10 = document.getElementById('btnDupPreset10');
+        var btnDupPreset28 = document.getElementById('btnDupPreset28');
+        if (btnDupPreset10 && btnDupPreset28) {
+            btnDupPreset10.addEventListener('click', function() {
+                if (inputCardsPerAB) inputCardsPerAB.value = 10;
+                if (inputGridCols) inputGridCols.value = 2;
+                btnDupPreset10.style.borderColor = '#2563eb';
+                btnDupPreset10.style.background = 'rgba(37, 99, 235, 0.25)';
+                if (btnDupPreset10.querySelector('span:first-child')) btnDupPreset10.querySelector('span:first-child').style.color = '#60a5fa';
+                if (btnDupPreset10.querySelector('span:last-child')) btnDupPreset10.querySelector('span:last-child').style.color = '#93c5fd';
+
+                btnDupPreset28.style.borderColor = '#444';
+                btnDupPreset28.style.background = '#222';
+                if (btnDupPreset28.querySelector('span:first-child')) btnDupPreset28.querySelector('span:first-child').style.color = '#e2e8f0';
+                if (btnDupPreset28.querySelector('span:last-child')) btnDupPreset28.querySelector('span:last-child').style.color = '#94a3b8';
+
+                updateDuplicatorSummary();
+                showToast('Duplicator Preset: 10 Cards (2 Columns × 5 Rows)!', 'info');
+            });
+
+            btnDupPreset28.addEventListener('click', function() {
+                if (inputCardsPerAB) inputCardsPerAB.value = 28;
+                if (inputGridCols) inputGridCols.value = 4;
+                btnDupPreset28.style.borderColor = '#2563eb';
+                btnDupPreset28.style.background = 'rgba(37, 99, 235, 0.25)';
+                if (btnDupPreset28.querySelector('span:first-child')) btnDupPreset28.querySelector('span:first-child').style.color = '#60a5fa';
+                if (btnDupPreset28.querySelector('span:last-child')) btnDupPreset28.querySelector('span:last-child').style.color = '#93c5fd';
+
+                btnDupPreset10.style.borderColor = '#444';
+                btnDupPreset10.style.background = '#222';
+                if (btnDupPreset10.querySelector('span:first-child')) btnDupPreset10.querySelector('span:first-child').style.color = '#e2e8f0';
+                if (btnDupPreset10.querySelector('span:last-child')) btnDupPreset10.querySelector('span:last-child').style.color = '#94a3b8';
+
+                updateDuplicatorSummary();
+                showToast('Duplicator Preset: 28 Cards (4 Columns × 7 Rows)!', 'info');
+            });
+        }
 
         // Keyring Event Listeners
         if (rawTextInputKeyring) {

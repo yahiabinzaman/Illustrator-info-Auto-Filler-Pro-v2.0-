@@ -561,12 +561,19 @@ Example:
                 </div>
             </div>
 
-            <div style="display: flex; gap: 5px; margin-top: 6px; align-items: center;">
-                <span style="font-size: 10px; color: #888;">Presets:</span>
-                <button class="btn btn-sm btn-preset-ab" data-val="10">10 / AB</button>
-                <button class="btn btn-sm btn-preset-ab" data-val="20">20 / AB</button>
-                <button class="btn btn-sm btn-preset-ab" data-val="25">25 / AB</button>
-                <button class="btn btn-sm btn-preset-ab" data-val="30">30 / AB</button>
+            <!-- Core Grid Presets in Duplicator -->
+            <div style="background: rgba(255, 255, 255, 0.04); border: 1px solid #383838; border-radius: 4px; padding: 7px 9px; margin-top: 6px;">
+                <div style="font-size: 11px; font-weight: bold; color: #fbbf24; margin-bottom: 5px;">⚡ Standard Layout Presets (প্রিসেট অনুযায়ী আর্টবোর্ড সাজাও):</div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
+                    <button type="button" id="btnDupPreset10" class="btn btn-sm" style="padding: 6px 8px; font-size: 11px; display: flex; flex-direction: column; align-items: center; gap: 2px; border: 1px solid #444; background: #222; border-radius: 3px; cursor: pointer;">
+                        <span style="font-weight: bold; color: #e2e8f0;">10 Cards / Artboard</span>
+                        <span style="font-size: 9.5px; color: #94a3b8;">2 Cols × 5 Rows (1-2 | 3-4)</span>
+                    </button>
+                    <button type="button" id="btnDupPreset28" class="btn btn-sm active" style="padding: 6px 8px; font-size: 11px; display: flex; flex-direction: column; align-items: center; gap: 2px; border: 1px solid #2563eb; background: rgba(37, 99, 235, 0.25); border-radius: 3px; cursor: pointer;">
+                        <span style="font-weight: bold; color: #60a5fa;">28 Cards / Artboard</span>
+                        <span style="font-size: 9.5px; color: #93c5fd;">4 Cols × 7 Rows (1-2-3-4)</span>
+                    </button>
+                </div>
             </div>
 
             <!-- Card Dimensions with Auto Measure -->
