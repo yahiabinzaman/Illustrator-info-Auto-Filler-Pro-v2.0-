@@ -1608,9 +1608,9 @@ var CardAutoFiller = {
 
             // --- STEP 3: POPULATE FORM NUMBER (Bottom-Right Box - Strictly 2 Lines) ---
             var formHandled = false;
-            if (card.formFrame && entry.formNumber) {
+            if (card.formFrame && (entry.formNumber || entry.form)) {
                 try {
-                    var rawForm = (entry.formNumber || "").replace(/^\s+|\s+$/g, '');
+                    var rawForm = (entry.formNumber || entry.form || "").replace(/^\s+|\s+$/g, '');
                     var mDigits = rawForm.match(/([০-৯0-9]+)/);
                     var formDigits = "";
                     if (mDigits) {
