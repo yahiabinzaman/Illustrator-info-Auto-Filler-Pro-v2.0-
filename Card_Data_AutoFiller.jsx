@@ -317,10 +317,14 @@ var CardAutoFiller = {
         if (/01[3-9]\d{8}/.test(text) || /০১[৩-৯][০-৯]{8}/.test(text) || /٠١[٠-৯]{9}/.test(text)) {
             return true;
         }
-        var studentTitles = ["মাওলানা", "মুহাম্মাদ", "মোহাম্মদ", "মোঃ", "হাফেজ", "মুফতী", "ক্বারী", "শিক্ষার্থী", "ছাত্র", "الحافظ", "مولانا"];
-        for (var s = 0; s < studentTitles.length; s++) {
-            if (text.indexOf(studentTitles[s]) !== -1 && (text.indexOf("\n") !== -1 || text.indexOf("\r") !== -1)) {
-                return true;
+        var clean = text.replace(/^\s+|\s+$/g, "");
+        var lines = clean.split(/[\r\n]+/);
+        if (lines.length >= 2) {
+            var studentTitles = ["মাওলানা", "মুহাম্মাদ", "মোহাম্মদ", "মোঃ", "হাফেজ", "মুফতী", "ক্বারী", "শিক্ষার্থী", "ছাত্র", "الحافظ", "مولانا"];
+            for (var s = 0; s < studentTitles.length; s++) {
+                if (clean.indexOf(studentTitles[s]) !== -1) {
+                    return true;
+                }
             }
         }
         return false;
@@ -530,7 +534,17 @@ var CardAutoFiller = {
                 return;
             }
 
-            if (personCount > 1 || tfs.length > 8) {
+            if (tfs.length >= 1 && tfs.length <= 5) {
+                var card = this.analyzeCardGroup(tfs, item);
+                if (card.nameFrame && (card.detailsFrame || card.serialFrame || card.namePlaceholderPath)) {
+                    card.group = item;
+                    card.bounds = item.geometricBounds;
+                    outCards.push(card);
+                    return;
+                }
+            }
+
+            if (personCount > 1 || tfs.length > 5) {
                 for (var c = 0; c < item.pageItems.length; c++) {
                     this.extractCardsFromItem(item.pageItems[c], outCards);
                 }
@@ -670,7 +684,7 @@ var CardAutoFiller = {
             card.bounds = gb;
             var w = Math.abs(gb[2] - gb[0]);
             var h = Math.abs(gb[1] - gb[3]);
-            if (w > 280 || h > 90) continue;
+            if (w > 450 || h > 350) continue;
             card.artboardIndex = 0;
             if (numABs > 1 && gb) {
                 var midX = (gb[0] + gb[2]) / 2;
@@ -1530,13 +1544,19 @@ var CardAutoFiller = {
                 if (sampleCard.nameFrame && sampleCard.nameFrame.textRange) {
                     var sTr = sampleCard.nameFrame.textRange;
                     var sz = sTr.characterAttributes.size;
-                    if (sz >= 7.0 && sz <= 10.5) masterTplName.size = sz;
-                    else masterTplName.size = 8.5358;
-                    if (sTr.characterAttributes.leading >= 6.0 && sTr.characterAttributes.leading <= 12.0) masterTplName.leading = sTr.characterAttributes.leading;
-                    else masterTplName.leading = 8.3936;
+                    if (sz > 0) masterTplName.size = sz;
+                    if (sTr.characterAttributes.leading > 0) masterTplName.leading = sTr.characterAttributes.leading;
                     if (sTr.characterAttributes.horizontalScale > 0 && sTr.characterAttributes.horizontalScale <= 100) masterTplName.hScale = sTr.characterAttributes.horizontalScale;
                     if (sTr.characterAttributes.textFont) masterTplName.font = sTr.characterAttributes.textFont;
                     try { masterTplName.just = sTr.paragraphAttributes.justification; } catch(j0e) {}
+                }
+                if (sampleCard.detailsFrame && sampleCard.detailsFrame.textRange) {
+                    var sdTr = sampleCard.detailsFrame.textRange;
+                    if (sdTr.characterAttributes.size > 0) masterTplDetails.size = sdTr.characterAttributes.size;
+                    if (sdTr.characterAttributes.leading > 0) masterTplDetails.leading = sdTr.characterAttributes.leading;
+                    if (sdTr.characterAttributes.horizontalScale > 0) masterTplDetails.hScale = sdTr.characterAttributes.horizontalScale;
+                    if (sdTr.characterAttributes.textFont) masterTplDetails.font = sdTr.characterAttributes.textFont;
+                    if (sdTr.characterAttributes.fillColor && sdTr.characterAttributes.fillColor.typename !== "NoColor") masterTplDetails.color = sdTr.characterAttributes.fillColor;
                 }
                 if (sampleCard.serialFrame && sampleCard.serialFrame.textRange) {
                     var ssTr = sampleCard.serialFrame.textRange;
@@ -1589,11 +1609,12 @@ var CardAutoFiller = {
                         var bnToAscii = {'০':'0','১':'1','২':'2','৩':'3','৪':'4','৫':'5','৬':'6','৭':'7','৮':'8','৯':'9'};
                         sVal = String(sVal).replace(/[০-৯]/g, function(d) { return bnToAscii[d] || d; });
                     }
-                    var finalSerialColor = tplSerial.color || solidWhiteCMYK;
+                    var finalSerialFont = tplSerial.font || finalNameFont;
+                    var finalSerialColor = tplSerial.color || solidBlackCMYK;
                     card.serialFrame.contents = sVal;
                     try {
                         var sAttr = card.serialFrame.textRange.characterAttributes;
-                        if (finalNameFont) sAttr.textFont = finalNameFont;
+                        if (finalSerialFont) sAttr.textFont = finalSerialFont;
                         sAttr.size = tplSerial.size;
                         sAttr.leading = tplSerial.leading;
                         sAttr.tracking = tplSerial.tracking;
@@ -1716,8 +1737,8 @@ var CardAutoFiller = {
                                         var isDAddr = /^(গ্রাম|পোস্ট|থানা|জেলা)/.test(dParaTxt) || dp === 1 || dp === 2;
                                         
                                         if (finalDetailsFont) dParaItem.characterAttributes.textFont = finalDetailsFont;
-                                        dParaItem.characterAttributes.size = 7.0;
-                                        dParaItem.characterAttributes.leading = finalDetailsLeading || 8.13;
+                                        dParaItem.characterAttributes.size = tplDetails.size || 7.0;
+                                        dParaItem.characterAttributes.leading = finalDetailsLeading || tplDetails.leading || 8.13;
                                         dParaItem.characterAttributes.tracking = tplDetails.tracking || -5;
                                         dParaItem.characterAttributes.horizontalScale = isDAddr ? userAddrScale : userDetScale;
                                         dParaItem.characterAttributes.fillColor = finalDetailsColor;
