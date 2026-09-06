@@ -259,17 +259,17 @@ var CardAutoFiller = {
         } catch(e) {}
         try {
             var cur = item;
-            while (cur) {
-                if (cur.typename === "Layer") {
+            var depth = 0;
+            while (cur && depth < 20) {
+                depth++;
+                if (cur.typename === 'Document' || cur.typename === 'Application' || cur === app) break;
+                if (cur.typename === 'Layer') {
                     if (!cur.visible || cur.locked) return true;
-                    var pLayer = cur.parent;
-                    while (pLayer && pLayer.typename === "Layer") {
-                        if (!pLayer.visible || pLayer.locked) return true;
-                        pLayer = pLayer.parent;
-                    }
-                    break;
+                } else {
+                    try {
+                        if (cur.hidden || cur.locked) return true;
+                    } catch(err) {}
                 }
-                if (cur.hidden || cur.locked) return true;
                 cur = cur.parent;
             }
         } catch(e) {}
@@ -350,11 +350,15 @@ var CardAutoFiller = {
         if (!items) return;
         for (var i = 0; i < items.length; i++) {
             var it = items[i];
-            if (this.isItemHidden(it)) continue; // STRICT: Ignore hidden items
-            if (it.typename === "TextFrame") {
-                outList.push(it);
-            } else if (it.typename === "GroupItem") {
-                this.collectTextFrames(it.pageItems, outList);
+            var tn = it.typename;
+            if (tn === 'TextFrame') {
+                try {
+                    if (!it.hidden && !it.locked) outList.push(it);
+                } catch(e) { outList.push(it); }
+            } else if (tn === 'GroupItem') {
+                try {
+                    if (!it.hidden && !it.locked) this.collectTextFrames(it.pageItems, outList);
+                } catch(e) {}
             }
         }
     },
