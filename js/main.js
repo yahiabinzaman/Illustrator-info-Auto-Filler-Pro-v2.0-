@@ -1247,6 +1247,52 @@
             });
         }
 
+        // Color Names Map for friendly labels
+        var COLOR_NAMES = {
+            '#A22F10': 'Red-Brown',
+            '#000000': 'Solid Black',
+            '#1E5AA8': 'Royal Blue',
+            '#006F9A': 'Deep Teal',
+            '#1B6E3F': 'Islamic Green',
+            '#9C1A1A': 'Crimson Maroon',
+            '#C88210': 'Golden Amber'
+        };
+
+        function normalizeHex(input) {
+            if (!input) return null;
+            var str = String(input).trim().toUpperCase();
+            if (!str) return null;
+            if (str.charAt(0) === '#') {
+                str = str.substring(1);
+            }
+            if (/^[0-9A-F]{3}$/i.test(str)) {
+                str = str.charAt(0) + str.charAt(0) + str.charAt(1) + str.charAt(1) + str.charAt(2) + str.charAt(2);
+            }
+            if (/^[0-9A-F]{6}$/i.test(str)) {
+                return '#' + str;
+            }
+            return null;
+        }
+
+        function syncColorSwatches(tabName, hex) {
+            var swatches = document.querySelectorAll('.color-swatch[data-tab="' + tabName + '"]');
+            var upperHex = (hex || '').toUpperCase();
+            swatches.forEach(function(sw) {
+                var swColor = (sw.getAttribute('data-color') || '').toUpperCase();
+                if (swColor === upperHex) {
+                    sw.classList.add('active');
+                } else {
+                    sw.classList.remove('active');
+                }
+            });
+        }
+
+        function updateColorLabel(label, hex, customName) {
+            if (!label || !hex) return;
+            var name = customName || COLOR_NAMES[hex];
+            label.textContent = name ? (hex + ' (' + name + ')') : hex;
+        }
+
         // Color Control Listeners
         function setupColorControls(picker, hexInput, label, swatchesTab, isKeyring) {
             if (!picker || !hexInput) return;
@@ -1254,7 +1300,7 @@
             picker.addEventListener('input', function() {
                 var val = this.value.toUpperCase();
                 hexInput.value = val;
-                if (label) label.textContent = val;
+                updateColorLabel(label, val);
                 if (isKeyring) {
                     currentKeyringColor = val;
                     renderKeyringPreview();
@@ -1262,22 +1308,52 @@
                     currentDiaryColor = val;
                     renderDiaryPreview();
                 }
+                syncColorSwatches(swatchesTab, val);
             });
 
             hexInput.addEventListener('input', function() {
-                var val = this.value.trim().toUpperCase();
-                if (/^#[0-9A-F]{6}$/i.test(val)) {
-                    picker.value = val;
-                    if (label) label.textContent = val;
+                var raw = this.value;
+                var norm = normalizeHex(raw);
+                if (norm) {
+                    picker.value = norm;
+                    updateColorLabel(label, norm);
                     if (isKeyring) {
-                        currentKeyringColor = val;
+                        currentKeyringColor = norm;
                         renderKeyringPreview();
                     } else {
-                        currentDiaryColor = val;
+                        currentDiaryColor = norm;
                         renderDiaryPreview();
                     }
+                    syncColorSwatches(swatchesTab, norm);
                 }
             });
+
+            function onHexBlurOrChange() {
+                var raw = hexInput.value;
+                var norm = normalizeHex(raw);
+                if (norm) {
+                    hexInput.value = norm;
+                    picker.value = norm;
+                    updateColorLabel(label, norm);
+                    if (isKeyring) {
+                        currentKeyringColor = norm;
+                        renderKeyringPreview();
+                    } else {
+                        currentDiaryColor = norm;
+                        renderDiaryPreview();
+                    }
+                    syncColorSwatches(swatchesTab, norm);
+                } else {
+                    var cur = isKeyring ? currentKeyringColor : currentDiaryColor;
+                    hexInput.value = cur;
+                    picker.value = cur;
+                    updateColorLabel(label, cur);
+                    syncColorSwatches(swatchesTab, cur);
+                }
+            }
+
+            hexInput.addEventListener('blur', onHexBlurOrChange);
+            hexInput.addEventListener('change', onHexBlurOrChange);
         }
 
         setupColorControls(colorPickerKeyring, colorHexKeyring, labelColorNameKeyring, 'keyring', true);
@@ -1289,10 +1365,10 @@
                 try {
                     var res = JSON.parse(resStr);
                     if (res.status === 'success' && res.hex) {
-                        var hexVal = res.hex.toUpperCase();
+                        var hexVal = normalizeHex(res.hex) || res.hex.toUpperCase();
                         if (picker) picker.value = hexVal;
                         if (hexInput) hexInput.value = hexVal;
-                        if (label) label.textContent = (res.spotName ? (res.spotName + " ") : "") + hexVal;
+                        updateColorLabel(label, hexVal, res.spotName);
                         if (isKeyring) {
                             currentKeyringColor = hexVal;
                             renderKeyringPreview();
@@ -1300,6 +1376,7 @@
                             currentDiaryColor = hexVal;
                             renderDiaryPreview();
                         }
+                        syncColorSwatches(isKeyring ? 'keyring' : 'diary', hexVal);
                         showToast('Picked color ' + hexVal + ' from canvas', 'success');
                     } else {
                         showToast(res.message || 'No color found in selection', 'error');
@@ -1326,21 +1403,20 @@
             sw.addEventListener('click', function() {
                 var col = this.getAttribute('data-color');
                 var tab = this.getAttribute('data-tab');
-                if (tab === 'keyring') {
+                var isKey = (tab === 'keyring');
+                if (isKey) {
                     if (colorPickerKeyring) colorPickerKeyring.value = col;
                     if (colorHexKeyring) colorHexKeyring.value = col;
-                    if (labelColorNameKeyring) labelColorNameKeyring.textContent = col;
+                    updateColorLabel(labelColorNameKeyring, col);
                     currentKeyringColor = col;
-                    document.querySelectorAll('.color-swatch[data-tab="keyring"]').forEach(function(s) { s.classList.remove('active'); });
-                    this.classList.add('active');
+                    syncColorSwatches('keyring', col);
                     renderKeyringPreview();
                 } else {
                     if (colorPickerDiary) colorPickerDiary.value = col;
                     if (colorHexDiary) colorHexDiary.value = col;
-                    if (labelColorNameDiary) labelColorNameDiary.textContent = col;
+                    updateColorLabel(labelColorNameDiary, col);
                     currentDiaryColor = col;
-                    document.querySelectorAll('.color-swatch[data-tab="diary"]').forEach(function(s) { s.classList.remove('active'); });
-                    this.classList.add('active');
+                    syncColorSwatches('diary', col);
                     renderDiaryPreview();
                 }
             });
@@ -1619,7 +1695,7 @@
                 fillBani: chkFillBaniKeyring ? chkFillBaniKeyring.checked : true,
                 fillQty: chkFillQtyKeyring ? chkFillQtyKeyring.checked : true,
                 qtyFormat: selectQtyFormatKeyring ? selectQtyFormatKeyring.value : "auto",
-                nameColor: currentKeyringColor,
+                nameColor: (normalizeHex(colorHexKeyring ? colorHexKeyring.value : currentKeyringColor) || currentKeyringColor),
                 startIndex: currentKeyringStartIndex,
                 skipFilledCards: skipFilled,
                 detailsHScale: detHScale,
@@ -1851,7 +1927,7 @@
                 fillBani: false,
                 fillQty: false,
                 qtyFormat: "auto",
-                nameColor: currentDiaryColor,
+                nameColor: (normalizeHex(colorHexDiary ? colorHexDiary.value : currentDiaryColor) || currentDiaryColor),
                 startIndex: currentDiaryStartIndex,
                 skipFilledCards: skipFilled,
                 addressHScale: addrHScaleD,

@@ -1597,14 +1597,19 @@ var CardAutoFiller = {
 
         var isCMYK = (doc.documentColorSpace === DocumentColorSpace.CMYK);
         var userChosenColor = null;
-        if (payload.nameColor && payload.nameColor !== "#000000" && payload.nameColor !== "#000" && !isSingleColor) {
-            try {
-                var sw = doc.swatches.getByName(payload.nameColor);
-                if (sw) userChosenColor = sw.color;
-            } catch(e) {}
+        if (payload.nameColor && !isSingleColor) {
+            var rawHex = String(payload.nameColor).replace(/[^0-9A-Fa-f]/g, "").toUpperCase();
+            if (rawHex === "000000" || rawHex === "000") {
+                userChosenColor = solidBlackCMYK;
+            } else {
+                try {
+                    var sw = doc.swatches.getByName(payload.nameColor);
+                    if (sw) userChosenColor = sw.color;
+                } catch(e) {}
 
-            if (!userChosenColor && /^#?[0-9A-Fa-f]{3,6}$/.test(payload.nameColor)) {
-                userChosenColor = this.hexToColor(payload.nameColor, isCMYK);
+                if (!userChosenColor && (rawHex.length === 3 || rawHex.length === 6)) {
+                    userChosenColor = this.hexToColor(rawHex, isCMYK);
+                }
             }
         }
 
