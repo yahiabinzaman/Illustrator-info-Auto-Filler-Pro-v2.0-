@@ -121,11 +121,28 @@ Example:
                     <span id="labelColorNameKeyring" style="font-size: 10px; color: #888;">#A22F10 (Default)</span>
                 </div>
                 <div class="color-picker-wrapper">
-                    <input type="color" id="colorPickerKeyring" value="#A22F10" class="color-input-native" title="Click to choose color">
-                    <input type="text" id="colorHexKeyring" value="#A22F10" class="input-text" style="width: 80px; text-transform: uppercase; font-family: monospace; font-size: 11px; text-align: center;">
+                    <input type="color" id="colorPickerKeyring" value="#006F9A" class="color-input-native" title="Click to choose color">
+                    <input type="text" id="colorHexKeyring" value="#006F9A" class="input-text" style="width: 80px; text-transform: uppercase; font-family: monospace; font-size: 11px; text-align: center;">
                     <button id="btnPickColorKeyring" class="btn btn-sm" style="flex: 1; padding: 4px 6px;" title="Get color from selected text frame on canvas">
                         Pick from Canvas
                     </button>
+                </div>
+                <!-- 2-Color CMYK Controls Row -->
+                <div class="cmyk-control-bar" style="display: flex; gap: 5px; align-items: center; margin-top: 5px; padding: 4px 6px; background: #202020; border-radius: 3px; border: 1px solid #383838; font-size: 10px; font-family: monospace;">
+                    <span style="color: #888; font-weight: bold; font-size: 9.5px;">CMYK:</span>
+                    <label style="margin: 0; color: #29b6f6; font-weight: bold; display: flex; align-items: center; gap: 2px;">
+                        C: <input type="number" id="inputColorC_Keyring" min="0" max="100" value="100" style="width: 36px; padding: 1px 2px; font-size: 10px; text-align: center; border: 1px solid #444; background: #161616; color: #fff; border-radius: 2px; font-weight: bold;">%
+                    </label>
+                    <label style="margin: 0; color: #e91e63; font-weight: bold; display: flex; align-items: center; gap: 2px;">
+                        M: <input type="number" id="inputColorM_Keyring" min="0" max="100" value="0" style="width: 36px; padding: 1px 2px; font-size: 10px; text-align: center; border: 1px solid #444; background: #161616; color: #fff; border-radius: 2px; font-weight: bold;">%
+                    </label>
+                    <label style="margin: 0; color: #ffeb3b; font-weight: bold; display: flex; align-items: center; gap: 2px;">
+                        Y: <input type="number" id="inputColorY_Keyring" min="0" max="100" value="0" style="width: 36px; padding: 1px 2px; font-size: 10px; text-align: center; border: 1px solid #444; background: #161616; color: #fff; border-radius: 2px; font-weight: bold;">%
+                    </label>
+                    <label style="margin: 0; color: #eee; font-weight: bold; display: flex; align-items: center; gap: 2px;">
+                        K: <input type="number" id="inputColorK_Keyring" min="0" max="100" value="45" style="width: 36px; padding: 1px 2px; font-size: 10px; text-align: center; border: 1px solid #444; background: #161616; color: #fff; border-radius: 2px; font-weight: bold;">%
+                    </label>
+                    <span id="badge2ColorKeyring" style="margin-left: auto; font-size: 9px; padding: 1px 5px; background: #1b5e20; color: #81c784; border-radius: 2px; font-weight: bold;" title="Only Cyan and Black plates will be used">2-Color (C+K)</span>
                 </div>
                 <div class="color-swatch-bar">
                     <span style="font-size: 9.5px; color: #888; margin-right: 2px;">Presets:</span>
@@ -348,11 +365,28 @@ Example:
                     <span id="labelColorNameDiary" style="font-size: 10px; color: #888;">#1E5AA8 (Blue)</span>
                 </div>
                 <div class="color-picker-wrapper">
-                    <input type="color" id="colorPickerDiary" value="#1E5AA8" class="color-input-native" title="Click to choose color">
-                    <input type="text" id="colorHexDiary" value="#1E5AA8" class="input-text" style="width: 80px; text-transform: uppercase; font-family: monospace; font-size: 11px; text-align: center;">
+                    <input type="color" id="colorPickerDiary" value="#006F9A" class="color-input-native" title="Click to choose color">
+                    <input type="text" id="colorHexDiary" value="#006F9A" class="input-text" style="width: 80px; text-transform: uppercase; font-family: monospace; font-size: 11px; text-align: center;">
                     <button id="btnPickColorDiary" class="btn btn-sm" style="flex: 1; padding: 4px 6px;" title="Get color from selected text frame on canvas">
                         Pick from Canvas
                     </button>
+                </div>
+                <!-- 2-Color CMYK Controls Row -->
+                <div class="cmyk-control-bar" style="display: flex; gap: 5px; align-items: center; margin-top: 5px; padding: 4px 6px; background: #202020; border-radius: 3px; border: 1px solid #383838; font-size: 10px; font-family: monospace;">
+                    <span style="color: #888; font-weight: bold; font-size: 9.5px;">CMYK:</span>
+                    <label style="margin: 0; color: #29b6f6; font-weight: bold; display: flex; align-items: center; gap: 2px;">
+                        C: <input type="number" id="inputColorC_Diary" min="0" max="100" value="100" style="width: 36px; padding: 1px 2px; font-size: 10px; text-align: center; border: 1px solid #444; background: #161616; color: #fff; border-radius: 2px; font-weight: bold;">%
+                    </label>
+                    <label style="margin: 0; color: #e91e63; font-weight: bold; display: flex; align-items: center; gap: 2px;">
+                        M: <input type="number" id="inputColorM_Diary" min="0" max="100" value="0" style="width: 36px; padding: 1px 2px; font-size: 10px; text-align: center; border: 1px solid #444; background: #161616; color: #fff; border-radius: 2px; font-weight: bold;">%
+                    </label>
+                    <label style="margin: 0; color: #ffeb3b; font-weight: bold; display: flex; align-items: center; gap: 2px;">
+                        Y: <input type="number" id="inputColorY_Diary" min="0" max="100" value="0" style="width: 36px; padding: 1px 2px; font-size: 10px; text-align: center; border: 1px solid #444; background: #161616; color: #fff; border-radius: 2px; font-weight: bold;">%
+                    </label>
+                    <label style="margin: 0; color: #eee; font-weight: bold; display: flex; align-items: center; gap: 2px;">
+                        K: <input type="number" id="inputColorK_Diary" min="0" max="100" value="45" style="width: 36px; padding: 1px 2px; font-size: 10px; text-align: center; border: 1px solid #444; background: #161616; color: #fff; border-radius: 2px; font-weight: bold;">%
+                    </label>
+                    <span id="badge2ColorDiary" style="margin-left: auto; font-size: 9px; padding: 1px 5px; background: #1b5e20; color: #81c784; border-radius: 2px; font-weight: bold;" title="Only Cyan and Black plates will be used">2-Color (C+K)</span>
                 </div>
                 <div class="color-swatch-bar">
                     <span style="font-size: 9.5px; color: #888; margin-right: 2px;">Presets:</span>
@@ -699,7 +733,7 @@ Example:
 
     <!-- Scripts -->
     <script src="js/CSInterface.js"></script>
-    <script src="js/main.js?v=2.6.1"></script>
+    <script src="js/main.js?v=2.7.0"></script>
 <script>
 function openAuthorProfile(e) {
     if (e) { e.preventDefault(); e.stopPropagation(); }

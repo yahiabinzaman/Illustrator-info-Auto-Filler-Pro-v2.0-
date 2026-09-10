@@ -85,8 +85,10 @@
     var labelColorNameDiary = document.getElementById('labelColorNameDiary');
     var colorSwatches = document.querySelectorAll('.color-swatch');
 
-    var currentKeyringColor = "#A22F10";
-    var currentDiaryColor = "#1E5AA8";
+    var currentKeyringColor = "#006F9A";
+    var currentKeyringCmyk = [100, 0, 0, 45];
+    var currentDiaryColor = "#006F9A";
+    var currentDiaryCmyk = [100, 0, 0, 45];
 
     // Diary Elements
     var rawTextInputDiary = document.getElementById('rawTextInputDiary');
@@ -1247,15 +1249,25 @@
             });
         }
 
-        // Color Names Map for friendly labels
+        // Exact 2-Color & CMYK definitions
+        var PRESET_CMYK = {
+            '#006F9A': [100, 0, 0, 45],  // 2-Color C+K Blue/Teal requested by user: C=100%, M=0%, Y=0%, K=45%
+            '#000000': [0, 0, 0, 100],   // 100% Solid Black
+            '#1E5AA8': [100, 0, 0, 45],  // 2-Color fallback for Royal Blue
+            '#1B6E3F': [85, 20, 100, 10],
+            '#9C1A1A': [20, 100, 100, 15],
+            '#C88210': [15, 45, 100, 0],
+            '#A22F10': [20, 90, 100, 15]
+        };
+
         var COLOR_NAMES = {
-            '#A22F10': 'Red-Brown',
+            '#006F9A': 'C:100 K:45 Blue',
             '#000000': 'Solid Black',
-            '#1E5AA8': 'Royal Blue',
-            '#006F9A': 'Deep Teal',
+            '#1E5AA8': 'C:100 K:45 Blue',
             '#1B6E3F': 'Islamic Green',
             '#9C1A1A': 'Crimson Maroon',
-            '#C88210': 'Golden Amber'
+            '#C88210': 'Golden Amber',
+            '#A22F10': 'Red-Brown'
         };
 
         function normalizeHex(input) {
@@ -1272,6 +1284,65 @@
                 return '#' + str;
             }
             return null;
+        }
+
+        function cmykToDisplayHex(c, m, y, k) {
+            if (c === 100 && m === 0 && y === 0 && k === 45) return '#006F9A';
+            if (c === 0 && m === 0 && y === 0 && k === 100) return '#000000';
+            var cN = c / 100, mN = m / 100, yN = y / 100, kN = k / 100;
+            var r = Math.round(255 * (1 - cN) * (1 - kN));
+            var g = Math.round(255 * (1 - mN) * (1 - kN));
+            var b = Math.round(255 * (1 - yN) * (1 - kN));
+            var toHex = function(n) { var h = Math.max(0, Math.min(255, n)).toString(16); return h.length === 1 ? '0' + h : h; };
+            return ('#' + toHex(r) + toHex(g) + toHex(b)).toUpperCase();
+        }
+
+        function hexToCmykEstimator(hex) {
+            var norm = normalizeHex(hex);
+            if (!norm) return [100, 0, 0, 45];
+            if (PRESET_CMYK[norm]) return PRESET_CMYK[norm].slice();
+            var r = parseInt(norm.substring(1, 3), 16) / 255;
+            var g = parseInt(norm.substring(3, 5), 16) / 255;
+            var b = parseInt(norm.substring(5, 7), 16) / 255;
+            var k = 1 - Math.max(r, Math.max(g, b));
+            if (k >= 1) return [0, 0, 0, 100];
+            var c = Math.round(((1 - r - k) / (1 - k)) * 100);
+            var m = Math.round(((1 - g - k) / (1 - k)) * 100);
+            var y = Math.round(((1 - b - k) / (1 - k)) * 100);
+            return [c, m, y, Math.round(k * 100)];
+        }
+
+        function updateCmykUI(isKeyring, cmykArr) {
+            var prefix = isKeyring ? 'Keyring' : 'Diary';
+            var inC = document.getElementById('inputColorC_' + prefix);
+            var inM = document.getElementById('inputColorM_' + prefix);
+            var inY = document.getElementById('inputColorY_' + prefix);
+            var inK = document.getElementById('inputColorK_' + prefix);
+            var badge = document.getElementById('badge2Color' + prefix);
+
+            var c = Math.round(cmykArr[0]);
+            var m = Math.round(cmykArr[1]);
+            var y = Math.round(cmykArr[2]);
+            var k = Math.round(cmykArr[3]);
+
+            if (inC) inC.value = c;
+            if (inM) inM.value = m;
+            if (inY) inY.value = y;
+            if (inK) inK.value = k;
+
+            if (badge) {
+                if (m === 0 && y === 0) {
+                    badge.textContent = '2-Color (C+K)';
+                    badge.style.background = '#1b5e20';
+                    badge.style.color = '#81c784';
+                    badge.title = 'Strictly 2 inks: Only Cyan and Black plates will be generated';
+                } else {
+                    badge.textContent = '4-Color CMYK';
+                    badge.style.background = '#333333';
+                    badge.style.color = '#aaaaaa';
+                    badge.title = 'Process 4-color printing';
+                }
+            }
         }
 
         function syncColorSwatches(tabName, hex) {
@@ -1293,6 +1364,53 @@
             label.textContent = name ? (hex + ' (' + name + ')') : hex;
         }
 
+        function setupCmykEventListeners(isKeyring) {
+            var prefix = isKeyring ? 'Keyring' : 'Diary';
+            ['C', 'M', 'Y', 'K'].forEach(function(chan) {
+                var el = document.getElementById('inputColor' + chan + '_' + prefix);
+                if (!el) return;
+                el.addEventListener('input', function() {
+                    var inC = document.getElementById('inputColorC_' + prefix);
+                    var inM = document.getElementById('inputColorM_' + prefix);
+                    var inY = document.getElementById('inputColorY_' + prefix);
+                    var inK = document.getElementById('inputColorK_' + prefix);
+
+                    var c = inC ? Math.max(0, Math.min(100, parseInt(inC.value, 10) || 0)) : 100;
+                    var m = inM ? Math.max(0, Math.min(100, parseInt(inM.value, 10) || 0)) : 0;
+                    var y = inY ? Math.max(0, Math.min(100, parseInt(inY.value, 10) || 0)) : 0;
+                    var k = inK ? Math.max(0, Math.min(100, parseInt(inK.value, 10) || 0)) : 45;
+
+                    var cmyk = [c, m, y, k];
+                    if (isKeyring) currentKeyringCmyk = cmyk;
+                    else currentDiaryCmyk = cmyk;
+
+                    updateCmykUI(isKeyring, cmyk);
+
+                    var hex = cmykToDisplayHex(c, m, y, k);
+                    var picker = isKeyring ? colorPickerKeyring : colorPickerDiary;
+                    var hexInput = isKeyring ? colorHexKeyring : colorHexDiary;
+                    var label = isKeyring ? labelColorNameKeyring : labelColorNameDiary;
+
+                    if (picker) picker.value = hex;
+                    if (hexInput) hexInput.value = hex;
+                    if (label) {
+                        var customName = (c === 100 && m === 0 && y === 0 && k === 45) ? 'C:100 K:45 Blue' : (c === 0 && m === 0 && y === 0 && k === 100 ? 'Solid Black' : null);
+                        updateColorLabel(label, hex, customName);
+                    }
+
+                    if (isKeyring) {
+                        currentKeyringColor = hex;
+                        renderKeyringPreview();
+                        syncColorSwatches('keyring', hex);
+                    } else {
+                        currentDiaryColor = hex;
+                        renderDiaryPreview();
+                        syncColorSwatches('diary', hex);
+                    }
+                });
+            });
+        }
+
         // Color Control Listeners
         function setupColorControls(picker, hexInput, label, swatchesTab, isKeyring) {
             if (!picker || !hexInput) return;
@@ -1301,11 +1419,16 @@
                 var val = this.value.toUpperCase();
                 hexInput.value = val;
                 updateColorLabel(label, val);
+                var estCmyk = hexToCmykEstimator(val);
                 if (isKeyring) {
                     currentKeyringColor = val;
+                    currentKeyringCmyk = estCmyk;
+                    updateCmykUI(true, estCmyk);
                     renderKeyringPreview();
                 } else {
                     currentDiaryColor = val;
+                    currentDiaryCmyk = estCmyk;
+                    updateCmykUI(false, estCmyk);
                     renderDiaryPreview();
                 }
                 syncColorSwatches(swatchesTab, val);
@@ -1317,11 +1440,16 @@
                 if (norm) {
                     picker.value = norm;
                     updateColorLabel(label, norm);
+                    var estCmyk = hexToCmykEstimator(norm);
                     if (isKeyring) {
                         currentKeyringColor = norm;
+                        currentKeyringCmyk = estCmyk;
+                        updateCmykUI(true, estCmyk);
                         renderKeyringPreview();
                     } else {
                         currentDiaryColor = norm;
+                        currentDiaryCmyk = estCmyk;
+                        updateCmykUI(false, estCmyk);
                         renderDiaryPreview();
                     }
                     syncColorSwatches(swatchesTab, norm);
@@ -1335,19 +1463,26 @@
                     hexInput.value = norm;
                     picker.value = norm;
                     updateColorLabel(label, norm);
+                    var estCmyk = hexToCmykEstimator(norm);
                     if (isKeyring) {
                         currentKeyringColor = norm;
+                        currentKeyringCmyk = estCmyk;
+                        updateCmykUI(true, estCmyk);
                         renderKeyringPreview();
                     } else {
                         currentDiaryColor = norm;
+                        currentDiaryCmyk = estCmyk;
+                        updateCmykUI(false, estCmyk);
                         renderDiaryPreview();
                     }
                     syncColorSwatches(swatchesTab, norm);
                 } else {
                     var cur = isKeyring ? currentKeyringColor : currentDiaryColor;
+                    var curCmyk = isKeyring ? currentKeyringCmyk : currentDiaryCmyk;
                     hexInput.value = cur;
                     picker.value = cur;
                     updateColorLabel(label, cur);
+                    updateCmykUI(isKeyring, curCmyk);
                     syncColorSwatches(swatchesTab, cur);
                 }
             }
@@ -1358,26 +1493,34 @@
 
         setupColorControls(colorPickerKeyring, colorHexKeyring, labelColorNameKeyring, 'keyring', true);
         setupColorControls(colorPickerDiary, colorHexDiary, labelColorNameDiary, 'diary', false);
+        setupCmykEventListeners(true);
+        setupCmykEventListeners(false);
 
-        // Pick from Canvas
+        // Pick from Canvas (Read exact C, M, Y, K)
         function pickColorFromCanvas(picker, hexInput, label, isKeyring) {
             evalHostScript('getSelectedCanvasColor()', function(resStr) {
                 try {
                     var res = JSON.parse(resStr);
-                    if (res.status === 'success' && res.hex) {
-                        var hexVal = normalizeHex(res.hex) || res.hex.toUpperCase();
+                    if (res.status === 'success' && (res.cmyk || res.hex)) {
+                        var hexVal = res.hex ? (normalizeHex(res.hex) || res.hex.toUpperCase()) : '#006F9A';
+                        var cmykVal = res.cmyk ? [Math.round(res.cmyk[0]), Math.round(res.cmyk[1]), Math.round(res.cmyk[2]), Math.round(res.cmyk[3])] : hexToCmykEstimator(hexVal);
+                        
                         if (picker) picker.value = hexVal;
                         if (hexInput) hexInput.value = hexVal;
                         updateColorLabel(label, hexVal, res.spotName);
                         if (isKeyring) {
                             currentKeyringColor = hexVal;
+                            currentKeyringCmyk = cmykVal;
+                            updateCmykUI(true, cmykVal);
                             renderKeyringPreview();
                         } else {
                             currentDiaryColor = hexVal;
+                            currentDiaryCmyk = cmykVal;
+                            updateCmykUI(false, cmykVal);
                             renderDiaryPreview();
                         }
                         syncColorSwatches(isKeyring ? 'keyring' : 'diary', hexVal);
-                        showToast('Picked color ' + hexVal + ' from canvas', 'success');
+                        showToast('Picked color: C=' + cmykVal[0] + '% M=' + cmykVal[1] + '% Y=' + cmykVal[2] + '% K=' + cmykVal[3] + '% (' + hexVal + ')', 'success');
                     } else {
                         showToast(res.message || 'No color found in selection', 'error');
                     }
@@ -1404,11 +1547,14 @@
                 var col = this.getAttribute('data-color');
                 var tab = this.getAttribute('data-tab');
                 var isKey = (tab === 'keyring');
+                var cmyk = hexToCmykEstimator(col);
                 if (isKey) {
                     if (colorPickerKeyring) colorPickerKeyring.value = col;
                     if (colorHexKeyring) colorHexKeyring.value = col;
                     updateColorLabel(labelColorNameKeyring, col);
                     currentKeyringColor = col;
+                    currentKeyringCmyk = cmyk;
+                    updateCmykUI(true, cmyk);
                     syncColorSwatches('keyring', col);
                     renderKeyringPreview();
                 } else {
@@ -1416,11 +1562,17 @@
                     if (colorHexDiary) colorHexDiary.value = col;
                     updateColorLabel(labelColorNameDiary, col);
                     currentDiaryColor = col;
+                    currentDiaryCmyk = cmyk;
+                    updateCmykUI(false, cmyk);
                     syncColorSwatches('diary', col);
                     renderDiaryPreview();
                 }
             });
         });
+
+        // Initialize CMYK 2-Color UI
+        updateCmykUI(true, currentKeyringCmyk);
+        updateCmykUI(false, currentDiaryCmyk);
 
         // Initial parse
         parseKeyringInput();
@@ -1696,6 +1848,7 @@
                 fillQty: chkFillQtyKeyring ? chkFillQtyKeyring.checked : true,
                 qtyFormat: selectQtyFormatKeyring ? selectQtyFormatKeyring.value : "auto",
                 nameColor: (normalizeHex(colorHexKeyring ? colorHexKeyring.value : currentKeyringColor) || currentKeyringColor),
+                nameCmyk: currentKeyringCmyk,
                 startIndex: currentKeyringStartIndex,
                 skipFilledCards: skipFilled,
                 detailsHScale: detHScale,
@@ -1928,6 +2081,7 @@
                 fillQty: false,
                 qtyFormat: "auto",
                 nameColor: (normalizeHex(colorHexDiary ? colorHexDiary.value : currentDiaryColor) || currentDiaryColor),
+                nameCmyk: currentDiaryCmyk,
                 startIndex: currentDiaryStartIndex,
                 skipFilledCards: skipFilled,
                 addressHScale: addrHScaleD,

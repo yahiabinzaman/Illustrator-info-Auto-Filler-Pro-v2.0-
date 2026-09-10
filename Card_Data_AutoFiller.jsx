@@ -130,8 +130,12 @@ var CardAutoFiller = {
                 res.hex = this.cmykToHex(sc.cyan, sc.magenta, sc.yellow, sc.black);
             }
         } else if (col.typename === "CMYKColor") {
-            res.cmyk = [col.cyan, col.magenta, col.yellow, col.black];
-            res.hex = this.cmykToHex(col.cyan, col.magenta, col.yellow, col.black);
+            res.cmyk = [Math.round(col.cyan), Math.round(col.magenta), Math.round(col.yellow), Math.round(col.black)];
+            if (Math.round(col.cyan) === 100 && Math.round(col.magenta) === 0 && Math.round(col.yellow) === 0 && Math.round(col.black) === 45) {
+                res.hex = "#006F9A";
+            } else {
+                res.hex = this.cmykToHex(col.cyan, col.magenta, col.yellow, col.black);
+            }
         } else if (col.typename === "RGBColor") {
             res.rgb = [col.red, col.green, col.blue];
             res.hex = this.rgbToHex(col.red, col.green, col.blue);
@@ -165,6 +169,21 @@ var CardAutoFiller = {
         hex = hex.replace(/[^0-9A-Fa-f]/g, "");
         if (hex.length === 3) hex = hex.charAt(0)+hex.charAt(0) + hex.charAt(1)+hex.charAt(1) + hex.charAt(2)+hex.charAt(2);
         if (hex.length !== 6) return null;
+
+        var upper = hex.toUpperCase();
+        if (isCMYK) {
+            // Strict 2-Color C+K mappings for offset printing:
+            if (upper === "006F9A" || upper === "008C8C" || upper === "1E5AA8") {
+                var cCol = new CMYKColor();
+                cCol.cyan = 100; cCol.magenta = 0; cCol.yellow = 0; cCol.black = 45;
+                return cCol;
+            }
+            if (upper === "000000") {
+                var kCol = new CMYKColor();
+                kCol.cyan = 0; kCol.magenta = 0; kCol.yellow = 0; kCol.black = 100;
+                return kCol;
+            }
+        }
 
         var r = parseInt(hex.substring(0, 2), 16);
         var g = parseInt(hex.substring(2, 4), 16);
@@ -1597,18 +1616,42 @@ var CardAutoFiller = {
 
         var isCMYK = (doc.documentColorSpace === DocumentColorSpace.CMYK);
         var userChosenColor = null;
-        if (payload.nameColor && !isSingleColor) {
-            var rawHex = String(payload.nameColor).replace(/[^0-9A-Fa-f]/g, "").toUpperCase();
-            if (rawHex === "000000" || rawHex === "000") {
-                userChosenColor = solidBlackCMYK;
-            } else {
-                try {
-                    var sw = doc.swatches.getByName(payload.nameColor);
-                    if (sw) userChosenColor = sw.color;
-                } catch(e) {}
+        if (!isSingleColor) {
+            // 1. Direct CMYK Array from payload (e.g. [100, 0, 0, 45])
+            if (isCMYK && payload.nameCmyk && payload.nameCmyk.length >= 4) {
+                var cVal = Math.max(0, Math.min(100, Math.round(Number(payload.nameCmyk[0]))));
+                var mVal = Math.max(0, Math.min(100, Math.round(Number(payload.nameCmyk[1]))));
+                var yVal = Math.max(0, Math.min(100, Math.round(Number(payload.nameCmyk[2]))));
+                var kVal = Math.max(0, Math.min(100, Math.round(Number(payload.nameCmyk[3]))));
+                var userCmyk = new CMYKColor();
+                userCmyk.cyan = cVal;
+                userCmyk.magenta = mVal;
+                userCmyk.yellow = yVal;
+                userCmyk.black = kVal;
+                userChosenColor = userCmyk;
+            }
 
-                if (!userChosenColor && (rawHex.length === 3 || rawHex.length === 6)) {
-                    userChosenColor = this.hexToColor(rawHex, isCMYK);
+            // 2. NameColor string / hex
+            if (!userChosenColor && payload.nameColor) {
+                var rawHex = String(payload.nameColor).replace(/[^0-9A-Fa-f]/g, "").toUpperCase();
+                if (isCMYK && (rawHex === "006F9A" || rawHex === "008C8C" || rawHex === "1E5AA8")) {
+                    var tealCmyk = new CMYKColor();
+                    tealCmyk.cyan = 100;
+                    tealCmyk.magenta = 0;
+                    tealCmyk.yellow = 0;
+                    tealCmyk.black = 45;
+                    userChosenColor = tealCmyk;
+                } else if (rawHex === "000000" || rawHex === "000") {
+                    userChosenColor = solidBlackCMYK;
+                } else {
+                    try {
+                        var sw = doc.swatches.getByName(payload.nameColor);
+                        if (sw) userChosenColor = sw.color;
+                    } catch(e) {}
+
+                    if (!userChosenColor && (rawHex.length === 3 || rawHex.length === 6)) {
+                        userChosenColor = this.hexToColor(rawHex, isCMYK);
+                    }
                 }
             }
         }
@@ -1678,7 +1721,19 @@ var CardAutoFiller = {
                             if (ca1.leading > 0) cardDetStyle.leading = ca1.leading;
                             if (ca1.horizontalScale > 0) cardDetStyle.hScale = ca1.horizontalScale;
                             cardDetStyle.tracking = ca1.tracking;
-                            if (ca1.fillColor && ca1.fillColor.typename !== "NoColor") cardDetStyle.color = ca1.fillColor;
+                            if (ca1.fillColor && ca1.fillColor.typename !== "NoColor") {
+                                if (isCMYK && ca1.fillColor.typename === "CMYKColor") {
+                                    if (ca1.fillColor.magenta === 0 && ca1.fillColor.yellow === 0) {
+                                        cardDetStyle.color = ca1.fillColor;
+                                    } else {
+                                        cardDetStyle.color = solidBlackCMYK;
+                                    }
+                                } else if (isCMYK) {
+                                    cardDetStyle.color = solidBlackCMYK;
+                                } else {
+                                    cardDetStyle.color = ca1.fillColor;
+                                }
+                            }
                             try { cardDetStyle.just = p1.paragraphAttributes.justification; } catch(j1) {}
                         }
                     }
@@ -1711,7 +1766,19 @@ var CardAutoFiller = {
                     if (sca.leading > 0) cardSerialStyle.leading = sca.leading;
                     if (sca.horizontalScale > 0) cardSerialStyle.hScale = sca.horizontalScale;
                     cardSerialStyle.tracking = sca.tracking;
-                    if (sca.fillColor && sca.fillColor.typename !== "NoColor") cardSerialStyle.color = sca.fillColor;
+                    if (sca.fillColor && sca.fillColor.typename !== "NoColor") {
+                        if (isCMYK && sca.fillColor.typename === "CMYKColor") {
+                            if (sca.fillColor.magenta === 0 && sca.fillColor.yellow === 0) {
+                                cardSerialStyle.color = sca.fillColor;
+                            } else {
+                                cardSerialStyle.color = solidBlackCMYK;
+                            }
+                        } else if (isCMYK) {
+                            cardSerialStyle.color = solidBlackCMYK;
+                        } else {
+                            cardSerialStyle.color = sca.fillColor;
+                        }
+                    }
                     try { cardSerialStyle.just = card.serialFrame.paragraphs[0].paragraphAttributes.justification; } catch(sj0) {}
                 } catch(sc2e) {}
             }
