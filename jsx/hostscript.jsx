@@ -451,15 +451,29 @@ var CardAutoFiller = {
         }
     },
 
-    detectCards: function(order, scope) {
+    detectCards: function(arg1, arg2) {
         var doc = app.activeDocument;
         if (!doc) return [];
+
+        var scope = "artboard";
+        var order = "zigzag";
+
+        if (arg1 === "selection" || arg1 === "artboard" || arg1 === "document" || arg1 === "all_artboards") {
+            scope = arg1;
+            if (arg2) order = arg2;
+        } else if (arg2 === "selection" || arg2 === "artboard" || arg2 === "document" || arg2 === "all_artboards") {
+            scope = arg2;
+            if (arg1) order = arg1;
+        } else {
+            if (arg1) order = arg1;
+            if (arg2) scope = arg2;
+        }
 
         var cardUnits = [];
         var candidateItems = [];
 
         var sel = doc.selection;
-        var hasExplicitSelection = (sel && sel.length > 0);
+        var hasExplicitSelection = (scope === "selection" && sel && sel.length > 0);
 
         if (hasExplicitSelection) {
             for (var s = 0; s < sel.length; s++) {
@@ -468,7 +482,7 @@ var CardAutoFiller = {
                     candidateItems.push(it);
                 }
             }
-        } else if (scope === "document") {
+        } else if (scope === "document" || scope === "all_artboards") {
             for (var l = 0; l < doc.layers.length; l++) {
                 var layer = doc.layers[l];
                 if (layer.visible && !layer.locked) {
@@ -542,7 +556,10 @@ var CardAutoFiller = {
 
         if (needsProximity) {
             var allDocTFs = [];
-            this.collectTextFrames(candidateItems, allDocTFs);
+            for (var dt = 0; dt < doc.textFrames.length; dt++) {
+                var dtf = doc.textFrames[dt];
+                if (!this.isItemHidden(dtf)) allDocTFs.push(dtf);
+            }
             for (var cu = 0; cu < cardUnits.length; cu++) {
                 var cCard = cardUnits[cu];
                 if (!cCard.nameFrame) continue;
