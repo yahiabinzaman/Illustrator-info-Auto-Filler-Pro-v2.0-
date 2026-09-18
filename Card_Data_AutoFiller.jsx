@@ -327,10 +327,19 @@ var CardAutoFiller = {
         return false;
     },
 
+    isBaniText: function(text) {
+        if (!text) return false;
+        if (/^[\s\r\n]*[-–—]/.test(text)) return true;
+        if (/[-–—]\s*(?:মাওলানা|হযরত|মুফতী|শায়খ|ড\.|আল্লামা|মুহাদ্দিস|ইমাম|রাসূল)/i.test(text)) return true;
+        if (/(?:বাণী|উক্তি|হাদীস|বানী)/i.test(text) && !/(?:পিতা|গ্রাম|পোস্ট|থানা|জেলা|মোবাইল)/i.test(text)) return true;
+        return false;
+    },
+
     hasStudentBiodata: function(text) {
         if (!text) return false;
+        if (this.isBaniText(text)) return false;
         if (text.indexOf("পিতা:") !== -1 || text.indexOf("পিতা :") !== -1 || text.indexOf("পিতা") !== -1 ||
-            text.indexOf("الوالد:") !== -1 || text.indexOf("الوالদ :") !== -1 || text.indexOf("বাবার নাম") !== -1) {
+            text.indexOf("الوالদ:") !== -1 || text.indexOf("الوالد :") !== -1 || text.indexOf("বাবার নাম") !== -1) {
             return true;
         }
         if (/01[3-9]\d{8}/.test(text) || /০১[৩-৯][০-৯]{8}/.test(text) || /٠١[٠-৯]{9}/.test(text)) {
@@ -339,11 +348,14 @@ var CardAutoFiller = {
         var clean = text.replace(/^\s+|\s+$/g, "");
         var lines = clean.split(/[\r\n]+/);
         if (lines.length >= 2) {
-            var studentTitles = ["মাওলানা", "মুহাম্মাদ", "মোহাম্মদ", "মোঃ", "হাফেজ", "মুফতী", "ক্বারী", "শিক্ষার্থী", "ছাত্র", "الحافظ", "مولانا"];
+            var studentTitles = ["মুহাম্মাদ", "মোহাম্মদ", "মোঃ", "শিক্ষার্থী", "ছাত্র", "الحافظ"];
             for (var s = 0; s < studentTitles.length; s++) {
                 if (clean.indexOf(studentTitles[s]) !== -1) {
                     return true;
                 }
+            }
+            if (/^(?:হাফেজ|মাওলানা|মুফতী|ক্বারী|মুহাদ্দিস)\b/m.test(clean)) {
+                return true;
             }
         }
         return false;
@@ -399,13 +411,25 @@ var CardAutoFiller = {
         try {
             var lays = parent.layers;
             if (!lays) return;
-            for (var l = 0; l < lays.length; l++) {
-                var lay = lays[l];
-                if (!lay.visible) continue; // STRICT: Ignore hidden layers completely!
-                outLayers.push(lay);
-                if (lay.layers && lay.layers.length > 0) {
+            for (var i = 0; i < lays.length; i++) {
+                var lay = lays[i];
+                if (lay.visible && !lay.locked) {
+                    outLayers.push(lay);
                     this.collectVisibleLayers(lay, outLayers);
                 }
+            }
+        } catch(e) {}
+    },
+
+    collectVisibleGroups: function(parent, outGroups) {
+        if (!parent) return;
+        try {
+            var grps = parent.groupItems;
+            if (!grps) return;
+            for (var i = 0; i < grps.length; i++) {
+                var grp = grps[i];
+                if (grp.hidden || this.isItemHidden(grp)) continue;
+                outGroups.push(grp);
             }
         } catch(e) {}
     },
@@ -427,55 +451,57 @@ var CardAutoFiller = {
         }
     },
 
-    detectCards: function(scope, order) {
-        var doc = this.getActiveDoc();
+    detectCards: function(order, scope) {
+        var doc = app.activeDocument;
         if (!doc) return [];
+
         var cardUnits = [];
         var candidateItems = [];
 
-        if (scope === "selection" && (!doc.selection || doc.selection.length === 0)) {
-            scope = "artboard";
-        }
+        var sel = doc.selection;
+        var hasExplicitSelection = (sel && sel.length > 0);
 
-        if (scope === "selection" && doc.selection && doc.selection.length > 0) {
-            for (var s = 0; s < doc.selection.length; s++) {
-                var sItem = doc.selection[s];
-                if (this.isItemHidden(sItem)) continue;
-                candidateItems.push(sItem);
-            }
-        } else if (scope === "all_artboards") {
-            var visibleLayers = [];
-            this.collectVisibleLayers(doc, visibleLayers);
-            for (var l = 0; l < visibleLayers.length; l++) {
-                var layer = visibleLayers[l];
-                for (var g = 0; g < layer.groupItems.length; g++) {
-                    var grp = layer.groupItems[g];
-                    if (this.isItemHidden(grp)) continue;
-                    candidateItems.push(grp);
+        if (hasExplicitSelection) {
+            for (var s = 0; s < sel.length; s++) {
+                var it = sel[s];
+                if (!this.isItemHidden(it)) {
+                    candidateItems.push(it);
                 }
-                for (var t = 0; t < layer.textFrames.length; t++) {
-                    var tf = layer.textFrames[t];
-                    if (this.isItemHidden(tf)) continue;
-                    candidateItems.push(tf);
+            }
+        } else if (scope === "document") {
+            for (var l = 0; l < doc.layers.length; l++) {
+                var layer = doc.layers[l];
+                if (layer.visible && !layer.locked) {
+                    for (var p = 0; p < layer.pageItems.length; p++) {
+                        var itm = layer.pageItems[p];
+                        if (!this.isItemHidden(itm)) {
+                            candidateItems.push(itm);
+                        }
+                    }
                 }
             }
         } else {
             var abIndex = doc.artboards.getActiveArtboardIndex();
-            var abRect = doc.artboards[abIndex].artboardRect;
-            var visibleLayers = [];
-            this.collectVisibleLayers(doc, visibleLayers);
-            for (var l = 0; l < visibleLayers.length; l++) {
-                var layer = visibleLayers[l];
-                for (var g = 0; g < layer.groupItems.length; g++) {
-                    var grp = layer.groupItems[g];
-                    if (this.isItemHidden(grp)) continue;
-                    var gb = grp.geometricBounds;
-                    if (gb[0] < abRect[2] && gb[2] > abRect[0] && gb[1] > abRect[3] && gb[3] < abRect[1]) {
-                        candidateItems.push(grp);
+            var ab = doc.artboards[abIndex];
+            var abRect = ab.artboardRect; // [left, top, right, bottom]
+
+            for (var l = 0; l < doc.layers.length; l++) {
+                var layer = doc.layers[l];
+                if (layer.visible && !layer.locked) {
+                    for (var p = 0; p < layer.pageItems.length; p++) {
+                        var itm = layer.pageItems[p];
+                        if (this.isItemHidden(itm)) continue;
+                        var gb = itm.geometricBounds;
+                        if (gb[0] < abRect[2] && gb[2] > abRect[0] && gb[1] > abRect[3] && gb[3] < abRect[1]) {
+                            candidateItems.push(itm);
+                        }
                     }
                 }
-                for (var t = 0; t < layer.textFrames.length; t++) {
-                    var tf = layer.textFrames[t];
+            }
+
+            if (candidateItems.length === 0) {
+                for (var t = 0; t < doc.textFrames.length; t++) {
+                    var tf = doc.textFrames[t];
                     if (this.isItemHidden(tf)) continue;
                     var gb = tf.geometricBounds;
                     if (gb[0] < abRect[2] && gb[2] > abRect[0] && gb[1] > abRect[3] && gb[3] < abRect[1]) {
@@ -508,7 +534,7 @@ var CardAutoFiller = {
         // Attach exact Serial & Form frames to each card by spatial proximity if not already attached
         var needsProximity = false;
         for (var cu = 0; cu < cardUnits.length; cu++) {
-            if (!cardUnits[cu].serialFrame || !cardUnits[cu].formFrame) {
+            if (!cardUnits[cu].serialFrame || !cardUnits[cu].formFrame || !cardUnits[cu].qtyFrame) {
                 needsProximity = true;
                 break;
             }
@@ -520,7 +546,7 @@ var CardAutoFiller = {
             for (var cu = 0; cu < cardUnits.length; cu++) {
                 var cCard = cardUnits[cu];
                 if (!cCard.nameFrame) continue;
-                if (cCard.serialFrame && cCard.formFrame) continue; // already attached!
+                if (cCard.serialFrame && cCard.formFrame && cCard.qtyFrame) continue; // already attached!
                 var cgb = cCard.nameFrame.geometricBounds;
                 var cLeft = cgb[0];
                 var cTop = cgb[1];
@@ -637,9 +663,9 @@ var CardAutoFiller = {
                 return;
             }
 
-            if (tfs.length >= 1 && tfs.length <= 5) {
+            if (tfs.length >= 1 && tfs.length <= 8) {
                 var card = this.analyzeCardGroup(tfs, item);
-                if (card.nameFrame && (card.detailsFrame || card.serialFrame || card.namePlaceholderPath)) {
+                if (card.nameFrame && (card.detailsFrame || card.baniFrame || card.serialFrame || card.qtyFrame || card.namePlaceholderPath)) {
                     card.group = item;
                     card.bounds = item.geometricBounds;
                     outCards.push(card);
@@ -647,7 +673,7 @@ var CardAutoFiller = {
                 }
             }
 
-            if (personCount > 1 || tfs.length > 5) {
+            if (personCount > 1 || tfs.length > 8) {
                 for (var c = 0; c < item.pageItems.length; c++) {
                     this.extractCardsFromItem(item.pageItems[c], outCards);
                 }
@@ -721,40 +747,49 @@ var CardAutoFiller = {
             var tfW = Math.abs(tfRight - tfLeft);
             var tfH = Math.abs(tfTop - tfBottom);
 
-            var relX = groupWidth > 0 ? (tfLeft - groupLeft) : 0;
-            var relY = groupHeight > 0 ? (groupTop - tfTop) : 0;
+            var relX = groupWidth > 0 ? (tfLeft - groupLeft) / groupWidth : 0;
+            var relY = groupHeight > 0 ? (groupTop - tfTop) / groupHeight : 0;
 
-            // 1. Form number frame (contains "ফরম", "দাখেলা", "রোল", "Form" or sits near bottom-right)
-            var isFormText = /(?:ফরম|দাখেলা|রোল|Form|Roll|‡¶´|‡dvi|diBk|‡ivj)/i.test(rawTxt) || 
-                             (/^[০-৯0-9\s\-\/]+$/.test(cleanTxt) && cleanTxt.length >= 4 && cleanTxt.length <= 8 && relY > groupHeight * 0.45);
-            if (isFormText || (relX > groupWidth * 0.40 && relY > groupHeight * 0.40 && tfW < 60 && tfH < 45)) {
-                card.formFrame = tf;
-                continue;
-            }
-
-            // 2. Top-Right serial/badge frame (strictly top-right pill: relX > 60%, relY < 35%, small width & height)
-            var isTopRightBadge = (groupWidth > 0 && groupHeight > 0 && relX > groupWidth * 0.60 && relY < groupHeight * 0.35 && tfW < 40 && tfH < 25);
-            if (isTopRightBadge || (cleanTxt.length <= 4 && num > 0 && tfW < 35 && tfH < 25)) {
-                if (!card.serialFrame) {
-                    card.serialFrame = tf;
-                    card.qtyFrame = tf;
-                    card.badgeFrame = tf;
-                    card.badgeNumber = num > 0 ? num : -1;
-                    continue;
-                }
-            }
-
-            // 3. Title / Memorabilia / Back-side header banners
+            // 1. Title / Memorabilia / Back-side header banners
             if (this.isBackSideText(rawTxt) || /(?:দাওরায়ে|দাওরা|মাস্টার্স|স্মৃতি|সমাপনী|হিফ[জয]|তাকমীল|দস্তারবন্দী|বিদায়ী|স্মারক|ফারেগিন|পরিচিতি|বিভাগ|wnRwi|wLªóvã|`vIiv|nvw`m|cwiwP|fv‡iwMb)/i.test(rawTxt)) {
                 continue;
             }
 
-            // 4. Institution name header
+            // 2. Year tag (e.g., "2027", "২০২৭", "১৪৪৬")
+            if (/^(?:19|20)\d\d$|^(?:১৪|১৫)[০-৯]{2}$|^(?:২০|১৯)[০-৯]{2}$/.test(cleanTxt)) {
+                card.badgeFrame = tf;
+                continue;
+            }
+
+            // 3. Form number frame (contains "ফরম", "দাখেলা", "রোল", "Form" or sits near bottom-right)
+            var isFormText = /(?:ফরম|দাখেলা|রোল|Form|Roll|‡¶´|‡dvi|diBk|‡ivj)/i.test(rawTxt) || 
+                             (/^[০-৯0-9\s\-\/]+$/.test(cleanTxt) && cleanTxt.length >= 4 && cleanTxt.length <= 8 && relY > 0.45);
+            if (isFormText || (relX > 0.40 && relY > 0.40 && tfW < 60 && tfH < 45)) {
+                card.formFrame = tf;
+                continue;
+            }
+
+            // 4. Quantity frame (sitting on right edge or small number frame)
+            if (/^[০-৯0-9]+$/.test(cleanTxt) && cleanTxt.length <= 4 && (relX > 0.65 || (groupWidth > 0 && tfLeft > groupRight - 55) || (tfW < 35 && tfH < 30))) {
+                if (!card.qtyFrame) {
+                    card.qtyFrame = tf;
+                    if (!card.serialFrame) card.serialFrame = tf;
+                    continue;
+                }
+            }
+
+            // 5. Explicit Bani quote
+            if (this.isBaniText(rawTxt)) {
+                card.baniFrame = tf;
+                continue;
+            }
+
+            // 6. Institution name header
             if (/gv`vwim|gv`ivmv|mZxNvUv|মাদ্রাসা|মাদরাসা|মারকায|জামিয়া|ইনস্টিটিউট|বিদ্যালয়|স্কুল|কলেজ/.test(rawTxt)) {
                 continue;
             }
 
-            // 5. Design label
+            // 7. Design label
             if (/^ডিজাইন\s*[০-৯0-9]+/i.test(rawTxt) || /^(?:Tapper|Round|Design)/i.test(rawTxt)) {
                 continue;
             }
@@ -773,7 +808,9 @@ var CardAutoFiller = {
         } else if (candidateFrames.length >= 2) {
             card.nameFrame = candidateFrames[0];
             card.detailsFrame = null;
-            card.baniFrame = candidateFrames[1];
+            if (!card.baniFrame) {
+                card.baniFrame = candidateFrames[1];
+            }
         }
 
         return card;
