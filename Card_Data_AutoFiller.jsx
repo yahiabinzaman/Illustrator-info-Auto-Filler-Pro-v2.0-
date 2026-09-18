@@ -338,12 +338,15 @@ var CardAutoFiller = {
 
     isBaniText: function(text) {
         if (!text) return false;
+        // Never treat text that has student biodata (e.g. phone or father) as Bani
+        if (this.hasStudentBiodata(text)) return false;
         // Unicode and ANSI keywords for Bani / Quotes
         if (/[\u09AC][\u09BE][\u09A3\u09A8][\u09C0]/.test(text)) return true; // বাণী / বানী
         if (/evbx|evYx/i.test(text)) return true; // ANSI বাণী
-        if (/(?:উত্তম\s*নিয়ত|প্রয়োজন\s*মেটাতে|লোভ\s*থেকে|মুক্ত\s*রাখ|মমতাজ|সোলায়মান|হাদিস|নসীহত|চিরন্তন|উক্তি)/i.test(text)) return true;
-        if (/(?:DËg|wbqZ|cÖ‡qvRb|‡jvf|gy³|ggZvR|‡mvjvqgvb|nvw`m|bwmnZ|Dw³)/i.test(text)) return true;
+        if (/(?:টাকা\s*দিয়ে|টাকা\s*দিয়ে|উত্তম\s*নিয়ত|প্রয়োজন\s*মেটাতে|প্রয়োজন\s*মেটাতে|লোভ\s*থেকে|মুক্ত\s*রাখ|মমতাজ|সোলায়মান\s*মুখতার|সোলায়মান\s*মুখতার|হাদিস|নসীহত|চিরন্তন\s*বাণী|কোটেশন)/i.test(text)) return true;
+        if (/(?:UvKv\s*w`‡q|DËg\s*wbqZ|cÖ‡qvRb\s*‡gUv‡Z|‡jvf\s*‡_‡K|gy³\s*ivL|ggZvR|‡mvjvqgvb\s*gyLZvi|nvw`m|bwmnZ|Dw³)/i.test(text)) return true;
         if (/^[\s\-\–—]+\s*(?:মাওলানা|হযরত|হজরত|মুফতী|শায়খ|gvIjvbv|nhiZ|gydZx)/i.test(text) || /[\r\n][\s\-\–—]+\s*(?:মাওলানা|হযরত|হজরত|মুফতী|শায়খ|gvIjvbv|nhiZ|gydZx)/i.test(text)) return true;
+        if (/^[“"'].{15,}[”"']$/.test(text.replace(/^\s+|\s+$/g, ''))) return true;
         return false;
     },
 
@@ -374,17 +377,13 @@ var CardAutoFiller = {
                 otherFrames.push({ tf: tf, type: "bani" });
             } else if (/^(?:ফরম|দাখেলা|রোল|Form|Roll|‡¶´|‡dvi|diBk|‡ivj)/i.test(cTxt)) {
                 otherFrames.push({ tf: tf, type: "form" });
-            } else if (this.hasStudentBiodata(cTxt) || (tf.lines.length >= 2 && cTxt.length >= 10)) {
-                nameCandidates.push(tf);
             } else {
                 var clean = cTxt.replace(/\s+/g, "");
                 var num = this.bengaliToInt(clean);
                 if (clean.length <= 4 && num > 0) {
                     otherFrames.push({ tf: tf, type: "qty_or_serial", num: num });
-                } else if (tf.lines.length === 1 && cTxt.length <= 40) {
-                    nameCandidates.push(tf);
                 } else {
-                    otherFrames.push({ tf: tf, type: "other" });
+                    nameCandidates.push(tf);
                 }
             }
         }
@@ -428,7 +427,7 @@ var CardAutoFiller = {
                 var dy = (nTop + nBottom) / 2 - (ogb[1] + ogb[3]) / 2;
                 var dist = Math.sqrt(dx * dx + dy * dy);
 
-                if (Math.abs(dx) < 260 && Math.abs(dy) < 200) {
+                if (Math.abs(dx) < 300 && Math.abs(dy) < 250) {
                     if (ot.type === "bani" && dist < minBaniDist) {
                         minBaniDist = dist;
                         card.baniFrame = otf;
@@ -436,7 +435,7 @@ var CardAutoFiller = {
                         minFormDist = dist;
                         card.formFrame = otf;
                     } else if (ot.type === "qty_or_serial") {
-                        if (dx > 30 && Math.abs(dy) < 70 && dist < minQtyDist) {
+                        if (dx > 30 && Math.abs(dy) < 80 && dist < minQtyDist) {
                             minQtyDist = dist;
                             card.qtyFrame = otf;
                         } else if (dy < 0 && dx > 0 && dist < minSerialDist) {
@@ -640,9 +639,9 @@ var CardAutoFiller = {
         if (!item || this.isItemHidden(item)) return;
 
         if (item.typename === "TextFrame") {
-            if (this.isBackSideText(item.contents)) return;
+            if (this.isBackSideText(item.contents) || this.isBaniText(item.contents)) return;
             var cTxt = item.contents;
-            if (this.hasStudentBiodata(cTxt) || item.lines.length >= 2) {
+            if (this.hasStudentBiodata(cTxt) || (item.lines.length >= 2 && !this.isBaniText(cTxt))) {
                 var card = {
                     nameFrame: item,
                     detailsFrame: null,
@@ -692,42 +691,29 @@ var CardAutoFiller = {
                 return;
             }
 
-            var hasSubGroups = false;
+            var subGroupCount = 0;
             for (var chk = 0; chk < item.pageItems.length; chk++) {
                 if (item.pageItems[chk].typename === "GroupItem") {
-                    hasSubGroups = true;
-                    break;
+                    subGroupCount++;
                 }
             }
 
-            if (hasSubGroups && (personCount > 1 || tfs.length > 6)) {
+            if (subGroupCount >= 2 || (subGroupCount >= 1 && tfs.length > 6)) {
                 for (var c = 0; c < item.pageItems.length; c++) {
-                    this.extractCardsFromItem(item.pageItems[c], outCards);
+                    if (item.pageItems[c].typename === "GroupItem") {
+                        this.extractCardsFromItem(item.pageItems[c], outCards);
+                    }
                 }
                 return;
             }
 
             if (tfs.length >= 1) {
                 var card = this.analyzeCardGroup(tfs, item);
-                if (card.nameFrame || card.namePlaceholderPath) {
-                    // Ignore header / banner groups at top of artboard that don't have biodata
-                    var isHeaderPos = false;
-                    try {
-                        var doc = app.activeDocument;
-                        var ab = doc.artboards[doc.artboards.getActiveArtboardIndex()];
-                        var abH = Math.abs(ab.artboardRect[1] - ab.artboardRect[3]);
-                        var gb = item.geometricBounds;
-                        if (gb[1] > (ab.artboardRect[1] - abH * 0.25) && !hasBio && tfs.length <= 2) {
-                            isHeaderPos = true;
-                        }
-                    } catch(e) {}
-
-                    if (!isHeaderPos) {
-                        card.group = item;
-                        card.bounds = item.geometricBounds;
-                        outCards.push(card);
-                        return;
-                    }
+                if (card.nameFrame || card.baniFrame) {
+                    card.group = item;
+                    card.bounds = item.geometricBounds;
+                    outCards.push(card);
+                    return;
                 }
             }
 
@@ -785,8 +771,8 @@ var CardAutoFiller = {
                 continue;
             }
 
-            // 2. Bani / Quote frame (strictly distinct from student biodata)
-            if (this.isBaniText(rawTxt) || (relY > groupHeight * 0.55 && tf.lines.length >= 2 && !this.hasStudentBiodata(rawTxt))) {
+            // 2. Bani / Quote frame
+            if (this.isBaniText(rawTxt)) {
                 card.baniFrame = tf;
                 continue;
             }
@@ -833,11 +819,19 @@ var CardAutoFiller = {
 
         if (candidateFrames.length === 1) {
             card.nameFrame = candidateFrames[0];
+            card.detailsFrame = null;
         } else if (candidateFrames.length >= 2) {
-            // If top frame has multi-lines (>= 3 lines or has biodata), it is a combined Name+Bio frame
-            if (candidateFrames[0].lines.length >= 3 || this.hasStudentBiodata(candidateFrames[0].contents)) {
+            var f1 = candidateFrames[1];
+            var f1gb = f1.geometricBounds;
+            var f1relY = groupHeight > 0 ? (groupTop - f1gb[1]) : 0;
+            if (this.isBaniText(f1.contents) || (f1relY > groupHeight * 0.45 && !this.hasStudentBiodata(f1.contents))) {
+                card.nameFrame = candidateFrames[0];
+                if (!card.baniFrame) card.baniFrame = f1;
+                card.detailsFrame = null;
+            } else if (candidateFrames[0].lines.length >= 3 || this.hasStudentBiodata(candidateFrames[0].contents)) {
                 card.nameFrame = candidateFrames[0];
                 if (!card.baniFrame) card.baniFrame = candidateFrames[1];
+                card.detailsFrame = null;
             } else {
                 card.nameFrame = candidateFrames[0];
                 card.detailsFrame = candidateFrames[1];
@@ -1753,6 +1747,21 @@ var CardAutoFiller = {
         for (var i = 0; i < fillLimit; i++) {
             var card = targetCards[i];
             var entry = activeEntries[i];
+
+            // If card.nameFrame is missing, dynamically create one in the upper area of the card
+            if (!card.nameFrame) {
+                try {
+                    var cgb = card.group ? card.group.geometricBounds : card.bounds;
+                    if (cgb) {
+                        var cgW = Math.abs(cgb[2] - cgb[0]);
+                        var cgH = Math.abs(cgb[1] - cgb[3]);
+                        var posCX = cgb[0] + cgW * 0.22;
+                        var posCY = cgb[1] - cgH * 0.18;
+                        var newCTF = (card.group && card.group.textFrames) ? card.group.textFrames.pointText([posCX, posCY]) : doc.textFrames.pointText([posCX, posCY]);
+                        card.nameFrame = newCTF;
+                    }
+                } catch(crErr) {}
+            }
 
             var cardBoldFont = globalBoldFont;
             var cardRegularFont = globalRegularFont;
