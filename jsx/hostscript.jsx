@@ -255,19 +255,19 @@ var CardAutoFiller = {
     isItemHidden: function(item) {
         if (!item) return true;
         try {
-            if (item.hidden || item.locked) return true;
+            if (item.hidden) return true;
         } catch(e) {}
         try {
-            var cur = item;
+            var cur = item.parent;
             var depth = 0;
             while (cur && depth < 20) {
                 depth++;
                 if (cur.typename === 'Document' || cur.typename === 'Application' || cur === app) break;
                 if (cur.typename === 'Layer') {
-                    if (!cur.visible || cur.locked) return true;
+                    if (!cur.visible) return true;
                 } else {
                     try {
-                        if (cur.hidden || cur.locked) return true;
+                        if (cur.hidden) return true;
                     } catch(err) {}
                 }
                 cur = cur.parent;
@@ -288,15 +288,28 @@ var CardAutoFiller = {
             norm.indexOf("সমাপনীস্মৃতি") !== -1 ||
             norm.indexOf("হিফজসমাপনী") !== -1 ||
             norm.indexOf("হিফযসমাপনী") !== -1 ||
+            norm.indexOf("হিফজুলকুরআনসমাপনীস্মৃতি") !== -1 ||
+            norm.indexOf("হিফযুলকুরআনসমাপনীস্মৃতি") !== -1 ||
             norm.indexOf("হিফজুলকুরআন") !== -1 ||
             norm.indexOf("হিফযুলকুরআন") !== -1 ||
             norm.indexOf("হিফযুলকোরআন") !== -1 ||
-            norm.indexOf("হিফজুলকোরআন") !== -1) {
+            norm.indexOf("হিফজুলকোরআন") !== -1 ||
+            norm.indexOf("বিদায়ীস্মৃতি") !== -1 ||
+            norm.indexOf("স্মৃতিস্মারক") !== -1 ||
+            norm.indexOf("দস্তারবন্দীস্মারক") !== -1 ||
+            norm.indexOf("ফারেগীনপরিচিতি") !== -1 ||
+            norm.indexOf("ফারেগিনপরিচিতি") !== -1 ||
+            norm.indexOf("ছাত্রপরিচিতি") !== -1 ||
+            norm.indexOf("মাদরাসাপরিচিতি") !== -1 ||
+            norm.indexOf("মাদ্রাসাপরিচিতি") !== -1) {
             return true;
         }
 
         var backKeywords = [
-            "দাওরায়ে", "সমাপনী", "স্মৃতি", "হিফজ", "হিফয",
+            "দাওরায়ে", "দাওরা", "মাস্টার্স", "হিফজ", "হিফয", "তাকমীল",
+            "দস্তারবন্দী", "বিদায়ী", "স্মারক", "ফারেগিন", "ফারেগীন",
+            "হিজরি", "হিজরী", "খ্রিষ্টাব্দ", "ঈসায়ী", "মারকায", "জামিয়া",
+            "মুহতামিম", "মুশরিফ", "মুদাররিস", "শিক্ষকবৃন্দ", "কর্মকর্তা",
             "শিক্ষাবর্ষ", "সনদপত্র", "স্মারক", "দস্তারবন্দী", "গ্রুপছবি",
             "আমন্ত্রনপত্র", "দাওয়াতনামা", "স্মৃতিচারণ"
         ];
@@ -312,7 +325,7 @@ var CardAutoFiller = {
         if (!text) return false;
         // Unicode matches
         if (text.indexOf("পিতা:") !== -1 || text.indexOf("পিতা :") !== -1 || text.indexOf("পিতা") !== -1 ||
-            text.indexOf("الوالদ:") !== -1 || text.indexOf("الوالد :") !== -1 || text.indexOf("বাবার নাম") !== -1) {
+            text.indexOf("الوالদ:") !== -1 || text.indexOf("الوالদ :") !== -1 || text.indexOf("বাবার নাম") !== -1) {
             return true;
         }
         // ANSI/Bijoy matches (wcZv = পিতা, ‡cv÷ = পোস্ট, _vbv = থানা, ‡Rjv = জেলা, MÖvg = গ্রাম)
@@ -459,7 +472,7 @@ var CardAutoFiller = {
             if (!lays) return;
             for (var l = 0; l < lays.length; l++) {
                 var lay = lays[l];
-                if (!lay.visible) continue; // STRICT: Ignore hidden layers completely!
+                if (!lay.visible) continue;
                 outLayers.push(lay);
                 if (lay.layers && lay.layers.length > 0) {
                     this.collectVisibleLayers(lay, outLayers);
@@ -475,11 +488,11 @@ var CardAutoFiller = {
             var tn = it.typename;
             if (tn === 'TextFrame') {
                 try {
-                    if (!it.hidden && !it.locked) outList.push(it);
+                    if (!it.hidden) outList.push(it);
                 } catch(e) { outList.push(it); }
             } else if (tn === 'GroupItem') {
                 try {
-                    if (!it.hidden && !it.locked) this.collectTextFrames(it.pageItems, outList);
+                    if (!it.hidden) this.collectTextFrames(it.pageItems, outList);
                 } catch(e) {}
             }
         }
@@ -555,7 +568,6 @@ var CardAutoFiller = {
                 var tf = allTFs[t];
                 if (this.isItemHidden(tf)) continue;
                 if (this.isBackSideText(tf.contents)) continue;
-                if (tf.contents.length > 500 || tf.lines.length > 15) continue;
                 filteredTFs.push(tf);
             }
             if (filteredTFs.length >= 1) {
@@ -568,8 +580,8 @@ var CardAutoFiller = {
         this.collectTextFrames(candidateItems, allDocTFs);
         for (var cu = 0; cu < cardUnits.length; cu++) {
             var cCard = cardUnits[cu];
-            if (!cCard.nameFrame) continue;
-            var cgb = cCard.nameFrame.geometricBounds;
+            var cgb = cCard.bounds || (cCard.nameFrame ? cCard.nameFrame.geometricBounds : null);
+            if (!cgb) continue;
             var cLeft = cgb[0];
             var cTop = cgb[1];
             var cRight = cgb[2];
@@ -582,7 +594,7 @@ var CardAutoFiller = {
 
             for (var dt = 0; dt < allDocTFs.length; dt++) {
                 var dtf = allDocTFs[dt];
-                if (dtf === cCard.nameFrame || this.isItemHidden(dtf)) continue;
+                if (dtf === cCard.nameFrame || dtf === cCard.baniFrame || this.isItemHidden(dtf)) continue;
                 var dtgb = dtf.geometricBounds;
                 var dx = dtgb[0] - cLeft;
                 var dy = cTop - dtgb[1]; // positive downwards
@@ -612,7 +624,7 @@ var CardAutoFiller = {
                 }
 
                 // 3. Proximity Qty Frame (Demo '10' on the right of the card)
-                if (!cCard.qtyFrame && dtgb[0] >= cRight - 20 && dtgb[0] <= cRight + 120 && Math.abs(cTop - dtgb[1]) < 60) {
+                if (!cCard.qtyFrame && dtgb[0] >= cRight - 20 && dtgb[0] <= cRight + 120 && Math.abs(cTop - dtgb[1]) < 80) {
                     var dRawQ = dtf.contents.replace(/^\s+|\s+$/g, '');
                     if (/^[০-৯0-9\.\s]+(?:পিস|pcs)?$/i.test(dRawQ)) {
                         cCard.qtyFrame = dtf;
@@ -620,7 +632,7 @@ var CardAutoFiller = {
                 }
 
                 // 4. Proximity Bani Frame (Below Name Frame within card boundary)
-                if (!cCard.baniFrame && (cTop - dtgb[1]) > 15 && (cTop - dtgb[1]) < 100 && Math.abs(dtgb[0] - cLeft) < 70) {
+                if (!cCard.baniFrame && (cTop - dtgb[1]) > 15 && (cTop - dtgb[1]) < 120 && Math.abs(dtgb[0] - cLeft) < 100) {
                     var dRawB = dtf.contents;
                     if (this.isBaniText(dRawB) || (dtf.lines.length >= 2 && !this.hasStudentBiodata(dRawB))) {
                         cCard.baniFrame = dtf;
@@ -640,8 +652,8 @@ var CardAutoFiller = {
 
         if (item.typename === "TextFrame") {
             if (this.isBackSideText(item.contents) || this.isBaniText(item.contents)) return;
-            var cTxt = item.contents;
-            if (this.hasStudentBiodata(cTxt) || (item.lines.length >= 2 && !this.isBaniText(cTxt))) {
+            var cTxt = item.contents || "";
+            if (this.hasStudentBiodata(cTxt) || item.lines.length >= 2 || cTxt.length >= 10) {
                 var card = {
                     nameFrame: item,
                     detailsFrame: null,
@@ -650,7 +662,6 @@ var CardAutoFiller = {
                     badgeFrame: null,
                     serialFrame: null,
                     formFrame: null,
-                    namePlaceholderPath: null,
                     group: item,
                     bounds: item.geometricBounds,
                     artboardIndex: 0
@@ -661,66 +672,28 @@ var CardAutoFiller = {
         }
 
         if (item.typename === "GroupItem") {
+            var gb = item.geometricBounds;
+            var itemW = Math.abs(gb[2] - gb[0]);
+            var itemH = Math.abs(gb[1] - gb[3]);
+
             var tfs = [];
             this.collectTextFrames(item.pageItems, tfs);
             if (tfs.length === 0) return;
 
-            var hasBack = false;
-            var hasBio = false;
-            var hasQty = false;
-            var personCount = 0;
-            var nonBackTfs = 0;
-
-            for (var t = 0; t < tfs.length; t++) {
-                var cTxt = tfs[t].contents;
-                var clean = cTxt.replace(/\s+/g, "");
-                var num = this.bengaliToInt(clean);
-                if (clean.length <= 4 && num > 0) hasQty = true;
-                if (this.hasStudentBiodata(cTxt)) {
-                    hasBio = true;
-                    personCount++;
-                }
-                if (this.isBackSideText(cTxt)) {
-                    hasBack = true;
-                } else if (!/gv`vwim|gv`ivmv|mZxNvUv|মাদ্রাসা|মাদরাসা|মারকায|জামিয়া/.test(cTxt)) {
-                    nonBackTfs++;
-                }
-            }
-
-            if (hasBack && !hasBio && !hasQty && nonBackTfs === 0) {
-                return;
-            }
-
-            var subGroupCount = 0;
-            for (var chk = 0; chk < item.pageItems.length; chk++) {
-                if (item.pageItems[chk].typename === "GroupItem") {
-                    subGroupCount++;
-                }
-            }
-
-            if (subGroupCount >= 2 || (subGroupCount >= 1 && tfs.length > 6)) {
+            var isMegaGroup = (itemW > 350 || itemH > 280 || tfs.length > 5);
+            if (isMegaGroup) {
                 for (var c = 0; c < item.pageItems.length; c++) {
-                    if (item.pageItems[c].typename === "GroupItem") {
-                        this.extractCardsFromItem(item.pageItems[c], outCards);
-                    }
+                    this.extractCardsFromItem(item.pageItems[c], outCards);
                 }
                 return;
             }
 
-            if (tfs.length >= 1) {
-                var card = this.analyzeCardGroup(tfs, item);
-                if (card.nameFrame || card.baniFrame) {
-                    card.group = item;
-                    card.bounds = item.geometricBounds;
-                    outCards.push(card);
-                    return;
-                }
-            }
-
-            for (var k = 0; k < item.pageItems.length; k++) {
-                if (item.pageItems[k].typename === "GroupItem") {
-                    this.extractCardsFromItem(item.pageItems[k], outCards);
-                }
+            var card = this.analyzeCardGroup(tfs, item);
+            if (card.nameFrame || card.baniFrame || tfs.length >= 1) {
+                card.group = item;
+                card.bounds = gb;
+                outCards.push(card);
+                return;
             }
         }
     },
@@ -1835,6 +1808,13 @@ var CardAutoFiller = {
             var finalDetHScale = (payload.detailsHScale !== undefined && payload.detailsHScale !== 85) ? detailsHScale : (origDetStyle.hScale || tplDetails.hScale);
             var finalDetColorToUse = origDetStyle.color || finalDetailsColor;
             var finalDetJust = (origDetStyle.just !== null && origDetStyle.just !== undefined) ? origDetStyle.just : tplDetails.just;
+
+            try { if (card.nameFrame) card.nameFrame.locked = false; } catch(e) {}
+            try { if (card.detailsFrame) card.detailsFrame.locked = false; } catch(e) {}
+            try { if (card.baniFrame) card.baniFrame.locked = false; } catch(e) {}
+            try { if (card.serialFrame) card.serialFrame.locked = false; } catch(e) {}
+            try { if (card.qtyFrame) card.qtyFrame.locked = false; } catch(e) {}
+            try { if (card.formFrame) card.formFrame.locked = false; } catch(e) {}
 
             // --- STEP 2: POPULATE SERIAL / KROMIK (Top-Right Pill) ---
             if (card.serialFrame && entry.serial) {
