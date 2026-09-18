@@ -1723,6 +1723,7 @@
                 serial: blk.serial,
                 name: nameToUse,
                 details: blk.details,
+                formNumber: blk.formNumber,
                 qty: blk.qty,
                 bani: blk.bani,
                 rawText: blk.rawText
