@@ -1821,8 +1821,12 @@
 
     function executeAutoFillKeyring() {
         try {
+            if (!parsedKeyringEntries.length && rawTextInputKeyring && rawTextInputKeyring.value.trim()) {
+                parseKeyringInput();
+            }
+
             if (!parsedKeyringEntries.length) {
-                showToast('Please enter data list first', 'error');
+                showToast('Please enter data list first (ডেটা লিস্ট দিন)', 'error');
                 return;
             }
 

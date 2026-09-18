@@ -1710,6 +1710,13 @@ var CardAutoFiller = {
                     if (sfTr.characterAttributes.horizontalScale > 0) masterTplForm.hScale = sfTr.characterAttributes.horizontalScale;
                     if (sfTr.characterAttributes.textFont) masterTplForm.font = sfTr.characterAttributes.textFont;
                 }
+                if (sampleCard.baniFrame && sampleCard.baniFrame.textRange) {
+                    var bTr = sampleCard.baniFrame.textRange;
+                    if (bTr.characterAttributes.textFont) {
+                        if (!docRegularFont) docRegularFont = bTr.characterAttributes.textFont;
+                        if (!docBoldFont) docBoldFont = bTr.characterAttributes.textFont;
+                    }
+                }
                 break;
             } catch(e) {}
         }
@@ -1730,7 +1737,10 @@ var CardAutoFiller = {
                         var cgH = Math.abs(cgb[1] - cgb[3]);
                         var posCX = cgb[0] + cgW * 0.22;
                         var posCY = cgb[1] - cgH * 0.18;
-                        var newCTF = (card.group && card.group.textFrames) ? card.group.textFrames.pointText([posCX, posCY]) : doc.textFrames.pointText([posCX, posCY]);
+                        var newCTF = doc.textFrames.pointText([posCX, posCY]);
+                        if (card.group) {
+                            try { newCTF.moveToBeginning(card.group); } catch(me) {}
+                        }
                         card.nameFrame = newCTF;
                     }
                 } catch(crErr) {}
