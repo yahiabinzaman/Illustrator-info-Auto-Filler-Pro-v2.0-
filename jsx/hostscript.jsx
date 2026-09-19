@@ -681,71 +681,38 @@ var CardAutoFiller = {
             this.collectTextFrames(item.pageItems, tfs);
             if (tfs.length === 0) return;
 
-            var hasBack = false;
-            var hasBio = false;
-            var hasQty = false;
-            var personCount = 0;
-            var nonBackTfs = 0;
+            var gb = item.geometricBounds;
+            var w = Math.abs(gb[2] - gb[0]);
+            var h = Math.abs(gb[1] - gb[3]);
 
-            for (var t = 0; t < tfs.length; t++) {
-                var cTxt = tfs[t].contents;
-                var clean = cTxt.replace(/\s+/g, "");
-                var num = this.bengaliToInt(clean);
-                if (clean.length <= 4 && num > 0) hasQty = true;
-                if (this.hasStudentBiodata(cTxt)) {
-                    hasBio = true;
-                    personCount++;
-                }
-                if (this.isBackSideText(cTxt)) {
-                    hasBack = true;
-                } else if (!/gv`vwim|gv`ivmv|mZxNvUv|মাদ্রাসা|মাদরাসা|মারকায|জামিয়া/.test(cTxt)) {
-                    nonBackTfs++;
+            // If this group contains sub-groups that themselves have text frames, OR if width > 280pt, OR if tfs > 4:
+            // It is a multi-card container/row (e.g. 2 cards side-by-side in a row). Recurse down!
+            var subGroupTFCount = 0;
+            for (var pi = 0; pi < item.pageItems.length; pi++) {
+                var pSub = item.pageItems[pi];
+                if (pSub.typename === "GroupItem") {
+                    var sTfs = [];
+                    this.collectTextFrames(pSub.pageItems, sTfs);
+                    if (sTfs.length > 0) {
+                        subGroupTFCount++;
+                    }
                 }
             }
 
-            if (hasBack && !hasBio && !hasQty && nonBackTfs === 0) {
-                return;
-            }
-
-            if (tfs.length >= 1 && tfs.length <= 8) {
-                var card = this.analyzeCardGroup(tfs, item);
-                if (card.nameFrame && (card.detailsFrame || card.baniFrame || card.serialFrame || card.qtyFrame || card.namePlaceholderPath)) {
-                    card.group = item;
-                    card.bounds = item.geometricBounds;
-                    outCards.push(card);
-                    return;
-                }
-            }
-
-            if (personCount > 1 || tfs.length > 8) {
+            if (subGroupTFCount >= 2 || w > 300 || tfs.length > 4) {
                 for (var c = 0; c < item.pageItems.length; c++) {
                     this.extractCardsFromItem(item.pageItems[c], outCards);
                 }
                 return;
             }
 
-            if (tfs.length >= 1) {
-                var card = this.analyzeCardGroup(tfs, item);
-                if (card.nameFrame || card.namePlaceholderPath) {
-                    // Ignore header / banner groups at top of artboard that don't have biodata
-                    var isHeaderPos = false;
-                    try {
-                        var doc = app.activeDocument;
-                        var ab = doc.artboards[doc.artboards.getActiveArtboardIndex()];
-                        var abH = Math.abs(ab.artboardRect[1] - ab.artboardRect[3]);
-                        var gb = item.geometricBounds;
-                        if (gb[1] > (ab.artboardRect[1] - abH * 0.25) && !hasBio && tfs.length <= 2) {
-                            isHeaderPos = true;
-                        }
-                    } catch(e) {}
-
-                    if (!isHeaderPos) {
-                        card.group = item;
-                        card.bounds = item.geometricBounds;
-                        outCards.push(card);
-                        return;
-                    }
-                }
+            // Single card group (1 to 4 text frames, width <= 300)
+            var card = this.analyzeCardGroup(tfs, item);
+            if (card.nameFrame || card.namePlaceholderPath) {
+                card.group = item;
+                card.bounds = item.geometricBounds;
+                outCards.push(card);
+                return;
             }
 
             for (var k = 0; k < item.pageItems.length; k++) {
@@ -808,7 +775,7 @@ var CardAutoFiller = {
             // 3. Form number frame (contains "ফরম", "দাখেলা", "রোল", "Form" or sits near bottom-right)
             var isFormText = /(?:ফরম|দাখেলা|রোল|Form|Roll|‡¶´|‡dvi|diBk|‡ivj)/i.test(rawTxt) || 
                              (/^[০-৯0-9\s\-\/]+$/.test(cleanTxt) && cleanTxt.length >= 4 && cleanTxt.length <= 8 && relY > 0.45);
-            if (isFormText || (relX > 0.40 && relY > 0.40 && tfW < 60 && tfH < 45)) {
+            if (isFormText || (relX > 0.40 && relY > 0.40 && tfW < 60 && tfH < 45 && !this.hasStudentBiodata(rawTxt) && tf.lines.length <= 2)) {
                 card.formFrame = tf;
                 continue;
             }
@@ -850,10 +817,46 @@ var CardAutoFiller = {
             card.nameFrame = candidateFrames[0];
             card.detailsFrame = null;
         } else if (candidateFrames.length >= 2) {
-            card.nameFrame = candidateFrames[0];
-            card.detailsFrame = null;
-            if (!card.baniFrame) {
-                card.baniFrame = candidateFrames[1];
+            var detFrame = null;
+            var nameFrame = null;
+            var otherCandidates = [];
+
+            for (var cf = 0; cf < candidateFrames.length; cf++) {
+                var ctf = candidateFrames[cf];
+                var cLines = ctf.lines.length;
+                var cParas = ctf.paragraphs.length;
+                var cText = ctf.contents;
+                var isDet = (cLines >= 2 || cParas >= 2 || 
+                            /(?:পিতা|মাতা|গ্রাম|ডাক|উপজেলা|জেলা|রক্ত|মোবাইল|ফোন|ঠিকানা|wcZv|gvZv|MÖvg|i³|‡gvevBj|‡dvb)/i.test(cText) ||
+                            /(?:01[3-9]\d{8}|০১[৩-৯][০-৯]{8})/.test(cText));
+                
+                if (isDet && !detFrame) {
+                    detFrame = ctf;
+                } else if (!nameFrame && (cLines === 1 || cParas === 1 || !isDet)) {
+                    nameFrame = ctf;
+                } else {
+                    otherCandidates.push(ctf);
+                }
+            }
+
+            if (!nameFrame && candidateFrames.length > 0) {
+                nameFrame = candidateFrames[0];
+                if (detFrame === nameFrame) detFrame = candidateFrames.length > 1 ? candidateFrames[1] : null;
+            }
+            if (!detFrame && candidateFrames.length > 1) {
+                detFrame = (candidateFrames[0] === nameFrame) ? candidateFrames[1] : candidateFrames[0];
+            }
+
+            card.nameFrame = nameFrame;
+            card.detailsFrame = detFrame;
+
+            if (otherCandidates.length > 0 && !card.baniFrame) {
+                for (var oc = 0; oc < otherCandidates.length; oc++) {
+                    if (otherCandidates[oc] !== card.nameFrame && otherCandidates[oc] !== card.detailsFrame) {
+                        card.baniFrame = otherCandidates[oc];
+                        break;
+                    }
+                }
             }
         }
 
@@ -1838,6 +1841,9 @@ var CardAutoFiller = {
                 just: masterTplSerial.just
             };
 
+            var isCardNameWhite = false;
+            var cardHasDetailsFrame = (card.detailsFrame !== null && card.detailsFrame !== undefined);
+
             // Inspect card.nameFrame
             if (card.nameFrame && card.nameFrame.paragraphs && card.nameFrame.paragraphs.length > 0) {
                 try {
@@ -1849,11 +1855,21 @@ var CardAutoFiller = {
                         if (ca0.leading > 0) cardNameStyle.leading = ca0.leading;
                         if (ca0.horizontalScale > 0) cardNameStyle.hScale = ca0.horizontalScale;
                         cardNameStyle.tracking = ca0.tracking;
-                        if (ca0.fillColor && ca0.fillColor.typename !== "NoColor") cardNameStyle.color = ca0.fillColor;
+                        if (ca0.fillColor && ca0.fillColor.typename !== "NoColor") {
+                            cardNameStyle.color = ca0.fillColor;
+                            var caFc = ca0.fillColor;
+                            if (caFc.typename === "CMYKColor" && caFc.cyan === 0 && caFc.magenta === 0 && caFc.yellow === 0 && caFc.black === 0) {
+                                isCardNameWhite = true;
+                            } else if (caFc.typename === "RGBColor" && caFc.red === 255 && caFc.green === 255 && caFc.blue === 255) {
+                                isCardNameWhite = true;
+                            } else if (caFc.typename === "GrayColor" && caFc.gray === 0) {
+                                isCardNameWhite = true;
+                            }
+                        }
                         try { cardNameStyle.just = p0.paragraphAttributes.justification; } catch(j0) {}
                     }
 
-                    if (card.nameFrame.paragraphs.length > 1) {
+                    if (card.nameFrame.paragraphs.length > 1 && !cardHasDetailsFrame) {
                         var p1 = card.nameFrame.paragraphs[1];
                         if (p1 && p1.characters.length > 0) {
                             var ca1 = p1.characters[0].characterAttributes;
@@ -1924,9 +1940,16 @@ var CardAutoFiller = {
                 } catch(sc2e) {}
             }
 
-            // User overrides
-            if (userChosenColor) cardNameStyle.color = userChosenColor;
-            else if (isSingleColor) cardNameStyle.color = solidBlackCMYK;
+            // User overrides & intelligent color preservation
+            if (isSingleColor) {
+                cardNameStyle.color = solidBlackCMYK;
+            } else if (isCardNameWhite && cardHasDetailsFrame) {
+                // If template name is white in a multi-frame card, preserve white header
+                cardNameStyle.color = solidWhiteCMYK;
+            } else if (userChosenColor) {
+                cardNameStyle.color = userChosenColor;
+            }
+
             if (hasCustomNameLeading) cardNameStyle.leading = userNameLeading;
             if (hasCustomDetailsLeading) cardDetStyle.leading = userDetailsLeading;
             if (payload.nameHScale !== undefined && payload.nameHScale !== 100) cardNameStyle.hScale = nameHScale;
