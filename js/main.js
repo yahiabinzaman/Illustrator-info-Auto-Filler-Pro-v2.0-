@@ -476,6 +476,7 @@
     function parseDiaryInput() {
         var rawTextInput = document.getElementById('rawTextInputDiary');
         var chkIncludeDetails = document.getElementById('chkIncludeDetailsDiary');
+        var selectSerialFormat = document.getElementById('selectSerialFormatDiary');
         var raw = (rawTextInput ? rawTextInput.value : "").trim();
         parsedDiaryEntries = [];
         if (!raw) {
@@ -484,15 +485,33 @@
         }
 
         var includeDetails = chkIncludeDetails ? chkIncludeDetails.checked : true;
+        var serialFormat = selectSerialFormat ? selectSerialFormat.value : "standalone";
         var blocks = parseRawBlocks(raw);
 
         for (var i = 0; i < blocks.length; i++) {
             var blk = blocks[i];
-            if (!blk.cleanName) continue;
+            if (!blk.cleanName && !blk.rawName) continue;
+
+            var nameToUse = blk.cleanName;
+            var num = i + 1;
+            if (blk.serial) {
+                var pNum = bengaliToInt(blk.serial);
+                if (pNum > 0) num = pNum;
+            }
+            var bnNum = intToBengali(num, false);
+            var enNum = String(num);
+
+            if (serialFormat === "bn_dot") {
+                nameToUse = bnNum + ". " + blk.cleanName;
+            } else if (serialFormat === "en_dot") {
+                nameToUse = enNum + ". " + blk.cleanName;
+            } else if (serialFormat === "none") {
+                nameToUse = blk.cleanName;
+            }
 
             parsedDiaryEntries.push({
-                serial: blk.serial,
-                name: blk.cleanName,
+                serial: blk.serial || bnNum,
+                name: nameToUse,
                 details: includeDetails ? blk.details : "",
                 formNumber: blk.formNumber,
                 rawText: blk.rawText
@@ -907,16 +926,89 @@
         var swatches = document.querySelectorAll('.color-swatch');
         swatches.forEach(function(sw) {
             sw.addEventListener('click', function() {
+                var tab = this.getAttribute('data-tab') || 'keyring';
                 var hex = this.getAttribute('data-color') || this.getAttribute('data-hex') || '#006F9A';
                 var cleanHex = normalizeHex(hex);
                 var cmyk = PRESET_PALETTE[cleanHex.toUpperCase()] || null;
-                updateK(cleanHex, cmyk);
+                if (tab === 'diary') {
+                    updateD(cleanHex, cmyk);
+                } else {
+                    updateK(cleanHex, cmyk);
+                }
                 showToast('Color set to ' + cleanHex, 'info');
             });
         });
 
-        // Initialize with default Deep Teal
+        // Diary Color Controls
+        var colorPickerD = document.getElementById('colorPickerDiary');
+        var colorHexD = document.getElementById('colorHexDiary');
+        var btnPickD = document.getElementById('btnPickColorDiary');
+        var labelD = document.getElementById('labelColorNameDiary');
+
+        function updateD(hex, cmyk) {
+            currentDiaryColor = normalizeHex(hex);
+            if (cmyk && cmyk.length >= 4) {
+                currentDiaryCmyk = [
+                    Math.max(0, Math.min(100, Math.round(cmyk[0]))),
+                    Math.max(0, Math.min(100, Math.round(cmyk[1]))),
+                    Math.max(0, Math.min(100, Math.round(cmyk[2]))),
+                    Math.max(0, Math.min(100, Math.round(cmyk[3])))
+                ];
+            } else {
+                var rgb = hexToRgb(currentDiaryColor);
+                currentDiaryCmyk = rgbToCmyk(rgb.r, rgb.g, rgb.b);
+            }
+
+            if (colorPickerD) colorPickerD.value = currentDiaryColor;
+            if (colorHexD) colorHexD.value = currentDiaryColor;
+            if (labelD) labelD.textContent = currentDiaryColor;
+
+            var swatchesD = document.querySelectorAll('.color-swatch[data-tab="diary"]');
+            swatchesD.forEach(function(sw) {
+                var sHex = normalizeHex(sw.getAttribute('data-color') || sw.getAttribute('data-hex') || '');
+                if (sHex === currentDiaryColor) sw.classList.add('active');
+                else sw.classList.remove('active');
+            });
+        }
+
+        if (colorPickerD) {
+            colorPickerD.addEventListener('input', function() { updateD(this.value.toUpperCase()); });
+            colorPickerD.addEventListener('change', function() { updateD(this.value.toUpperCase()); });
+        }
+        if (colorHexD) {
+            colorHexD.addEventListener('input', function() { 
+                var val = this.value.trim();
+                if (val.length === 4 || val.length === 7) updateD(normalizeHex(val)); 
+            });
+            colorHexD.addEventListener('change', function() { updateD(normalizeHex(this.value)); });
+        }
+        if (btnPickD) {
+            btnPickD.addEventListener('click', function() {
+                evalHostScript('getSelectedCanvasColor()', function(resStr) {
+                    try {
+                        var res = JSON.parse(resStr);
+                        if (res.status === 'success') {
+                            if (res.cmyk && res.cmyk.length >= 4) {
+                                var rgb = cmykToRgb(res.cmyk[0], res.cmyk[1], res.cmyk[2], res.cmyk[3]);
+                                var hex = rgbToHex(rgb.r, rgb.g, rgb.b);
+                                updateD(res.hex || hex, res.cmyk);
+                            } else if (res.hex) {
+                                updateD(normalizeHex(res.hex));
+                            }
+                            showToast('Sampled canvas color: ' + currentDiaryColor, 'success');
+                        } else {
+                            showToast(res.message || 'Please select an object on canvas', 'error');
+                        }
+                    } catch(e) {
+                        showToast('Failed to get canvas color', 'error');
+                    }
+                });
+            });
+        }
+
+        // Initialize with default colors
         updateK(currentKeyringColor, currentKeyringCmyk);
+        updateD(currentDiaryColor, currentDiaryCmyk);
     }
 
     // ==========================================
@@ -1041,6 +1133,20 @@
                 loadFromCanvasSelection(rawTextInputD, function() {
                     parseDiaryInput();
                 });
+            });
+        }
+
+        var selectSerialFormatD = document.getElementById('selectSerialFormatDiary');
+        if (selectSerialFormatD) selectSerialFormatD.addEventListener('change', parseDiaryInput);
+
+        var btnResetIdxD = document.getElementById('btnResetIndexDiary');
+        if (btnResetIdxD) {
+            btnResetIdxD.addEventListener('click', function() {
+                currentDiaryStartIndex = 0;
+                var inputIdx = document.getElementById('inputStartIndexDiary');
+                if (inputIdx) inputIdx.value = 1;
+                renderDiaryPreview();
+                showToast('Reset to #1', 'info');
             });
         }
 
