@@ -21,7 +21,7 @@
         
         var fullCode = '';
         if (extPath) {
-            fullCode = 'if (typeof CardAutoFiller === "undefined") { try { var _f = new File("' + extPath + '/jsx/hostscript.jsx"); _f.encoding = "UTF-8"; _f.open("r"); var _c = _f.read(); _f.close(); eval(_c); } catch(e) {}; }; ' + code;
+            fullCode = 'try { var _f = new File("' + extPath + '/jsx/hostscript.jsx"); if (_f.exists) { _f.encoding = "UTF-8"; _f.open("r"); var _c = _f.read(); _f.close(); eval(_c); } } catch(e) {}; ' + code;
         } else {
             fullCode = code;
         }
