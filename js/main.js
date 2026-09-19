@@ -611,8 +611,13 @@
 
             var inputDetHScaleD = document.getElementById('inputDetailsHScaleDiary');
             var inputNmHScaleD = document.getElementById('inputNameHScaleDiary');
-            var detHScaleD = inputDetHScaleD ? (parseFloat(inputDetHScaleD.value) || 96) : 96;
-            var nmHScaleD = inputNmHScaleD ? (parseFloat(inputNmHScaleD.value) || 100) : 100;
+            var detHScaleD = inputDetHScaleD ? (parseFloat(inputDetHScaleD.value) || 85) : 85;
+            var nmHScaleD = inputNmHScaleD ? (parseFloat(inputNmHScaleD.value) || 80) : 80;
+
+            var inputDetSizeD = document.getElementById('inputDetailsSizeDiary');
+            var inputDetLeadD = document.getElementById('inputDetailsLeadingDiary');
+            var detSizeD = inputDetSizeD ? inputDetSizeD.value.trim() : "Auto";
+            var detLeadD = inputDetLeadD ? inputDetLeadD.value.trim() : "Auto";
 
             var payload = {
                 isKeyring: false,
@@ -629,7 +634,9 @@
                 startIndex: currentDiaryStartIndex,
                 skipFilledCards: skipFilled,
                 detailsHScale: detHScaleD,
-                nameHScale: nmHScaleD
+                nameHScale: nmHScaleD,
+                detailsSize: detSizeD,
+                detailsLeading: detLeadD
             };
 
             if (btnAutoFill) {
@@ -1241,7 +1248,7 @@
             });
 
             // Sync input changes back to button active state
-            ['inputDetailsHScaleKeyring', 'inputNameHScaleKeyring', 'inputDetailsLeadingKeyring', 'inputDetailsHScaleDiary', 'inputNameHScaleDiary'].forEach(function(id) {
+            ['inputDetailsHScaleKeyring', 'inputNameHScaleKeyring', 'inputDetailsLeadingKeyring', 'inputDetailsHScaleDiary', 'inputNameHScaleDiary', 'inputDetailsSizeDiary', 'inputDetailsLeadingDiary'].forEach(function(id) {
                 var input = document.getElementById(id);
                 if (input) {
                     input.addEventListener('input', function() {

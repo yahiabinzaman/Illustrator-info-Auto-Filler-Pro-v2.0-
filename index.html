@@ -314,22 +314,46 @@ Example:
                 <div class="control-group">
                     <label for="inputDetailsHScaleDiary">ঠিকানার স্কেল (Address Scale)</label>
                     <div style="display: flex; gap: 3px; align-items: center; flex-wrap: wrap;">
-                        <input type="number" id="inputDetailsHScaleDiary" min="30" max="200" value="96" style="width: 46px; text-align: center; font-weight: bold;">
+                        <input type="number" id="inputDetailsHScaleDiary" min="30" max="200" value="85" style="width: 46px; text-align: center; font-weight: bold;">
                         <button type="button" class="btn btn-sm btn-scale-preset" data-target="inputDetailsHScaleDiary" data-val="75">75%</button>
                         <button type="button" class="btn btn-sm btn-scale-preset" data-target="inputDetailsHScaleDiary" data-val="80">80%</button>
-                        <button type="button" class="btn btn-sm btn-scale-preset" data-target="inputDetailsHScaleDiary" data-val="85">85%</button>
-                        <button type="button" class="btn btn-sm btn-scale-preset active" data-target="inputDetailsHScaleDiary" data-val="96">96%</button>
+                        <button type="button" class="btn btn-sm btn-scale-preset active" data-target="inputDetailsHScaleDiary" data-val="85">85%</button>
+                        <button type="button" class="btn btn-sm btn-scale-preset" data-target="inputDetailsHScaleDiary" data-val="96">96%</button>
                         <button type="button" class="btn btn-sm btn-scale-preset" data-target="inputDetailsHScaleDiary" data-val="100">100%</button>
                     </div>
                 </div>
                 <div class="control-group">
                     <label for="inputNameHScaleDiary">নামের স্কেল (Name Scale)</label>
                     <div style="display: flex; gap: 3px; align-items: center; flex-wrap: wrap;">
-                        <input type="number" id="inputNameHScaleDiary" min="30" max="200" value="100" style="width: 46px; text-align: center; font-weight: bold;">
+                        <input type="number" id="inputNameHScaleDiary" min="30" max="200" value="80" style="width: 46px; text-align: center; font-weight: bold;">
                         <button type="button" class="btn btn-sm btn-scale-preset" data-target="inputNameHScaleDiary" data-val="75">75%</button>
-                        <button type="button" class="btn btn-sm btn-scale-preset" data-target="inputNameHScaleDiary" data-val="80">80%</button>
+                        <button type="button" class="btn btn-sm btn-scale-preset active" data-target="inputNameHScaleDiary" data-val="80">80%</button>
                         <button type="button" class="btn btn-sm btn-scale-preset" data-target="inputNameHScaleDiary" data-val="85">85%</button>
-                        <button type="button" class="btn btn-sm btn-scale-preset active" data-target="inputNameHScaleDiary" data-val="100">100%</button>
+                        <button type="button" class="btn btn-sm btn-scale-preset" data-target="inputNameHScaleDiary" data-val="100">100%</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid-2" style="margin-top: 4px;">
+                <div class="control-group">
+                    <label for="inputDetailsSizeDiary">ঠিকানার সাইজ (Details Size)</label>
+                    <div style="display: flex; gap: 3px; align-items: center; flex-wrap: wrap;">
+                        <input type="text" id="inputDetailsSizeDiary" value="Auto" placeholder="Auto" style="width: 46px; text-align: center; font-weight: bold;" title="Auto copies size directly from template">
+                        <button type="button" class="btn btn-sm btn-leading-preset active" data-target="inputDetailsSizeDiary" data-val="Auto">Auto</button>
+                        <button type="button" class="btn btn-sm btn-leading-preset" data-target="inputDetailsSizeDiary" data-val="6.6">6.6</button>
+                        <button type="button" class="btn btn-sm btn-leading-preset" data-target="inputDetailsSizeDiary" data-val="8.5">8.5</button>
+                        <button type="button" class="btn btn-sm btn-leading-preset" data-target="inputDetailsSizeDiary" data-val="9.7">9.7</button>
+                        <button type="button" class="btn btn-sm btn-leading-preset" data-target="inputDetailsSizeDiary" data-val="12">12</button>
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label for="inputDetailsLeadingDiary">লাইন লিডিং (Line Leading)</label>
+                    <div style="display: flex; gap: 3px; align-items: center; flex-wrap: wrap;">
+                        <input type="text" id="inputDetailsLeadingDiary" value="Auto" placeholder="Auto" style="width: 46px; text-align: center; font-weight: bold;" title="Auto copies leading directly from template">
+                        <button type="button" class="btn btn-sm btn-leading-preset active" data-target="inputDetailsLeadingDiary" data-val="Auto">Auto</button>
+                        <button type="button" class="btn btn-sm btn-leading-preset" data-target="inputDetailsLeadingDiary" data-val="8.4">8.4</button>
+                        <button type="button" class="btn btn-sm btn-leading-preset" data-target="inputDetailsLeadingDiary" data-val="11">11</button>
+                        <button type="button" class="btn btn-sm btn-leading-preset" data-target="inputDetailsLeadingDiary" data-val="13">13</button>
                     </div>
                 </div>
             </div>
