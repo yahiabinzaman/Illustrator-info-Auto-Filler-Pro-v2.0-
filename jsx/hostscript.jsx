@@ -613,6 +613,8 @@ var CardAutoFiller = {
                 var bestForm = null;
                 var minSerialDist = 9999;
                 var minFormDist = 9999;
+                var minQtyDist = 9999;
+                var bestQty = null;
 
                 for (var dt = 0; dt < allDocTFs.length; dt++) {
                     var dtf = allDocTFs[dt];
@@ -620,10 +622,11 @@ var CardAutoFiller = {
                     var dtgb = dtf.geometricBounds;
                     var dx = dtgb[0] - cLeft;
                     var dy = cTop - dtgb[1]; // positive downwards
+                    var dRaw = dtf.contents.replace(/^\s+|\s+$/g, "");
+                    var isYearNum = /^(?:19|20)\d\d$|^(?:১৪|১৫)[০-৯]{2}$|^(?:২০|১৯)[০-৯]{2}$/.test(dRaw.replace(/\s+/g, ""));
 
-                    if (!cCard.serialFrame) {
-                        var dRawS = dtf.contents.replace(/^\s+|\s+$/g, "");
-                        if (/^[০-৯0-9]+$/.test(dRawS.replace(/\s+/g, "")) && dRawS.length <= 4) {
+                    if (!cCard.serialFrame && !isYearNum) {
+                        if (/^[০-৯0-9]+$/.test(dRaw.replace(/\s+/g, "")) && dRaw.length <= 4) {
                             var nCenterX = (cgb[0] + cgb[2]) / 2;
                             var nCenterY = (cgb[1] + cgb[3]) / 2;
                             var sCenterX = (dtgb[0] + dtgb[2]) / 2;
@@ -636,10 +639,22 @@ var CardAutoFiller = {
                         }
                     }
 
+                    if (!cCard.qtyFrame && !isYearNum) {
+                        if (/^[০-৯0-9]+$/.test(dRaw.replace(/\s+/g, "")) && dRaw.length <= 4) {
+                            // Qty frames sit to the right edge or outside right of the card
+                            if (dtgb[0] > cgb[0] + 40) {
+                                var qDistY = Math.abs(dtgb[1] - cgb[1]);
+                                if (qDistY < minQtyDist && qDistY < 100) {
+                                    minQtyDist = qDistY;
+                                    bestQty = dtf;
+                                }
+                            }
+                        }
+                    }
+
                     if (!cCard.formFrame) {
-                        var dRawF = dtf.contents.replace(/^\s+|\s+$/g, "");
-                        var isFormLabel = /(?:ফরম|দাখেলা|রোল|Form|Roll|‡¶´|‡dvi|diBk|‡ivj)/i.test(dRawF);
-                        var isFormDigits = /^[০-৯0-9\s\-\/]+$/.test(dRawF) && dRawF.length <= 10;
+                        var isFormLabel = /(?:ফরম|দাখেলা|রোল|Form|Roll|‡¶´|‡dvi|diBk|‡ivj)/i.test(dRaw);
+                        var isFormDigits = /^[০-৯0-9\s\-\/]+$/.test(dRaw) && dRaw.length <= 10;
                         var isSmallTF = dtf.lines.length <= 2 && dtf.contents.length <= 25;
                         
                         // Form frame is typically in bottom-right quadrant relative to name frame
@@ -655,10 +670,7 @@ var CardAutoFiller = {
 
                 if (bestSerial && !cCard.serialFrame) cCard.serialFrame = bestSerial;
                 if (bestForm && !cCard.formFrame) cCard.formFrame = bestForm;
-                if (!cCard.qtyFrame) {
-                    if (bestSerial) cCard.qtyFrame = bestSerial;
-                    else if (cCard.serialFrame) cCard.qtyFrame = cCard.serialFrame;
-                }
+                if (bestQty && !cCard.qtyFrame) cCard.qtyFrame = bestQty;
             }
         }
 
@@ -1574,14 +1586,6 @@ var CardAutoFiller = {
     },
 
     populateCards: function(jsonPayload) {
-        var doc = this.getActiveDoc();
-        if (!doc) {
-            return JSON.stringify({
-                status: "error",
-                message: "No active Illustrator document found. Please open or create a document."
-            });
-        }
-
         var payload = {};
         try {
             if (typeof jsonPayload === "string") {
@@ -1597,6 +1601,334 @@ var CardAutoFiller = {
             return JSON.stringify({
                 status: "error",
                 message: "Failed to parse data: " + e.message
+            });
+        }
+
+        if (payload.isKeyring === true) {
+            return this.populateKeyringCards(payload);
+        } else {
+            return this.populateDiaryCards(payload);
+        }
+    },
+
+    populateKeyringCards: function(payload) {
+        var doc = this.getActiveDoc();
+        if (!doc) {
+            return JSON.stringify({
+                status: "error",
+                message: "No active Illustrator document found. Please open or create a document."
+            });
+        }
+
+        var entries = payload.entries || [];
+        if (!entries.length) {
+            return JSON.stringify({
+                status: "error",
+                message: "No entries to populate."
+            });
+        }
+
+        var scope = payload.scope || "artboard";
+        var order = payload.order || "row";
+        var makeBold = payload.makeBold !== false;
+        var fillBani = payload.fillBani !== false;
+        var fillQty = payload.fillQty !== false;
+        var skipFilledCards = payload.skipFilledCards !== false;
+        var startIndex = parseInt(payload.startIndex, 10) || 0;
+
+        var detailsHScale = parseFloat(payload.detailsHScale);
+        if (isNaN(detailsHScale) || detailsHScale <= 0) detailsHScale = 85;
+
+        var nameHScale = parseFloat(payload.nameHScale);
+        if (isNaN(nameHScale) || nameHScale <= 0) nameHScale = 100;
+
+        var userNameLeading = parseFloat(payload.nameLeading);
+        var hasCustomNameLeading = (!isNaN(userNameLeading) && userNameLeading > 0);
+
+        var userDetailsLeading = parseFloat(payload.detailsLeading);
+        var hasCustomDetailsLeading = (!isNaN(userDetailsLeading) && userDetailsLeading > 0);
+
+        var cards = this.detectCards(scope);
+        if (!cards.length) {
+            return JSON.stringify({
+                status: "error",
+                message: "No keyring card templates detected. Make sure your cards are visible and unlocked."
+            });
+        }
+
+        cards = this.sortCards(cards, order);
+
+        var targetCards = [];
+        if (!skipFilledCards || scope === "selection" || startIndex === 0) {
+            targetCards = cards;
+        } else {
+            for (var c = 0; c < cards.length; c++) {
+                var card = cards[c];
+                var cardNm = card.nameFrame ? card.nameFrame.contents.split(/\r|\n/)[0].replace(/\s+/g, '') : "";
+
+                var isPriorEntry = false;
+                for (var p = 0; p < startIndex && p < entries.length; p++) {
+                    if (entries[p].name && entries[p].name.replace(/\s+/g, '') === cardNm) {
+                        isPriorEntry = true;
+                        break;
+                    }
+                }
+                if (isPriorEntry) continue;
+                targetCards.push(card);
+            }
+        }
+
+        if (targetCards.length === 0) targetCards = cards;
+
+        var activeEntries = entries.slice(startIndex);
+        if (activeEntries.length === 0) {
+            startIndex = 0;
+            activeEntries = entries;
+        }
+
+        var isCMYK = (doc.documentColorSpace === DocumentColorSpace.CMYK);
+        var solidBlackCMYK = new CMYKColor();
+        solidBlackCMYK.cyan = 0; solidBlackCMYK.magenta = 0; solidBlackCMYK.yellow = 0; solidBlackCMYK.black = 100;
+
+        var userChosenColor = null;
+        if (isCMYK && payload.nameCmyk && payload.nameCmyk.length >= 4) {
+            var cVal = Math.max(0, Math.min(100, Math.round(Number(payload.nameCmyk[0]))));
+            var mVal = Math.max(0, Math.min(100, Math.round(Number(payload.nameCmyk[1]))));
+            var yVal = Math.max(0, Math.min(100, Math.round(Number(payload.nameCmyk[2]))));
+            var kVal = Math.max(0, Math.min(100, Math.round(Number(payload.nameCmyk[3]))));
+            var userCmyk = new CMYKColor();
+            userCmyk.cyan = cVal;
+            userCmyk.magenta = mVal;
+            userCmyk.yellow = yVal;
+            userCmyk.black = kVal;
+            userChosenColor = userCmyk;
+        } else if (payload.nameColor) {
+            var rawHex = String(payload.nameColor).replace(/[^0-9A-Fa-f]/g, "").toUpperCase();
+            if (rawHex.length === 3 || rawHex.length === 6) {
+                userChosenColor = this.hexToColor(rawHex, isCMYK);
+            }
+        }
+
+        var bornomalaPair = this.getBornomalaFonts();
+        var boldFont = bornomalaPair.bold;
+        var regularFont = bornomalaPair.regular || boldFont;
+
+        var filledCount = 0;
+        var fillLimit = Math.min(targetCards.length, activeEntries.length);
+
+        for (var i = 0; i < fillLimit; i++) {
+            var card = targetCards[i];
+            var entry = activeEntries[i];
+
+            // 1. POPULATE NAME FRAME
+            if (card.nameFrame && entry.name) {
+                var cleanName = (entry.name || "").replace(/^\s+|\s+$/g, "");
+                var origNameFont = boldFont;
+                var origNameSize = 11.0;
+                var origNameLeading = 11.0;
+                var origNameColor = userChosenColor || solidBlackCMYK;
+                var origNameHScale = nameHScale;
+                var origNameTracking = 0;
+                var origNameJust = null;
+
+                try {
+                    if (card.nameFrame.characters.length > 0) {
+                        var nca = card.nameFrame.characters[0].characterAttributes;
+                        if (nca.textFont) origNameFont = nca.textFont;
+                        if (nca.size > 0) origNameSize = nca.size;
+                        if (nca.leading > 0) origNameLeading = nca.leading;
+                        origNameTracking = nca.tracking;
+                        if (!userChosenColor && nca.fillColor && nca.fillColor.typename !== "NoColor") {
+                            origNameColor = nca.fillColor;
+                        }
+                    }
+                    if (card.nameFrame.paragraphs.length > 0) {
+                        origNameJust = card.nameFrame.paragraphs[0].paragraphAttributes.justification;
+                    }
+                } catch(ne) {}
+
+                if (userChosenColor) origNameColor = userChosenColor;
+                if (hasCustomNameLeading) origNameLeading = userNameLeading;
+
+                card.nameFrame.contents = cleanName;
+                try {
+                    var nTr = card.nameFrame.textRange;
+                    if (origNameFont) nTr.characterAttributes.textFont = origNameFont;
+                    nTr.characterAttributes.size = origNameSize;
+                    nTr.characterAttributes.leading = origNameLeading;
+                    nTr.characterAttributes.horizontalScale = origNameHScale;
+                    nTr.characterAttributes.tracking = origNameTracking;
+                    nTr.characterAttributes.fillColor = origNameColor;
+                    if (origNameJust !== null) nTr.paragraphAttributes.justification = origNameJust;
+                    nTr.paragraphAttributes.spaceBefore = 0;
+                    nTr.paragraphAttributes.spaceAfter = 0;
+                } catch(nStyErr) {}
+            }
+
+            // 2. POPULATE DETAILS FRAME (Separate multi-line text frame)
+            if (card.detailsFrame && entry.details) {
+                var cleanDetails = (entry.details || "").replace(/^\s+|\s+$/g, "");
+                cleanDetails = cleanDetails.split("\r\n").join("\r").split("\n").join("\r");
+
+                var origDetFont = regularFont;
+                var origDetSize = 6.0;
+                var origDetLeading = 6.73;
+                var origDetColor = solidBlackCMYK;
+                var origDetTracking = 0;
+                var origDetJust = null;
+
+                try {
+                    if (card.detailsFrame.characters.length > 0) {
+                        var dca = card.detailsFrame.characters[0].characterAttributes;
+                        if (dca.textFont) origDetFont = dca.textFont;
+                        if (dca.size > 0) origDetSize = dca.size;
+                        if (dca.leading > 0) origDetLeading = dca.leading;
+                        origDetTracking = dca.tracking;
+                        if (dca.fillColor && dca.fillColor.typename !== "NoColor") {
+                            origDetColor = dca.fillColor;
+                        }
+                    }
+                    if (card.detailsFrame.paragraphs.length > 0) {
+                        origDetJust = card.detailsFrame.paragraphs[0].paragraphAttributes.justification;
+                    }
+                } catch(de) {}
+
+                if (hasCustomDetailsLeading) origDetLeading = userDetailsLeading;
+
+                card.detailsFrame.contents = cleanDetails;
+                try {
+                    var dTr = card.detailsFrame.textRange;
+                    if (origDetFont) dTr.characterAttributes.textFont = origDetFont;
+                    dTr.characterAttributes.size = origDetSize;
+                    dTr.characterAttributes.leading = origDetLeading;
+                    dTr.characterAttributes.horizontalScale = detailsHScale;
+                    dTr.characterAttributes.tracking = origDetTracking;
+                    dTr.characterAttributes.fillColor = origDetColor;
+                    if (origDetJust !== null) dTr.paragraphAttributes.justification = origDetJust;
+                    dTr.paragraphAttributes.spaceBefore = 0;
+                    dTr.paragraphAttributes.spaceAfter = 0;
+
+                    for (var dp = 0; dp < card.detailsFrame.paragraphs.length; dp++) {
+                        try {
+                            var dpPara = card.detailsFrame.paragraphs[dp];
+                            if (origDetFont) dpPara.characterAttributes.textFont = origDetFont;
+                            dpPara.characterAttributes.size = origDetSize;
+                            dpPara.characterAttributes.leading = origDetLeading;
+                            dpPara.characterAttributes.horizontalScale = detailsHScale;
+                            dpPara.characterAttributes.tracking = origDetTracking;
+                            dpPara.characterAttributes.fillColor = origDetColor;
+                            if (origDetJust !== null) dpPara.paragraphAttributes.justification = origDetJust;
+                            dpPara.paragraphAttributes.spaceBefore = 0;
+                            dpPara.paragraphAttributes.spaceAfter = 0;
+                        } catch(dpE) {}
+                    }
+                } catch(dStyErr) {}
+            }
+
+            // 3. POPULATE QTY FRAME (Right side quantity)
+            if (fillQty && card.qtyFrame && entry.qty) {
+                var origQtyFont = boldFont;
+                var origQtySize = 22.0;
+                var origQtyLeading = 22.0;
+                var origQtyColor = solidBlackCMYK;
+                var origQtyHScale = 100.0;
+                var origQtyTracking = 0;
+                var origQtyJust = null;
+
+                try {
+                    if (card.qtyFrame.characters.length > 0) {
+                        var qca = card.qtyFrame.characters[0].characterAttributes;
+                        if (qca.textFont) origQtyFont = qca.textFont;
+                        if (qca.size > 0) origQtySize = qca.size;
+                        if (qca.leading > 0) origQtyLeading = qca.leading;
+                        if (qca.horizontalScale > 0) origQtyHScale = qca.horizontalScale;
+                        origQtyTracking = qca.tracking;
+                        if (qca.fillColor && qca.fillColor.typename !== "NoColor") {
+                            origQtyColor = qca.fillColor;
+                        }
+                    }
+                    if (card.qtyFrame.paragraphs.length > 0) {
+                        origQtyJust = card.qtyFrame.paragraphs[0].paragraphAttributes.justification;
+                    }
+                } catch(qe) {}
+
+                var qRaw = String(entry.qty).replace(/^\s+|\s+$/g, '');
+                var isAnsiFont = (origQtyFont && /bornomala|sutonny/i.test(origQtyFont.name));
+                var qDigits = qRaw.replace(/[^\d০-৯]/g, '');
+                var qFinal = qDigits;
+                if (qDigits) {
+                    if (isAnsiFont) {
+                        var bnToAscii = {'০':'0','১':'1','২':'2','৩':'3','৪':'4','৫':'5','৬':'6','৭':'7','৮':'8','৯':'9'};
+                        qFinal = qDigits.replace(/[০-৯]/g, function(d) { return bnToAscii[d] || d; });
+                    } else {
+                        qFinal = this.toBengaliDigits(qDigits);
+                    }
+                }
+
+                card.qtyFrame.contents = qFinal;
+                try {
+                    var qTr = card.qtyFrame.textRange;
+                    if (origQtyFont) qTr.characterAttributes.textFont = origQtyFont;
+                    qTr.characterAttributes.size = origQtySize;
+                    qTr.characterAttributes.leading = origQtyLeading;
+                    qTr.characterAttributes.horizontalScale = origQtyHScale;
+                    qTr.characterAttributes.tracking = origQtyTracking;
+                    qTr.characterAttributes.fillColor = origQtyColor;
+                    if (origQtyJust !== null) qTr.paragraphAttributes.justification = origQtyJust;
+                    qTr.paragraphAttributes.spaceBefore = 0;
+                    qTr.paragraphAttributes.spaceAfter = 0;
+                } catch(qStyErr) {}
+            }
+
+            // 4. POPULATE BANI FRAME (if present)
+            if (fillBani && card.baniFrame && entry.bani && entry.bani.replace(/\s+/g, '').length > 0) {
+                var origBaniFont = null;
+                var origBaniSize = null;
+                var origBaniLeading = null;
+                var origBaniColor = null;
+
+                try {
+                    if (card.baniFrame.characters.length > 0) {
+                        var bca = card.baniFrame.characters[0].characterAttributes;
+                        origBaniFont = bca.textFont;
+                        origBaniSize = bca.size;
+                        origBaniLeading = bca.leading;
+                        origBaniColor = bca.fillColor;
+                    }
+                } catch(be) {}
+
+                var cleanBani = entry.bani.split('\r\n').join('\r').split('\n').join('\r');
+                card.baniFrame.contents = cleanBani;
+                try {
+                    var bTr = card.baniFrame.textRange;
+                    if (origBaniFont) bTr.characterAttributes.textFont = origBaniFont;
+                    if (origBaniSize) bTr.characterAttributes.size = origBaniSize;
+                    if (origBaniLeading) bTr.characterAttributes.leading = origBaniLeading;
+                    if (origBaniColor) bTr.characterAttributes.fillColor = origBaniColor;
+                } catch(bStyErr) {}
+            }
+
+            filledCount++;
+        }
+
+        try { app.redraw(); } catch(e) {}
+
+        return JSON.stringify({
+            status: "success",
+            filledCount: filledCount,
+            totalCards: targetCards.length,
+            totalEntries: entries.length,
+            nextStartIndex: startIndex + filledCount,
+            message: "Successfully populated " + filledCount + " keyring cards."
+        });
+    },
+
+    populateDiaryCards: function(payload) {
+        var doc = this.getActiveDoc();
+        if (!doc) {
+            return JSON.stringify({
+                status: "error",
+                message: "No active Illustrator document found. Please open or create a document."
             });
         }
 
