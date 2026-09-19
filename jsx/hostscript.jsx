@@ -1984,7 +1984,7 @@ var CardAutoFiller = {
 
             // --- STEP 3: POPULATE FORM NUMBER (Bottom-Right Box - Strictly 2 Lines) ---
             var formHandled = false;
-            var shouldFillForm = (payload.fillForm !== false);
+            var shouldFillForm = (payload.fillForm !== false && payload.fillFormNumber !== false);
             if (card.formFrame && shouldFillForm && (entry.formNumber || entry.form)) {
                 try {
                     var rawForm = (entry.formNumber || entry.form || "").replace(/^\s+|\s+$/g, "");
@@ -2009,11 +2009,11 @@ var CardAutoFiller = {
 
                     // Read existing form frame styling
                     var formFont = globalRegularFont;
-                    var formSize = tplForm.size || 5.3181;
-                    var formLeading = tplForm.leading || 5.5884;
-                    var formHScale = tplForm.hScale || 98.6;
-                    var formTracking = tplForm.tracking || -50;
-                    var formJust = tplForm.just || null;
+                    var formSize = masterTplForm.size || 5.3181;
+                    var formLeading = masterTplForm.leading || 5.5884;
+                    var formHScale = masterTplForm.hScale || 98.6;
+                    var formTracking = masterTplForm.tracking || -50;
+                    var formJust = masterTplForm.just || null;
 
                     try {
                         if (card.formFrame.characters.length > 0) {
@@ -2053,6 +2053,9 @@ var CardAutoFiller = {
                                 fp.paragraphAttributes.spaceAfter = 0;
                             } catch(fpe) {}
                         }
+                        try {
+                            card.formFrame.zOrder(ZOrderMethod.BRINGTOFRONT);
+                        } catch(zoe) {}
                     } catch(fStyErr) {}
                     formHandled = true;
                 } catch(ffErr) {}
