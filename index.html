@@ -309,6 +309,31 @@ Example:
                 </div>
             </div>
 
+            <!-- Typography & Horizontal Scale Controls -->
+            <div class="grid-2" style="margin-top: 6px;">
+                <div class="control-group">
+                    <label for="inputDetailsHScaleDiary">ঠিকানার স্কেল (Address Scale)</label>
+                    <div style="display: flex; gap: 3px; align-items: center; flex-wrap: wrap;">
+                        <input type="number" id="inputDetailsHScaleDiary" min="30" max="200" value="96" style="width: 46px; text-align: center; font-weight: bold;">
+                        <button type="button" class="btn btn-sm btn-scale-preset" data-target="inputDetailsHScaleDiary" data-val="75">75%</button>
+                        <button type="button" class="btn btn-sm btn-scale-preset" data-target="inputDetailsHScaleDiary" data-val="80">80%</button>
+                        <button type="button" class="btn btn-sm btn-scale-preset" data-target="inputDetailsHScaleDiary" data-val="85">85%</button>
+                        <button type="button" class="btn btn-sm btn-scale-preset active" data-target="inputDetailsHScaleDiary" data-val="96">96%</button>
+                        <button type="button" class="btn btn-sm btn-scale-preset" data-target="inputDetailsHScaleDiary" data-val="100">100%</button>
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label for="inputNameHScaleDiary">নামের স্কেল (Name Scale)</label>
+                    <div style="display: flex; gap: 3px; align-items: center; flex-wrap: wrap;">
+                        <input type="number" id="inputNameHScaleDiary" min="30" max="200" value="100" style="width: 46px; text-align: center; font-weight: bold;">
+                        <button type="button" class="btn btn-sm btn-scale-preset" data-target="inputNameHScaleDiary" data-val="75">75%</button>
+                        <button type="button" class="btn btn-sm btn-scale-preset" data-target="inputNameHScaleDiary" data-val="80">80%</button>
+                        <button type="button" class="btn btn-sm btn-scale-preset" data-target="inputNameHScaleDiary" data-val="85">85%</button>
+                        <button type="button" class="btn btn-sm btn-scale-preset active" data-target="inputNameHScaleDiary" data-val="100">100%</button>
+                    </div>
+                </div>
+            </div>
+
             <div class="checkbox-list" style="margin-top: 6px;">
                 <label class="checkbox-label">
                     <input type="checkbox" id="chkIncludeDetailsDiary" checked>

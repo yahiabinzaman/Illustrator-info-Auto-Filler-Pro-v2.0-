@@ -609,6 +609,11 @@
             var skipFilled = chkSkipFilled ? chkSkipFilled.checked : false;
             var autoRemove = chkAutoRemove ? chkAutoRemove.checked : true;
 
+            var inputDetHScaleD = document.getElementById('inputDetailsHScaleDiary');
+            var inputNmHScaleD = document.getElementById('inputNameHScaleDiary');
+            var detHScaleD = inputDetHScaleD ? (parseFloat(inputDetHScaleD.value) || 96) : 96;
+            var nmHScaleD = inputNmHScaleD ? (parseFloat(inputNmHScaleD.value) || 100) : 100;
+
             var payload = {
                 isKeyring: false,
                 fillSerial: true,
@@ -622,7 +627,9 @@
                 nameColor: currentDiaryColor,
                 nameCmyk: currentDiaryCmyk,
                 startIndex: currentDiaryStartIndex,
-                skipFilledCards: skipFilled
+                skipFilledCards: skipFilled,
+                detailsHScale: detHScaleD,
+                nameHScale: nmHScaleD
             };
 
             if (btnAutoFill) {
@@ -1234,7 +1241,7 @@
             });
 
             // Sync input changes back to button active state
-            ['inputDetailsHScaleKeyring', 'inputNameHScaleKeyring', 'inputDetailsLeadingKeyring'].forEach(function(id) {
+            ['inputDetailsHScaleKeyring', 'inputNameHScaleKeyring', 'inputDetailsLeadingKeyring', 'inputDetailsHScaleDiary', 'inputNameHScaleDiary'].forEach(function(id) {
                 var input = document.getElementById(id);
                 if (input) {
                     input.addEventListener('input', function() {

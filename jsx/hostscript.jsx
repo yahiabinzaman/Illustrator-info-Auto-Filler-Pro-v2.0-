@@ -1973,8 +1973,8 @@ var CardAutoFiller = {
 
             if (hasCustomNameLeading) cardNameStyle.leading = userNameLeading;
             if (hasCustomDetailsLeading) cardDetStyle.leading = userDetailsLeading;
-            if (payload.nameHScale !== undefined && payload.nameHScale !== 100) cardNameStyle.hScale = nameHScale;
-            if (payload.detailsHScale !== undefined && payload.detailsHScale !== 85 && payload.detailsHScale !== 95) cardDetStyle.hScale = detailsHScale;
+            if (payload.nameHScale !== undefined && !isNaN(nameHScale) && nameHScale > 0) cardNameStyle.hScale = nameHScale;
+            if (payload.detailsHScale !== undefined && !isNaN(detailsHScale) && detailsHScale > 0) cardDetStyle.hScale = detailsHScale;
 
             // --- STEP 2: POPULATE SERIAL / KROMIK (Only when serial is requested, NEVER for Keyrings) ---
             var shouldFillSerial = (!payload.isKeyring && payload.fillSerial !== false);
