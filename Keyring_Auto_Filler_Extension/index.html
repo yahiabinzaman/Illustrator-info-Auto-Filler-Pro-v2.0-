@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Name &amp; Card Auto-Filler</title>
+    <link rel="stylesheet" href="css/style.css?v=2.8.0">
+    <script>
+    function switchTab(tabId) {
+        if (!tabId) return;
+        var btns = document.querySelectorAll('.tab-btn');
+        for (var i = 0; i < btns.length; i++) {
+            if (btns[i].getAttribute('data-tab') === tabId) {
+                btns[i].classList.add('active');
+            } else if (btns[i].getAttribute('data-tab')) {
+                btns[i].classList.remove('active');
+            }
+        }
+        var panes = document.querySelectorAll('.tab-pane');
+        for (var j = 0; j < panes.length; j++) {
+            if (panes[j].id === tabId) {
+                panes[j].classList.add('active');
+                panes[j].style.display = 'flex';
+            } else {
+                panes[j].classList.remove('active');
+                panes[j].style.display = 'none';
+            }
+        }
+        try {
+            if (window.onTabSwitched) window.onTabSwitched(tabId);
+        } catch(e) {}
+    }
+    function forceReloadPanel() {
+        try { localStorage.clear(); } catch(e) {}
+        try { sessionStorage.clear(); } catch(e) {}
+        try {
+            var cs = new CSInterface();
+            var extPath = cs.getSystemPath(SystemPath.EXTENSION).replace(/\\/g, '/');
+            var loadScript = "try { $.evalFile(new File('" + extPath + "/jsx/hostscript.jsx')); } catch(e) {}";
+            cs.evalScript(loadScript, function() {
+                window.location.reload(true);
+            });
+        } catch(e) {
+            window.location.reload(true);
+        }
+    }
+    </script>
+</head>
+<body>
+    <!-- Clean Segmented Tab Bar -->
+    <div class="tab-bar">
+        <button class="tab-btn active" data-tab="tab-keyring" onclick="switchTab('tab-keyring')">Keyring Pro</button>
+        <button class="tab-btn" data-tab="tab-duplicate" onclick="switchTab('tab-duplicate')">Duplicator</button>
+        <button class="tab-btn" data-tab="tab-canvas-move" onclick="switchTab('tab-canvas-move')">Canvas Move</button>
+        <button id="btnReloadPanel" class="tab-btn" onclick="forceReloadPanel()" style="flex: 0 0 auto; padding: 4px 6px; font-size: 10px;" title="Reload Panel">↻</button>
+    </div>
+
+    <!-- TAB 1: Keyring Filler -->
+    <div id="tab-keyring" class="tab-pane active">
+        <!-- Input Section -->
+        <div class="section-box">
+            <div class="section-header">
+                <span class="section-title">Data List (Unicode / ANSI)</span>
+                <div style="display: flex; gap: 4px;">
+                    <button id="btnLoadSampleKeyring" class="btn btn-sm">Sample</button>
+                    <button id="btnClearKeyring" class="btn btn-sm">Clear</button>
+                </div>
+            </div>
+
+            <textarea id="rawTextInputKeyring" placeholder="Paste names and details here...
+Example:
+১
+মাওলানা মোঃ সাদিকুল ইসলাম
+পিতা: মোঃ ছানোয়ার হোসেন
+হাসনই, মধুপুর, টাঙ্গাইল
+০১৮২৬-৫৯০৬৫৮
+পরিমাণ: ২৫ পিস"></textarea>
+
+            <button id="btnLoadSelectionKeyring" class="btn btn-sm" style="width: 100%;">
+                Load from Selected Canvas TextFrame
+            </button>
+        </div>
+
+        <!-- Settings Section -->
+        <div class="section-box">
+            <div class="section-header">
+                <span class="section-title">Settings &amp; Layout</span>
+            </div>
+
+            <div class="grid-2">
+                <div class="control-group">
+                    <label for="selectFillOrderKeyring">Fill Direction</label>
+                    <select id="selectFillOrderKeyring">
+                        <option value="zigzag" selected>Row by Row (১ - ২ - ৩ - ৪)</option>
+                        <option value="column">Column-wise (১, ২, ৩...)</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label for="selectScopeKeyring">Target Scope</label>
+                    <select id="selectScopeKeyring">
+                        <option value="artboard" selected>Active Artboard</option>
+                        <option value="all_artboards">All Artboards</option>
+                        <option value="selection">Selected Cards</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Name Color Row -->
+            <div class="control-group" style="margin-top: 2px;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <label>Name Color</label>
+                    <span id="labelColorNameKeyring" style="font-size: 10px; color: #888;">#006F9A</span>
+                </div>
+                <div class="color-picker-wrapper">
+                    <input type="color" id="colorPickerKeyring" value="#006F9A" class="color-input-native" title="Choose color">
+                    <input type="text" id="colorHexKeyring" value="#006F9A" class="input-text" style="width: 75px; text-transform: uppercase; font-family: monospace; font-size: 10.5px; text-align: center;">
+                    <button id="btnPickColorKeyring" class="btn btn-sm" style="flex: 1;" title="Get color from canvas selection">
+                        Pick from Canvas
+                    </button>
+                </div>
+                
+                <div class="cmyk-control-bar">
+                    <span style="color: #888; font-weight: 600;">CMYK:</span>
+                    <label>C: <input type="number" id="inputColorC_Keyring" min="0" max="100" value="100">%</label>
+                    <label>M: <input type="number" id="inputColorM_Keyring" min="0" max="100" value="0">%</label>
+                    <label>Y: <input type="number" id="inputColorY_Keyring" min="0" max="100" value="0">%</label>
+                    <label>K: <input type="number" id="inputColorK_Keyring" min="0" max="100" value="45">%</label>
+                </div>
+
+                <div class="color-swatch-bar">
+                    <span style="font-size: 9.5px; color: #777;">Presets:</span>
+                    <div class="color-swatch active" data-tab="keyring" data-color="#006F9A" style="background:#006F9A;" title="Deep Teal (#006F9A)"></div>
+                    <div class="color-swatch" data-tab="keyring" data-color="#000000" style="background:#000000;" title="Solid Black (#000000)"></div>
+                    <div class="color-swatch" data-tab="keyring" data-color="#1E5AA8" style="background:#1E5AA8;" title="Royal Blue (#1E5AA8)"></div>
+                    <div class="color-swatch" data-tab="keyring" data-color="#1B6E3F" style="background:#1B6E3F;" title="Islamic Green (#1B6E3F)"></div>
+                    <div class="color-swatch" data-tab="keyring" data-color="#9C1A1A" style="background:#9C1A1A;" title="Maroon (#9C1A1A)"></div>
+                    <div class="color-swatch" data-tab="keyring" data-color="#A22F10" style="background:#A22F10;" title="Red-Brown (#A22F10)"></div>
+                    <div class="color-swatch" data-tab="keyring" data-color="#C88210" style="background:#C88210;" title="Gold (#C88210)"></div>
+                </div>
+            </div>
+
+            <!-- Typography Controls -->
+            <div class="grid-2" style="margin-top: 4px;">
+                <div class="control-group">
+                    <label for="inputDetailsHScaleKeyring">Details Scale</label>
+                    <div style="display: flex; gap: 3px; align-items: center;">
+                        <input type="number" id="inputDetailsHScaleKeyring" min="30" max="200" value="85" style="width: 50px; text-align: center;">
+                        <button type="button" class="btn btn-sm btn-scale-preset active" data-target="inputDetailsHScaleKeyring" data-val="85">85%</button>
+                        <button type="button" class="btn btn-sm btn-scale-preset" data-target="inputDetailsHScaleKeyring" data-val="90">90%</button>
+                        <button type="button" class="btn btn-sm btn-scale-preset" data-target="inputDetailsHScaleKeyring" data-val="100">100%</button>
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label for="inputNameHScaleKeyring">Name Scale</label>
+                    <div style="display: flex; gap: 3px; align-items: center;">
+                        <input type="number" id="inputNameHScaleKeyring" min="30" max="200" value="100" style="width: 50px; text-align: center;">
+                        <button type="button" class="btn btn-sm btn-scale-preset active" data-target="inputNameHScaleKeyring" data-val="100">100%</button>
+                        <button type="button" class="btn btn-sm btn-scale-preset" data-target="inputNameHScaleKeyring" data-val="85">85%</button>
+                        <button type="button" class="btn btn-sm btn-scale-preset" data-target="inputNameHScaleKeyring" data-val="75">75%</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid-2" style="margin-top: 4px;">
+                <div class="control-group">
+                    <label for="inputDetailsLeadingKeyring">Line Leading</label>
+                    <div style="display: flex; gap: 3px; align-items: center;">
+                        <input type="text" id="inputDetailsLeadingKeyring" value="Auto" placeholder="Auto" style="width: 50px; text-align: center;">
+                        <button type="button" class="btn btn-sm btn-leading-preset active" data-target="inputDetailsLeadingKeyring" data-val="Auto">Auto</button>
+                        <button type="button" class="btn btn-sm btn-leading-preset" data-target="inputDetailsLeadingKeyring" data-val="9.6">9.6</button>
+                        <button type="button" class="btn btn-sm btn-leading-preset" data-target="inputDetailsLeadingKeyring" data-val="8.75">8.75</button>
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label for="inputStartIndexKeyring">Start Entry #</label>
+                    <div style="display: flex; gap: 3px; align-items: center;">
+                        <input type="number" id="inputStartIndexKeyring" value="1" min="1" style="width: 50px; text-align: center;">
+                        <button id="btnResetIndexKeyring" class="btn btn-sm" title="Reset to #1">Reset</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Core Options -->
+            <div class="checkbox-list" style="margin-top: 6px;">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="chkStripNumberKeyring" checked>
+                    <span>নামের আগে ১, ২, ১০ ইত্যাদি ক্রমিক বাদ দাও</span>
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox" id="chkMakeBoldKeyring" checked>
+                    <span>নাম বোল্ড রাখো (Apply Bold on Name)</span>
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox" id="chkFillQtyKeyring" checked>
+                    <span>পিস সংখ্যা বসাও (Fill Quantity / Pcs)</span>
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox" id="chkFillBaniKeyring" checked>
+                    <span>বাণী আলাদা ফ্রেমে অটো বসাও (যদি থাকে)</span>
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox" id="chkSkipFilledKeyring" checked>
+                    <span>অলরেডি বসা কার্ড স্কিপ করো (Skip Filled)</span>
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox" id="chkAutoRemoveFilledKeyring" checked>
+                    <span>বসে যাওয়া নাম টেক্সটবক্স থেকে রিমুভ করো</span>
+                </label>
+            </div>
+        </div>
+
+        <!-- Action Button -->
+        <button id="btnAutoFillKeyring" class="btn btn-primary" style="width: 100%; padding: 8px; font-size: 11.5px;">
+            Auto Fill Keyring Cards
+        </button>
+
+        <!-- Preview Section -->
+        <div class="section-box">
+            <div class="section-header">
+                <span class="section-title">Parsed Preview</span>
+                <span id="entriesCountBadgeKeyring" style="font-size: 10px; color: #888888;">0 Entries</span>
+            </div>
+            <div id="previewListKeyring" class="preview-container">
+                <div class="empty-text">No entries parsed. Paste list above or click "Sample".</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 2: Diary / ID Card Filler -->
+    <div id="tab-diary" class="tab-pane">
+        <div class="section-box">
+            <div class="section-header">
+                <span class="section-title">Data List (Unicode / ANSI)</span>
+                <div style="display: flex; gap: 4px;">
+                    <button id="btnLoadSampleDiary" class="btn btn-sm">Sample</button>
+                    <button id="btnClearDiary" class="btn btn-sm">Clear</button>
+                </div>
+            </div>
+
+            <textarea id="rawTextInputDiary" placeholder="Paste names and biodata list here..."></textarea>
+
+            <button id="btnLoadSelectionDiary" class="btn btn-sm" style="width: 100%;">
+                Load from Selected Canvas TextFrame
+            </button>
+        </div>
+
+        <div class="section-box">
+            <div class="section-header">
+                <span class="section-title">Diary / Card Settings</span>
+            </div>
+
+            <div class="grid-2">
+                <div class="control-group">
+                    <label for="selectSerialFormatDiary">Serial Format</label>
+                    <select id="selectSerialFormatDiary">
+                        <option value="standalone" selected>Top Corner Box (১১৯)</option>
+                        <option value="bn_dot">১. নাম (Bangla)</option>
+                        <option value="en_dot">1. Name (English)</option>
+                        <option value="none">No Serial</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label for="selectScopeDiary">Target Scope</label>
+                    <select id="selectScopeDiary">
+                        <option value="artboard" selected>Active Artboard</option>
+                        <option value="all_artboards">All Artboards</option>
+                        <option value="selection">Selected Cards</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="grid-2" style="margin-top: 4px;">
+                <div class="control-group">
+                    <label for="selectFillOrderDiary">Fill Direction</label>
+                    <select id="selectFillOrderDiary">
+                        <option value="zigzag" selected>Row by Row (১ - ২ - ৩ - ৪)</option>
+                        <option value="column">Column-wise</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label for="inputStartIndexDiary">Start Entry #</label>
+                    <div style="display: flex; gap: 3px; align-items: center;">
+                        <input type="number" id="inputStartIndexDiary" value="1" min="1" style="width: 50px; text-align: center;">
+                        <button id="btnResetIndexDiary" class="btn btn-sm" title="Reset to #1">Reset</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="control-group" style="margin-top: 2px;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <label>Name Color</label>
+                    <span id="labelColorNameDiary" style="font-size: 10px; color: #888;">#1E5AA8</span>
+                </div>
+                <div class="color-picker-wrapper">
+                    <input type="color" id="colorPickerDiary" value="#1E5AA8" class="color-input-native">
+                    <input type="text" id="colorHexDiary" value="#1E5AA8" class="input-text" style="width: 75px; text-transform: uppercase; font-family: monospace; font-size: 10.5px; text-align: center;">
+                    <button id="btnPickColorDiary" class="btn btn-sm" style="flex: 1;">
+                        Pick from Canvas
+                    </button>
+                </div>
+                <div class="color-swatch-bar">
+                    <span style="font-size: 9.5px; color: #777;">Presets:</span>
+                    <div class="color-swatch active" data-tab="diary" data-color="#1E5AA8" style="background:#1E5AA8;" title="Royal Blue"></div>
+                    <div class="color-swatch" data-tab="diary" data-color="#000000" style="background:#000000;" title="Solid Black"></div>
+                    <div class="color-swatch" data-tab="diary" data-color="#006F9A" style="background:#006F9A;" title="Deep Teal"></div>
+                    <div class="color-swatch" data-tab="diary" data-color="#1B6E3F" style="background:#1B6E3F;" title="Islamic Green"></div>
+                    <div class="color-swatch" data-tab="diary" data-color="#9C1A1A" style="background:#9C1A1A;" title="Maroon"></div>
+                </div>
+            </div>
+
+            <!-- Typography & Horizontal Scale Controls -->
+            <div class="grid-2" style="margin-top: 6px;">
+                <div class="control-group">
+                    <label for="inputDetailsHScaleDiary">ঠিকানার স্কেল (Address Scale)</label>
+                    <div style="display: flex; gap: 3px; align-items: center; flex-wrap: wrap;">
+                        <input type="number" id="inputDetailsHScaleDiary" min="30" max="200" value="85" style="width: 46px; text-align: center; font-weight: bold;">
+                        <button type="button" class="btn btn-sm btn-scale-preset" data-target="inputDetailsHScaleDiary" data-val="75">75%</button>
+                        <button type="button" class="btn btn-sm btn-scale-preset" data-target="inputDetailsHScaleDiary" data-val="80">80%</button>
+                        <button type="button" class="btn btn-sm btn-scale-preset active" data-target="inputDetailsHScaleDiary" data-val="85">85%</button>
+                        <button type="button" class="btn btn-sm btn-scale-preset" data-target="inputDetailsHScaleDiary" data-val="96">96%</button>
+                        <button type="button" class="btn btn-sm btn-scale-preset" data-target="inputDetailsHScaleDiary" data-val="100">100%</button>
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label for="inputNameHScaleDiary">নামের স্কেল (Name Scale)</label>
+                    <div style="display: flex; gap: 3px; align-items: center; flex-wrap: wrap;">
+                        <input type="number" id="inputNameHScaleDiary" min="30" max="200" value="80" style="width: 46px; text-align: center; font-weight: bold;">
+                        <button type="button" class="btn btn-sm btn-scale-preset" data-target="inputNameHScaleDiary" data-val="75">75%</button>
+                        <button type="button" class="btn btn-sm btn-scale-preset active" data-target="inputNameHScaleDiary" data-val="80">80%</button>
+                        <button type="button" class="btn btn-sm btn-scale-preset" data-target="inputNameHScaleDiary" data-val="85">85%</button>
+                        <button type="button" class="btn btn-sm btn-scale-preset" data-target="inputNameHScaleDiary" data-val="100">100%</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid-2" style="margin-top: 4px;">
+                <div class="control-group">
+                    <label for="inputDetailsSizeDiary">ঠিকানার সাইজ (Details Size)</label>
+                    <div style="display: flex; gap: 3px; align-items: center; flex-wrap: wrap;">
+                        <input type="text" id="inputDetailsSizeDiary" value="Auto" placeholder="Auto" style="width: 46px; text-align: center; font-weight: bold;" title="Auto copies size directly from template">
+                        <button type="button" class="btn btn-sm btn-leading-preset active" data-target="inputDetailsSizeDiary" data-val="Auto">Auto</button>
+                        <button type="button" class="btn btn-sm btn-leading-preset" data-target="inputDetailsSizeDiary" data-val="6.6">6.6</button>
+                        <button type="button" class="btn btn-sm btn-leading-preset" data-target="inputDetailsSizeDiary" data-val="8.5">8.5</button>
+                        <button type="button" class="btn btn-sm btn-leading-preset" data-target="inputDetailsSizeDiary" data-val="9.7">9.7</button>
+                        <button type="button" class="btn btn-sm btn-leading-preset" data-target="inputDetailsSizeDiary" data-val="12">12</button>
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label for="inputDetailsLeadingDiary">লাইন লিডিং (Line Leading)</label>
+                    <div style="display: flex; gap: 3px; align-items: center; flex-wrap: wrap;">
+                        <input type="text" id="inputDetailsLeadingDiary" value="Auto" placeholder="Auto" style="width: 46px; text-align: center; font-weight: bold;" title="Auto copies leading directly from template">
+                        <button type="button" class="btn btn-sm btn-leading-preset active" data-target="inputDetailsLeadingDiary" data-val="Auto">Auto</button>
+                        <button type="button" class="btn btn-sm btn-leading-preset" data-target="inputDetailsLeadingDiary" data-val="8.4">8.4</button>
+                        <button type="button" class="btn btn-sm btn-leading-preset" data-target="inputDetailsLeadingDiary" data-val="11">11</button>
+                        <button type="button" class="btn btn-sm btn-leading-preset" data-target="inputDetailsLeadingDiary" data-val="13">13</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="checkbox-list" style="margin-top: 6px;">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="chkIncludeDetailsDiary" checked>
+                    <span>পিতা ও ঠিকানা অন্তর্ভুক্ত করো (Include Details)</span>
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox" id="chkMakeBoldDiary" checked>
+                    <span>নাম বোল্ড রাখো (Apply Bold on Name)</span>
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox" id="chkFillFormNumberDiary" checked>
+                    <span>ফরম / দাখেলা নম্বর পূরণ করো</span>
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox" id="chkSkipFilledDiary" checked>
+                    <span>অলরেডি বসা কার্ড স্কিপ করো</span>
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox" id="chkAutoRemoveFilledDiary" checked>
+                    <span>বসে যাওয়া নাম টেক্সটবক্স থেকে রিমুভ করো</span>
+                </label>
+            </div>
+        </div>
+
+        <button id="btnAutoFillDiary" class="btn btn-primary" style="width: 100%; padding: 8px; font-size: 11.5px;">
+            Auto Fill Diary Names
+        </button>
+
+        <div class="section-box">
+            <div class="section-header">
+                <span class="section-title">Parsed Preview</span>
+                <span id="entriesCountBadgeDiary" style="font-size: 10px; color: #888888;">0 Entries</span>
+            </div>
+            <div id="previewListDiary" class="preview-container">
+                <div class="empty-text">No entries parsed. Paste list above or click "Sample".</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 3: Template Duplicator -->
+    <div id="tab-duplicate" class="tab-pane">
+        <div class="section-box">
+            <div class="section-header">
+                <span class="section-title">Duplicator Configuration</span>
+                <button id="btnMatchListCount" class="btn btn-sm">Match List Count</button>
+            </div>
+
+            <div class="grid-2">
+                <div class="control-group">
+                    <label for="inputTotalCopies">Total Copies</label>
+                    <input type="number" id="inputTotalCopies" min="1" value="50">
+                </div>
+                <div class="control-group">
+                    <label for="inputCardsPerAB">Cards per Artboard</label>
+                    <input type="number" id="inputCardsPerAB" min="1" value="20">
+                </div>
+            </div>
+
+            <div class="grid-2" style="margin-top: 4px;">
+                <div class="control-group">
+                    <label for="inputCardW">Card Width (pt)</label>
+                    <input type="number" id="inputCardW" min="10" step="0.5" value="192">
+                </div>
+                <div class="control-group">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <label for="inputCardH">Card Height (pt)</label>
+                        <button type="button" id="btnMeasureCard" class="btn btn-sm" style="padding: 1px 4px; font-size: 9.5px;">Auto Measure</button>
+                    </div>
+                    <input type="number" id="inputCardH" min="10" step="0.5" value="98">
+                </div>
+            </div>
+
+            <div class="grid-3" style="margin-top: 4px;">
+                <div class="control-group">
+                    <label for="inputGridCols">Columns</label>
+                    <input type="number" id="inputGridCols" min="1" value="2">
+                </div>
+                <div class="control-group">
+                    <label for="inputGapX">Gap X (pt)</label>
+                    <input type="number" id="inputGapX" min="0" value="0">
+                </div>
+                <div class="control-group">
+                    <label for="inputGapY">Gap Y (pt)</label>
+                    <input type="number" id="inputGapY" min="0" value="0">
+                </div>
+            </div>
+
+            <div style="margin-top: 6px;">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="chkFitArtboard" checked>
+                    <span>Auto-fit Artboard Size</span>
+                </label>
+            </div>
+
+            <div id="duplicateCalcSummary" style="background: #1e1e1e; border: 1px solid #383838; border-radius: 2px; padding: 5px 8px; font-size: 10.5px; color: #aaaaaa;">
+                হিসাব: <strong>50টি কার্ড</strong> তৈরি করতে মোট <strong>3টি আর্টবোর্ড</strong> লাগবে।
+            </div>
+        </div>
+
+        <button id="btnRunDuplicate" class="btn btn-primary" style="width: 100%; padding: 8px; font-size: 11.5px;">
+            Duplicate Templates &amp; Create Artboards
+        </button>
+    </div>
+
+    <!-- TAB 4: Canvas Move -->
+    <div id="tab-canvas-move" class="tab-pane">
+        <div class="section-box">
+            <div class="section-header">
+                <span class="section-title">Canvas Direct Placement</span>
+            </div>
+            <p style="font-size: 10.5px; color: #888888; line-height: 1.35;">
+                Select blank template cards on canvas and floating text frames, then move them directly into position.
+            </p>
+
+            <div class="grid-2" style="margin-top: 4px;">
+                <div class="control-group">
+                    <label for="selectCardSort">Card Direction</label>
+                    <select id="selectCardSort">
+                        <option value="column" selected>Column-wise</option>
+                        <option value="zigzag">Row by Row</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label for="selectTextSort">Text Direction</label>
+                    <select id="selectTextSort">
+                        <option value="column" selected>Column-wise</option>
+                        <option value="zigzag">Row by Row</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <button id="btnPlaceCanvasText" class="btn btn-primary" style="width: 100%; padding: 8px;">
+            Move &amp; Place Text into Cards
+        </button>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="panelToast" class="panel-toast"></div>
+
+    <!-- Minimal Native Adobe Footer -->
+    <footer class="panel-footer">
+        <a href="https://github.com/yahiabinzaman" id="btn-author-link" onclick="openAuthorProfile(event); return false;" style="color: #888888; text-decoration: none; cursor: pointer;">
+            Developed by <strong style="color: #1473e6; font-weight: 600;">Yahia Bin Zaman</strong>
+        </a>
+        <span style="font-size: 10px; color: #555555; font-family: monospace;">v2.8.0</span>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="js/CSInterface.js"></script>
+    <script src="js/main.js?v=2.8.0"></script>
+<script>
+function openAuthorProfile(e) {
+    if (e) { e.preventDefault(); e.stopPropagation(); }
+    var url = "https://github.com/yahiabinzaman";
+    try { if (window.cep && window.cep.util) { window.cep.util.openURLInDefaultBrowser(url); return false; } } catch (e1) {}
+    try { if (window.__adobe_cep__) { window.__adobe_cep__.openURLInDefaultBrowser(url); return false; } } catch (e2) {}
+    try { var cs = new CSInterface(); cs.openURLInDefaultBrowser(url); return false; } catch (e3) {}
+    window.open(url, '_blank');
+    return false;
+}
+</script>
+</body>
+</html>
