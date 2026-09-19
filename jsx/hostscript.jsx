@@ -1713,31 +1713,50 @@ var CardAutoFiller = {
         var globalRegularFont = docRegularFont || docBoldFont;
 
         // Master template styles matching original cards perfectly
-        var masterTplName = { size: 13.0, leading: 6.46, tracking: -5, hScale: 80.0, font: globalBoldFont, color: null, just: null };
-        var masterTplDetails = { size: 10.0, leading: 13.0, tracking: 0, hScale: 95.0, font: globalRegularFont, color: null, just: null };
-        var masterTplSerial = { size: 8.1956, leading: 8.4, tracking: 0, hScale: 90.3, font: globalBoldFont, color: null, just: null };
-        var masterTplForm = { size: 5.3181, leading: 5.5884, tracking: -50, hScale: 98.6, font: globalRegularFont, color: null, just: null };
+        var masterTplName = { size: 8.5, leading: 8.4, tracking: 0, hScale: 100.0, font: globalBoldFont, color: null, just: null };
+        var masterTplDetails = { size: 6.6, leading: 8.4, tracking: 0, hScale: 100.0, font: globalRegularFont, color: null, just: null };
+        var masterTplSerial = { size: 6.2, leading: 8.4, tracking: 0, hScale: 100.0, font: globalBoldFont, color: null, just: null };
+        var masterTplForm = { size: 5.0, leading: 5.5, tracking: -50, hScale: 98.6, font: globalRegularFont, color: null, just: null };
 
         for (var tci = 0; tci < targetCards.length; tci++) {
             var sampleCard = targetCards[tci];
             try {
-                if (sampleCard.nameFrame && sampleCard.nameFrame.textRange) {
-                    var sTr = sampleCard.nameFrame.textRange;
-                    var sz = sTr.characterAttributes.size;
-                    if (sz > 0) masterTplName.size = sz;
-                    if (sTr.characterAttributes.leading > 0) masterTplName.leading = sTr.characterAttributes.leading;
-                    if (sTr.characterAttributes.horizontalScale > 0 && sTr.characterAttributes.horizontalScale <= 100) masterTplName.hScale = sTr.characterAttributes.horizontalScale;
-                    if (sTr.characterAttributes.textFont) masterTplName.font = sTr.characterAttributes.textFont;
-                    if (sTr.characterAttributes.fillColor && sTr.characterAttributes.fillColor.typename !== "NoColor") masterTplName.color = sTr.characterAttributes.fillColor;
-                    try { masterTplName.just = sTr.paragraphAttributes.justification; } catch(j0e) {}
+                if (sampleCard.nameFrame && sampleCard.nameFrame.paragraphs && sampleCard.nameFrame.paragraphs.length > 0) {
+                    var sp0 = sampleCard.nameFrame.paragraphs[0];
+                    if (sp0 && sp0.characters.length > 0) {
+                        var sca0 = sp0.characters[0].characterAttributes;
+                        if (sca0.size > 0) masterTplName.size = sca0.size;
+                        if (sca0.leading > 0) masterTplName.leading = sca0.leading;
+                        if (sca0.horizontalScale > 0) masterTplName.hScale = sca0.horizontalScale;
+                        if (sca0.textFont) masterTplName.font = sca0.textFont;
+                        if (sca0.fillColor && sca0.fillColor.typename !== "NoColor") masterTplName.color = sca0.fillColor;
+                        try { masterTplName.just = sp0.paragraphAttributes.justification; } catch(j0e) {}
+                    }
+
+                    if (sampleCard.nameFrame.paragraphs.length > 1) {
+                        var sp1 = sampleCard.nameFrame.paragraphs[1];
+                        if (sp1 && sp1.characters.length > 0) {
+                            var sca1 = sp1.characters[0].characterAttributes;
+                            if (sca1.size > 0 && sca1.size <= 8.5) masterTplDetails.size = sca1.size;
+                            if (sca1.leading > 0 && sca1.leading <= 11.0) masterTplDetails.leading = sca1.leading;
+                            if (sca1.horizontalScale > 0) masterTplDetails.hScale = sca1.horizontalScale;
+                            if (sca1.textFont) masterTplDetails.font = sca1.textFont;
+                            if (sca1.fillColor && sca1.fillColor.typename !== "NoColor") masterTplDetails.color = sca1.fillColor;
+                            try { masterTplDetails.just = sp1.paragraphAttributes.justification; } catch(j1e) {}
+                        }
+                    }
                 }
-                if (sampleCard.detailsFrame && sampleCard.detailsFrame.textRange) {
-                    var sdTr = sampleCard.detailsFrame.textRange;
-                    if (sdTr.characterAttributes.size > 0) masterTplDetails.size = sdTr.characterAttributes.size;
-                    if (sdTr.characterAttributes.leading > 0) masterTplDetails.leading = sdTr.characterAttributes.leading;
-                    if (sdTr.characterAttributes.horizontalScale > 0) masterTplDetails.hScale = sdTr.characterAttributes.horizontalScale;
-                    if (sdTr.characterAttributes.textFont) masterTplDetails.font = sdTr.characterAttributes.textFont;
-                    if (sdTr.characterAttributes.fillColor && sdTr.characterAttributes.fillColor.typename !== "NoColor") masterTplDetails.color = sdTr.characterAttributes.fillColor;
+                if (sampleCard.detailsFrame && sampleCard.detailsFrame.paragraphs && sampleCard.detailsFrame.paragraphs.length > 0) {
+                    var sdp0 = sampleCard.detailsFrame.paragraphs[0];
+                    if (sdp0 && sdp0.characters.length > 0) {
+                        var sdca0 = sdp0.characters[0].characterAttributes;
+                        if (sdca0.size > 0) masterTplDetails.size = sdca0.size;
+                        if (sdca0.leading > 0) masterTplDetails.leading = sdca0.leading;
+                        if (sdca0.horizontalScale > 0) masterTplDetails.hScale = sdca0.horizontalScale;
+                        if (sdca0.textFont) masterTplDetails.font = sdca0.textFont;
+                        if (sdca0.fillColor && sdca0.fillColor.typename !== "NoColor") masterTplDetails.color = sdca0.fillColor;
+                        try { masterTplDetails.just = sdp0.paragraphAttributes.justification; } catch(dj1e) {}
+                    }
                 }
                 if (sampleCard.serialFrame && sampleCard.serialFrame.textRange) {
                     var ssTr = sampleCard.serialFrame.textRange;
@@ -1754,7 +1773,7 @@ var CardAutoFiller = {
                     if (sfTr.characterAttributes.horizontalScale > 0) masterTplForm.hScale = sfTr.characterAttributes.horizontalScale;
                     if (sfTr.characterAttributes.textFont) masterTplForm.font = sfTr.characterAttributes.textFont;
                 }
-                break;
+                if (masterTplDetails.size < 9.0) break;
             } catch(e) {}
         }
 
@@ -1874,8 +1893,10 @@ var CardAutoFiller = {
                         if (p1 && p1.characters.length > 0) {
                             var ca1 = p1.characters[0].characterAttributes;
                             if (ca1.textFont) cardDetStyle.font = ca1.textFont;
-                            if (ca1.size > 0) cardDetStyle.size = ca1.size;
-                            if (ca1.leading > 0) cardDetStyle.leading = ca1.leading;
+                            if (ca1.size > 0 && ca1.size <= masterTplDetails.size * 1.15) cardDetStyle.size = ca1.size;
+                            else cardDetStyle.size = masterTplDetails.size;
+                            if (ca1.leading > 0 && ca1.leading <= masterTplDetails.leading * 1.15) cardDetStyle.leading = ca1.leading;
+                            else cardDetStyle.leading = masterTplDetails.leading;
                             if (ca1.horizontalScale > 0) cardDetStyle.hScale = ca1.horizontalScale;
                             cardDetStyle.tracking = ca1.tracking;
                             if (ca1.fillColor && ca1.fillColor.typename !== "NoColor") {
