@@ -844,46 +844,53 @@ var CardAutoFiller = {
             card.nameFrame = candidateFrames[0];
             card.detailsFrame = null;
         } else if (candidateFrames.length >= 2) {
-            var detFrame = null;
-            var nameFrame = null;
-            var otherCandidates = [];
+            var bioFrame = null;        // Multi-line student info (Name + Father + Address + Phone)
+            var nonBioFrame = null;     // Quote / Bani / advice text
+            var shortNameFrame = null;  // 1-line name frame
+            var separateDetFrame = null;// Starts with পিতা: or address
 
             for (var cf = 0; cf < candidateFrames.length; cf++) {
                 var ctf = candidateFrames[cf];
-                var cLines = ctf.lines.length;
-                var cParas = ctf.paragraphs.length;
-                var cText = ctf.contents;
-                var isDet = (cLines >= 2 || cParas >= 2 || 
-                            /(?:পিতা|মাতা|গ্রাম|ডাক|উপজেলা|জেলা|রক্ত|মোবাইল|ফোন|ঠিকানা|wcZv|gvZv|MÖvg|i³|‡gvevBj|‡dvb)/i.test(cText) ||
-                            /(?:01[3-9]\d{8}|০১[৩-৯][০-৯]{8})/.test(cText));
-                
-                if (isDet && !detFrame) {
-                    detFrame = ctf;
-                } else if (!nameFrame && (cLines === 1 || cParas === 1 || !isDet)) {
-                    nameFrame = ctf;
+                var cText = ctf.contents.replace(/^\s+|\s+$/g, "");
+                var hasBio = this.hasStudentBiodata(cText) || /(?:পিতা|মাতা|গ্রাম|ডাক|উপজেলা|জেলা|মোবাইল|ফোন|রক্ত|01[3-9]\d{8}|০১[৩-৯][০-৯]{8})/i.test(cText);
+                var isBani = this.isBaniText(cText);
+
+                if (isBani) {
+                    if (!card.baniFrame) card.baniFrame = ctf;
+                } else if (hasBio) {
+                    var lines = cText.split(/[\r\n]+/);
+                    if (lines.length >= 2) {
+                        if (!bioFrame) bioFrame = ctf;
+                        else if (!nonBioFrame) nonBioFrame = ctf;
+                    } else {
+                        if (!separateDetFrame) separateDetFrame = ctf;
+                    }
                 } else {
-                    otherCandidates.push(ctf);
-                }
-            }
-
-            if (!nameFrame && candidateFrames.length > 0) {
-                nameFrame = candidateFrames[0];
-                if (detFrame === nameFrame) detFrame = candidateFrames.length > 1 ? candidateFrames[1] : null;
-            }
-            if (!detFrame && candidateFrames.length > 1) {
-                detFrame = (candidateFrames[0] === nameFrame) ? candidateFrames[1] : candidateFrames[0];
-            }
-
-            card.nameFrame = nameFrame;
-            card.detailsFrame = detFrame;
-
-            if (otherCandidates.length > 0 && !card.baniFrame) {
-                for (var oc = 0; oc < otherCandidates.length; oc++) {
-                    if (otherCandidates[oc] !== card.nameFrame && otherCandidates[oc] !== card.detailsFrame) {
-                        card.baniFrame = otherCandidates[oc];
-                        break;
+                    if (ctf.lines.length === 1 || ctf.paragraphs.length === 1) {
+                        if (!shortNameFrame) shortNameFrame = ctf;
+                    } else {
+                        if (!nonBioFrame) nonBioFrame = ctf;
                     }
                 }
+            }
+
+            if (bioFrame) {
+                // Multi-line frame with student info is the Person Info frame!
+                card.nameFrame = bioFrame;
+                card.detailsFrame = null;
+                if (!card.baniFrame) {
+                    card.baniFrame = nonBioFrame || shortNameFrame || separateDetFrame;
+                }
+            } else if (shortNameFrame && separateDetFrame) {
+                card.nameFrame = shortNameFrame;
+                card.detailsFrame = separateDetFrame;
+                if (!card.baniFrame && nonBioFrame) card.baniFrame = nonBioFrame;
+            } else if (shortNameFrame && nonBioFrame) {
+                card.nameFrame = shortNameFrame;
+                card.baniFrame = nonBioFrame;
+            } else {
+                card.nameFrame = candidateFrames[0];
+                card.detailsFrame = candidateFrames.length > 1 ? candidateFrames[1] : null;
             }
         }
 
