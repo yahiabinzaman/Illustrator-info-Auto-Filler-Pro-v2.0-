@@ -356,9 +356,10 @@ var CardAutoFiller = {
 
     isBaniText: function(text) {
         if (!text) return false;
+        if (/(?:[-–—]\s*(?:মাও|মাওলানা|হযরত|মুফতী|মুফতি|শায়খ|ড\.|আল্লামা|মুহাদ্দিস|ইমাম|রাসূল|হাকিমুল|রহ|হাফি))/i.test(text)) return true;
+        if (/(?:বাণী|বানী|Bani|উক্তি|হাদীস|উপদেশ|মহান|স্মারক|টাকা দিয়েই|টাকা দিয়ে|প্রয়োজন মেটাতে|লোভ থেকে|মোহ থেকে|মুক্ত রাখতে)/i.test(text)) return true;
         if (/^[\s\r\n]*[-–—]/.test(text)) return true;
-        if (/[-–—]\s*(?:মাওলানা|হযরত|মুফতী|শায়খ|ড\.|আল্লামা|মুহাদ্দিস|ইমাম|রাসূল)/i.test(text)) return true;
-        if (/(?:বাণী|উক্তি|হাদীস|বানী)/i.test(text) && !/(?:পিতা|গ্রাম|পোস্ট|থানা|জেলা|মোবাইল)/i.test(text)) return true;
+        if (text.indexOf("রহ:") !== -1 || text.indexOf("রহ.") !== -1 || text.indexOf("হাফি:") !== -1 || text.indexOf("হাফি.") !== -1) return true;
         return false;
     },
 
@@ -1720,9 +1721,12 @@ var CardAutoFiller = {
             var card = targetCards[i];
             var entry = activeEntries[i];
 
-            // 1. POPULATE NAME FRAME
+            // 1. POPULATE PERSON INFO (Name on line 1, Father/Address/Mobile on lines 2..4 next to icons)
             if (card.nameFrame && entry.name) {
                 var cleanName = (entry.name || "").replace(/^\s+|\s+$/g, "");
+                var cleanDetails = (entry.details || "").replace(/^\s+|\s+$/g, "");
+                cleanDetails = cleanDetails.split("\r\n").join("\r").split("\n").join("\r");
+
                 var origNameFont = boldFont;
                 var origNameSize = 11.0;
                 var origNameLeading = 11.0;
@@ -1730,45 +1734,6 @@ var CardAutoFiller = {
                 var origNameHScale = nameHScale;
                 var origNameTracking = 0;
                 var origNameJust = null;
-
-                try {
-                    if (card.nameFrame.characters.length > 0) {
-                        var nca = card.nameFrame.characters[0].characterAttributes;
-                        if (nca.textFont) origNameFont = nca.textFont;
-                        if (nca.size > 0) origNameSize = nca.size;
-                        if (nca.leading > 0) origNameLeading = nca.leading;
-                        origNameTracking = nca.tracking;
-                        if (!userChosenColor && nca.fillColor && nca.fillColor.typename !== "NoColor") {
-                            origNameColor = nca.fillColor;
-                        }
-                    }
-                    if (card.nameFrame.paragraphs.length > 0) {
-                        origNameJust = card.nameFrame.paragraphs[0].paragraphAttributes.justification;
-                    }
-                } catch(ne) {}
-
-                if (userChosenColor) origNameColor = userChosenColor;
-                if (hasCustomNameLeading) origNameLeading = userNameLeading;
-
-                card.nameFrame.contents = cleanName;
-                try {
-                    var nTr = card.nameFrame.textRange;
-                    if (origNameFont) nTr.characterAttributes.textFont = origNameFont;
-                    nTr.characterAttributes.size = origNameSize;
-                    nTr.characterAttributes.leading = origNameLeading;
-                    nTr.characterAttributes.horizontalScale = origNameHScale;
-                    nTr.characterAttributes.tracking = origNameTracking;
-                    nTr.characterAttributes.fillColor = origNameColor;
-                    if (origNameJust !== null) nTr.paragraphAttributes.justification = origNameJust;
-                    nTr.paragraphAttributes.spaceBefore = 0;
-                    nTr.paragraphAttributes.spaceAfter = 0;
-                } catch(nStyErr) {}
-            }
-
-            // 2. POPULATE DETAILS FRAME (Separate multi-line text frame)
-            if (card.detailsFrame && entry.details) {
-                var cleanDetails = (entry.details || "").replace(/^\s+|\s+$/g, "");
-                cleanDetails = cleanDetails.split("\r\n").join("\r").split("\n").join("\r");
 
                 var origDetFont = regularFont;
                 var origDetSize = 6.0;
@@ -1778,51 +1743,125 @@ var CardAutoFiller = {
                 var origDetJust = null;
 
                 try {
-                    if (card.detailsFrame.characters.length > 0) {
-                        var dca = card.detailsFrame.characters[0].characterAttributes;
-                        if (dca.textFont) origDetFont = dca.textFont;
-                        if (dca.size > 0) origDetSize = dca.size;
-                        if (dca.leading > 0) origDetLeading = dca.leading;
-                        origDetTracking = dca.tracking;
-                        if (dca.fillColor && dca.fillColor.typename !== "NoColor") {
-                            origDetColor = dca.fillColor;
+                    if (card.nameFrame.paragraphs.length > 0) {
+                        var p0 = card.nameFrame.paragraphs[0];
+                        if (p0.characters.length > 0) {
+                            var nca = p0.characters[0].characterAttributes;
+                            if (nca.textFont) origNameFont = nca.textFont;
+                            if (nca.size > 0) origNameSize = nca.size;
+                            if (nca.leading > 0) origNameLeading = nca.leading;
+                            origNameTracking = nca.tracking;
+                            if (!userChosenColor && nca.fillColor && nca.fillColor.typename !== "NoColor") {
+                                origNameColor = nca.fillColor;
+                            }
+                        }
+                        origNameJust = p0.paragraphAttributes.justification;
+                    }
+
+                    if (card.nameFrame.paragraphs.length > 1) {
+                        var p1 = card.nameFrame.paragraphs[1];
+                        if (p1.characters.length > 0) {
+                            var dca = p1.characters[0].characterAttributes;
+                            if (dca.textFont) origDetFont = dca.textFont;
+                            if (dca.size > 0) origDetSize = dca.size;
+                            if (dca.leading > 0) origDetLeading = dca.leading;
+                            origDetTracking = dca.tracking;
+                            if (dca.fillColor && dca.fillColor.typename !== "NoColor") {
+                                origDetColor = dca.fillColor;
+                            }
+                        }
+                    } else if (card.detailsFrame && card.detailsFrame !== card.nameFrame && card.detailsFrame !== card.baniFrame) {
+                        if (card.detailsFrame.characters.length > 0) {
+                            var ddca = card.detailsFrame.characters[0].characterAttributes;
+                            if (ddca.textFont) origDetFont = ddca.textFont;
+                            if (ddca.size > 0) origDetSize = ddca.size;
+                            if (ddca.leading > 0) origDetLeading = ddca.leading;
+                            origDetTracking = ddca.tracking;
+                            if (ddca.fillColor && ddca.fillColor.typename !== "NoColor") {
+                                origDetColor = ddca.fillColor;
+                            }
                         }
                     }
-                    if (card.detailsFrame.paragraphs.length > 0) {
-                        origDetJust = card.detailsFrame.paragraphs[0].paragraphAttributes.justification;
-                    }
-                } catch(de) {}
+                } catch(ne) {}
 
+                if (userChosenColor) origNameColor = userChosenColor;
+                if (hasCustomNameLeading) origNameLeading = userNameLeading;
                 if (hasCustomDetailsLeading) origDetLeading = userDetailsLeading;
 
-                card.detailsFrame.contents = cleanDetails;
-                try {
-                    var dTr = card.detailsFrame.textRange;
-                    if (origDetFont) dTr.characterAttributes.textFont = origDetFont;
-                    dTr.characterAttributes.size = origDetSize;
-                    dTr.characterAttributes.leading = origDetLeading;
-                    dTr.characterAttributes.horizontalScale = detailsHScale;
-                    dTr.characterAttributes.tracking = origDetTracking;
-                    dTr.characterAttributes.fillColor = origDetColor;
-                    if (origDetJust !== null) dTr.paragraphAttributes.justification = origDetJust;
-                    dTr.paragraphAttributes.spaceBefore = 0;
-                    dTr.paragraphAttributes.spaceAfter = 0;
+                var isSeparateDetFrame = (card.detailsFrame && card.detailsFrame !== card.nameFrame && card.detailsFrame !== card.baniFrame);
 
-                    for (var dp = 0; dp < card.detailsFrame.paragraphs.length; dp++) {
-                        try {
-                            var dpPara = card.detailsFrame.paragraphs[dp];
-                            if (origDetFont) dpPara.characterAttributes.textFont = origDetFont;
-                            dpPara.characterAttributes.size = origDetSize;
-                            dpPara.characterAttributes.leading = origDetLeading;
-                            dpPara.characterAttributes.horizontalScale = detailsHScale;
-                            dpPara.characterAttributes.tracking = origDetTracking;
-                            dpPara.characterAttributes.fillColor = origDetColor;
-                            if (origDetJust !== null) dpPara.paragraphAttributes.justification = origDetJust;
-                            dpPara.paragraphAttributes.spaceBefore = 0;
-                            dpPara.paragraphAttributes.spaceAfter = 0;
-                        } catch(dpE) {}
-                    }
-                } catch(dStyErr) {}
+                if (!isSeparateDetFrame) {
+                    // Single combined frame: Name (line 1) + Father (line 2) + Village (line 3) + Phone (line 4)
+                    var fullInfo = cleanDetails ? (cleanName + "\r" + cleanDetails) : cleanName;
+                    card.nameFrame.contents = fullInfo;
+
+                    // 1. Apply base details styling to entire frame
+                    try {
+                        var nTr = card.nameFrame.textRange;
+                        if (origDetFont) nTr.characterAttributes.textFont = origDetFont;
+                        nTr.characterAttributes.size = origDetSize;
+                        nTr.characterAttributes.leading = origDetLeading;
+                        nTr.characterAttributes.horizontalScale = detailsHScale;
+                        nTr.characterAttributes.tracking = origDetTracking;
+                        nTr.characterAttributes.fillColor = origDetColor;
+                        if (origDetJust !== null) nTr.paragraphAttributes.justification = origDetJust;
+                        nTr.paragraphAttributes.spaceBefore = 0;
+                        nTr.paragraphAttributes.spaceAfter = 0;
+                    } catch(bStyErr) {}
+
+                    // 2. Apply Name styling to Paragraph 0
+                    try {
+                        if (card.nameFrame.paragraphs.length > 0) {
+                            var p0 = card.nameFrame.paragraphs[0];
+                            if (origNameFont) p0.characterAttributes.textFont = origNameFont;
+                            p0.characterAttributes.size = origNameSize;
+                            p0.characterAttributes.leading = origNameLeading;
+                            p0.characterAttributes.horizontalScale = nameHScale;
+                            p0.characterAttributes.tracking = origNameTracking;
+                            p0.characterAttributes.fillColor = origNameColor;
+                            if (origNameJust !== null) p0.paragraphAttributes.justification = origNameJust;
+                        }
+                    } catch(p0Err) {}
+
+                    // 3. Ensure subsequent paragraphs keep details styling
+                    try {
+                        for (var p = 1; p < card.nameFrame.paragraphs.length; p++) {
+                            var pIt = card.nameFrame.paragraphs[p];
+                            if (origDetFont) pIt.characterAttributes.textFont = origDetFont;
+                            pIt.characterAttributes.size = origDetSize;
+                            pIt.characterAttributes.leading = origDetLeading;
+                            pIt.characterAttributes.horizontalScale = detailsHScale;
+                            pIt.characterAttributes.tracking = origDetTracking;
+                            pIt.characterAttributes.fillColor = origDetColor;
+                            if (origDetJust !== null) pIt.paragraphAttributes.justification = origDetJust;
+                        }
+                    } catch(pDetErr) {}
+                } else {
+                    // Separate Name frame and Details frame
+                    card.nameFrame.contents = cleanName;
+                    try {
+                        var nTr = card.nameFrame.textRange;
+                        if (origNameFont) nTr.characterAttributes.textFont = origNameFont;
+                        nTr.characterAttributes.size = origNameSize;
+                        nTr.characterAttributes.leading = origNameLeading;
+                        nTr.characterAttributes.horizontalScale = nameHScale;
+                        nTr.characterAttributes.tracking = origNameTracking;
+                        nTr.characterAttributes.fillColor = origNameColor;
+                        if (origNameJust !== null) nTr.paragraphAttributes.justification = origNameJust;
+                    } catch(nStyErr) {}
+
+                    card.detailsFrame.contents = cleanDetails;
+                    try {
+                        var dTr = card.detailsFrame.textRange;
+                        if (origDetFont) dTr.characterAttributes.textFont = origDetFont;
+                        dTr.characterAttributes.size = origDetSize;
+                        dTr.characterAttributes.leading = origDetLeading;
+                        dTr.characterAttributes.horizontalScale = detailsHScale;
+                        dTr.characterAttributes.tracking = origDetTracking;
+                        dTr.characterAttributes.fillColor = origDetColor;
+                        if (origDetJust !== null) dTr.paragraphAttributes.justification = origDetJust;
+                    } catch(dStyErr) {}
+                }
             }
 
             // 3. POPULATE QTY FRAME (Right side quantity)
