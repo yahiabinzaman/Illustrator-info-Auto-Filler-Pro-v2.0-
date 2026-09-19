@@ -564,10 +564,24 @@ var CardAutoFiller = {
                 var tf = allTFs[t];
                 if (this.isItemHidden(tf)) continue;
                 if (this.isBackSideText(tf.contents)) continue;
-                if (tf.contents.length > 500 || tf.lines.length > 15) continue;
+                if (tf.contents.length > 500 || tf.lines.length > 25) continue;
                 filteredTFs.push(tf);
             }
-            if (filteredTFs.length >= 2) {
+            if (filteredTFs.length === 1) {
+                cardUnits.push({
+                    nameFrame: filteredTFs[0],
+                    detailsFrame: null,
+                    baniFrame: null,
+                    qtyFrame: null,
+                    badgeFrame: null,
+                    serialFrame: null,
+                    formFrame: null,
+                    namePlaceholderPath: null,
+                    group: filteredTFs[0],
+                    bounds: filteredTFs[0].geometricBounds,
+                    artboardIndex: 0
+                });
+            } else if (filteredTFs.length >= 2) {
                 cardUnits = this.clusterProximityCards(filteredTFs);
             }
         }
