@@ -100,21 +100,48 @@ var CardAutoFiller = {
         }
         var doc = app.activeDocument;
         var sel = doc.selection;
-        if (!sel) {
+        if (!sel || (sel instanceof Array && sel.length === 0)) {
             return JSON.stringify({ status: "error", message: "Please select text or an object on the canvas." });
         }
 
         var col = null;
+        function findColor(item) {
+            if (!item || col) return;
+            if (item.typename === "TextRange") {
+                if (item.characterAttributes && item.characterAttributes.fillColor && item.characterAttributes.fillColor.typename !== "NoColor") {
+                    col = item.characterAttributes.fillColor;
+                }
+            } else if (item.typename === "TextFrame") {
+                if (item.characters.length > 0 && item.characters[0].characterAttributes && item.characters[0].characterAttributes.fillColor && item.characters[0].characterAttributes.fillColor.typename !== "NoColor") {
+                    col = item.characters[0].characterAttributes.fillColor;
+                } else if (item.fillColor && item.fillColor.typename !== "NoColor") {
+                    col = item.fillColor;
+                }
+            } else if (item.typename === "PathItem") {
+                if (item.filled && item.fillColor && item.fillColor.typename !== "NoColor") {
+                    col = item.fillColor;
+                }
+            } else if (item.typename === "CompoundPathItem") {
+                if (item.pathItems.length > 0 && item.pathItems[0].filled && item.pathItems[0].fillColor) {
+                    col = item.pathItems[0].fillColor;
+                }
+            } else if (item.typename === "GroupItem") {
+                for (var i = 0; i < item.pageItems.length; i++) {
+                    findColor(item.pageItems[i]);
+                    if (col) break;
+                }
+            }
+        }
+
         if (sel.typename === "TextRange") {
             col = sel.characterAttributes.fillColor;
-        } else if (sel.typename === "TextFrame") {
-            if (sel.characters.length > 0) col = sel.characters[0].fillColor;
-        } else if (sel instanceof Array && sel.length > 0) {
-            var item = sel[0];
-            if (item.typename === "TextRange") col = item.characterAttributes.fillColor;
-            else if (item.typename === "TextFrame" && item.characters.length > 0) col = item.characters[0].fillColor;
-            else if (item.textFrames && item.textFrames.length > 0 && item.textFrames[0].characters.length > 0) col = item.textFrames[0].characters[0].fillColor;
-            else if (item.fillColor) col = item.fillColor;
+        } else if (sel instanceof Array) {
+            for (var s = 0; s < sel.length; s++) {
+                findColor(sel[s]);
+                if (col) break;
+            }
+        } else {
+            findColor(sel);
         }
 
         if (!col || col.typename === "NoColor") {
@@ -1541,7 +1568,11 @@ var CardAutoFiller = {
         var payload = {};
         try {
             if (typeof jsonPayload === "string") {
-                payload = eval('(' + jsonPayload + ')');
+                try {
+                    payload = JSON.parse(jsonPayload);
+                } catch(eJson) {
+                    payload = eval('(' + jsonPayload + ')');
+                }
             } else {
                 payload = jsonPayload;
             }
@@ -1901,8 +1932,9 @@ var CardAutoFiller = {
             if (payload.nameHScale !== undefined && payload.nameHScale !== 100) cardNameStyle.hScale = nameHScale;
             if (payload.detailsHScale !== undefined && payload.detailsHScale !== 85 && payload.detailsHScale !== 95) cardDetStyle.hScale = detailsHScale;
 
-            // --- STEP 2: POPULATE SERIAL / KROMIK ---
-            if (card.serialFrame && entry.serial) {
+            // --- STEP 2: POPULATE SERIAL / KROMIK (Only when serial is requested, NEVER for Keyrings) ---
+            var shouldFillSerial = (!payload.isKeyring && payload.fillSerial !== false);
+            if (shouldFillSerial && card.serialFrame && entry.serial) {
                 try {
                     var sVal = entry.serial;
                     var sFont = cardSerialStyle.font || cardNameStyle.font;
@@ -2108,7 +2140,60 @@ var CardAutoFiller = {
                         } catch(pAddErr) {}
                     }
                 }
-            } catch (err) {}
+            } catch(nErr) {}
+
+            // --- STEP 4B: POPULATE BANI (Only if bani is provided and fillBani enabled) ---
+            try {
+                if (payload.fillBani !== false && card.baniFrame && entry.bani && entry.bani.replace(/\s+/g, '').length > 0) {
+                    var origBaniFont = null;
+                    var origBaniSize = null;
+                    var origBaniLeading = null;
+                    var origBaniColor = null;
+                    try {
+                        var btr = card.baniFrame.textRange;
+                        origBaniFont = btr.characterAttributes.textFont;
+                        origBaniSize = btr.characterAttributes.size;
+                        origBaniLeading = btr.characterAttributes.leading;
+                        origBaniColor = btr.characterAttributes.fillColor;
+                    } catch(be) {}
+
+                    var cleanBani = entry.bani.split('\r\n').join('\r').split('\n').join('\r');
+                    card.baniFrame.contents = cleanBani;
+
+                    try {
+                        var nbtr = card.baniFrame.textRange;
+                        if (origBaniFont) nbtr.characterAttributes.textFont = origBaniFont;
+                        if (origBaniSize) nbtr.characterAttributes.size = origBaniSize;
+                        if (origBaniLeading) nbtr.characterAttributes.leading = origBaniLeading;
+                        if (origBaniColor) nbtr.characterAttributes.fillColor = origBaniColor;
+                    } catch(bsty) {}
+                }
+            } catch(bErr) {}
+
+            // --- STEP 5: POPULATE QTY ---
+            try {
+                if (card.qtyFrame && entry.qty) {
+                    var origQtyFont = null;
+                    var origQtySize = null;
+                    var origQtyColor = null;
+                    try {
+                        var qtr = card.qtyFrame.textRange;
+                        origQtyFont = qtr.characterAttributes.textFont;
+                        origQtySize = qtr.characterAttributes.size;
+                        origQtyColor = qtr.characterAttributes.fillColor;
+                    } catch(qe) {}
+
+                    var qVal = String(entry.qty).replace(/^\s+|\s+$/g, '');
+                    card.qtyFrame.contents = qVal;
+
+                    try {
+                        var nQtr = card.qtyFrame.textRange;
+                        if (origQtyFont) nQtr.characterAttributes.textFont = origQtyFont;
+                        if (origQtySize) nQtr.characterAttributes.size = origQtySize;
+                        if (origQtyColor) nQtr.characterAttributes.fillColor = origQtyColor;
+                    } catch(qStyErr) {}
+                }
+            } catch(e) {}
 
             // --- STEP 5: POPULATE BANI (if in keyring mode and fillBani is enabled) ---
             try {

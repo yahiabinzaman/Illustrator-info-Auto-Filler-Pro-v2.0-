@@ -1,7 +1,7 @@
 /**
  * Illustrator Name & Bio Card Auto-Filler Engine
  * Author: Yahia Bin Zaman (https://github.com/yahiabinzaman)
- * Version: 2.3.0 Pro - Dual Mode: Keyring Filler & Diary Filler
+ * Version: 2.8.0 Pro - Dual Mode: Keyring Filler & Diary Filler
  */
 
 (function() {
@@ -10,6 +10,9 @@
     var csInterface = new CSInterface();
     var bnDigits = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
 
+    // ==========================================
+    // Core Utilities & Host Communication
+    // ==========================================
     function evalHostScript(code, callback) {
         var extPath = '';
         try {
@@ -18,7 +21,7 @@
         
         var fullCode = '';
         if (extPath) {
-            fullCode = 'try { $.evalFile(new File("' + extPath + '/jsx/hostscript.jsx")); } catch(e) {}; ' + code;
+            fullCode = 'if (typeof CardAutoFiller === "undefined") { try { var _f = new File("' + extPath + '/jsx/hostscript.jsx"); _f.encoding = "UTF-8"; _f.open("r"); var _c = _f.read(); _f.close(); eval(_c); } catch(e) {}; }; ' + code;
         } else {
             fullCode = code;
         }
@@ -41,7 +44,7 @@
     function bengaliToInt(str) {
         if (!str) return -1;
         var bnNums = { '০': 0, '১': 1, '২': 2, '৩': 3, '৪': 4, '৫': 5, '৬': 6, '৭': 7, '৮': 8, '৯': 9 };
-        var clean = str.replace(/[^০-৯0-9]/g, '');
+        var clean = String(str).replace(/[^০-৯0-9]/g, '');
         if (!clean) return -1;
         var res = 0;
         for (var i = 0; i < clean.length; i++) {
@@ -52,1551 +55,117 @@
         return res > 0 ? res : -1;
     }
 
-    // Tabs
-    var tabBtns = document.querySelectorAll('.tab-btn');
-    var tabPanes = document.querySelectorAll('.tab-pane');
-
-    // Keyring Elements
-    var rawTextInputKeyring = document.getElementById('rawTextInputKeyring');
-    var entriesCountBadgeKeyring = document.getElementById('entriesCountBadgeKeyring');
-    var previewListKeyring = document.getElementById('previewListKeyring');
-    var btnAutoFillKeyring = document.getElementById('btnAutoFillKeyring');
-    var btnLoadSelectionKeyring = document.getElementById('btnLoadSelectionKeyring');
-    var btnLoadSampleKeyring = document.getElementById('btnLoadSampleKeyring');
-    var btnClearKeyring = document.getElementById('btnClearKeyring');
-    var selectFillOrderKeyring = document.getElementById('selectFillOrderKeyring');
-    var selectScopeKeyring = document.getElementById('selectScopeKeyring');
-    var chkStripNumberKeyring = document.getElementById('chkStripNumberKeyring');
-    var chkMakeBoldKeyring = document.getElementById('chkMakeBoldKeyring');
-    var chkFillBaniKeyring = document.getElementById('chkFillBaniKeyring');
-    var chkFillQtyKeyring = document.getElementById('chkFillQtyKeyring');
-    var selectQtyFormatKeyring = document.getElementById('selectQtyFormatKeyring');
-    var chkSkipNoNameKeyring = document.getElementById('chkSkipNoNameKeyring');
-
-    // Color Controls
-    var colorPickerKeyring = document.getElementById('colorPickerKeyring');
-    var colorHexKeyring = document.getElementById('colorHexKeyring');
-    var btnPickColorKeyring = document.getElementById('btnPickColorKeyring');
-    var labelColorNameKeyring = document.getElementById('labelColorNameKeyring');
-
-    var colorPickerDiary = document.getElementById('colorPickerDiary');
-    var colorHexDiary = document.getElementById('colorHexDiary');
-    var btnPickColorDiary = document.getElementById('btnPickColorDiary');
-    var labelColorNameDiary = document.getElementById('labelColorNameDiary');
-    var colorSwatches = document.querySelectorAll('.color-swatch');
-
-    var currentKeyringColor = "#006F9A";
-    var currentKeyringCmyk = [100, 0, 0, 45];
-    var currentDiaryColor = "#006F9A";
-    var currentDiaryCmyk = [100, 0, 0, 45];
-
-    // Diary Elements
-    var rawTextInputDiary = document.getElementById('rawTextInputDiary');
-    var entriesCountBadgeDiary = document.getElementById('entriesCountBadgeDiary');
-    var previewListDiary = document.getElementById('previewListDiary');
-    var btnAutoFillDiary = document.getElementById('btnAutoFillDiary');
-    var btnLoadSelectionDiary = document.getElementById('btnLoadSelectionDiary');
-    var btnLoadSampleDiary = document.getElementById('btnLoadSampleDiary');
-    var btnClearDiary = document.getElementById('btnClearDiary');
-    var selectSerialFormatDiary = document.getElementById('selectSerialFormatDiary');
-    var selectScopeDiary = document.getElementById('selectScopeDiary');
-    var selectFillOrderDiary = document.getElementById('selectFillOrderDiary');
-    var selectDiaryRenumber = document.getElementById('selectDiaryRenumber');
-    var chkIncludeDetailsDiary = document.getElementById('chkIncludeDetailsDiary');
-    var chkMakeBoldDiary = document.getElementById('chkMakeBoldDiary');
-
-    // Canvas Move Elements
-    var btnPlaceCanvasText = document.getElementById('btnPlaceCanvasText');
-    var selectCardSort = document.getElementById('selectCardSort');
-    var selectTextSort = document.getElementById('selectTextSort');
-    var sliderOffsetX = document.getElementById('sliderOffsetX');
-    var sliderOffsetY = document.getElementById('sliderOffsetY');
-    var valOffsetX = document.getElementById('valOffsetX');
-    var valOffsetY = document.getElementById('valOffsetY');
-    var chkGroupPlaced = document.getElementById('chkGroupPlaced');
-    var chkBringToFront = document.getElementById('chkBringToFront');
-
-    // Badge Renumber Elements
-    var btnRenumberBadges = document.getElementById('btnRenumberBadges');
-    var selectBadgeStyle = document.getElementById('selectBadgeStyle');
-    var inputBadgeStart = document.getElementById('inputBadgeStart');
-    var inputBadgePrefix = document.getElementById('inputBadgePrefix');
-    var inputBadgeSuffix = document.getElementById('inputBadgeSuffix');
-
-    // Footer & Toast
-    var btnAuthorLink = document.getElementById('btn-author-link');
-    var panelToast = document.getElementById('panelToast');
-
-    // Regex definitions
-    var serialPrefixRegex = /^\s*[\(\[\{]?([০-৯0-9]{1,4})[\.\)\-\/\:\|\]\}]\s*/;
-    var serialLineRegex = /^\s*[\(\[\{]?([০-৯0-9]{1,4})[\.\)\-\/\:\|\]\}]?\s*$/;
-    var qtyRegex = /(?:^|\s*)([০-৯0-9]{1,4})\s*(?:পিস|পিছ|টি|টা|pc|pcs|piece|pieces)(?:\s*|$)/i;
-    var baniRegex = /^(?:[\u09AC][\u09BE][\u09A3\u09A8][\u09C0])\s*[:\u0983]/i;
-
-    var sampleBanglaData = `১০
-হাফেজ মো: সিফাতুল্লাহ বিশ্বাস
-পিতা: আজাহারুল ইসলাম
-ব্রাহ্মণডাঙ্গা, মনিরামপুর, যশোর
-০১৯২৩৪৩০৯৬০
-১০ পিস
-বাণী: বিন্দু বিন্দু জলে তৈরী হয় সাগর, একটু একটু চেষ্টায় সফল হয় জীবন। — মাওলানা আবু তাহের মিসবাহ দা:বা:
-
-১১
-হাফেজ শুয়াইব হুসাইন
-পিতা: সাইফুল ইসলাম
-বাঁকড়া, ঝিকরগাছা, যশোর
-০১৭৪৫৬৪৩২৯৪
-১৫ পিস
-বাণী: আল্লাহর উপর ভরসা রেখে যারা দ্বীনের মেহনত মোজাহাদা করে, হতাশা কখনো তাদের হতোদ্যম করতে পারেনা, তারা তো সফলতার জন্য নয়, আল্লাহর সন্তুষ্টির জন্যই কাজ করে। — মাওলানা আবু তাহের মিসবাহ দা:বা:
-
-১২
-হাফেজ আবু বকর সিদ্দিক
-পিতা: জনাব হাসিবুল ইসলাম
-আকুন্দবাড়ীয়া, সদর, চুয়াডাঙ্গা
-০১৯৬৫৮২৮৮৫৭
-২৫ পিস
-বাণী: আমি পিঁপড়া হয়ে পদদলিত হব, কিন্তু ভ্রমর হয়ে কাউকে দংশন করব না। — শায়খুল হাদিস ইবরাহীম খলীল রহ.`;
-
-    var parsedKeyringEntries = [];
-    var parsedDiaryEntries = [];
-    var currentKeyringStartIndex = 0;
-    var currentDiaryStartIndex = 0;
-
-    // Batch & State Elements
-    var chkSkipFilledKeyring = document.getElementById('chkSkipFilledKeyring');
-    var chkAutoRemoveFilledKeyring = document.getElementById('chkAutoRemoveFilledKeyring');
-    var inputStartIndexKeyring = document.getElementById('inputStartIndexKeyring');
-    var btnResetIndexKeyring = document.getElementById('btnResetIndexKeyring');
-
-    var chkSkipFilledDiary = document.getElementById('chkSkipFilledDiary');
-    var chkAutoRemoveFilledDiary = document.getElementById('chkAutoRemoveFilledDiary');
-    var inputStartIndexDiary = document.getElementById('inputStartIndexDiary');
-    var btnResetIndexDiary = document.getElementById('btnResetIndexDiary');
-
-    function init() {
-    window.onTabSwitched = function(targetTabId) {
-        if (targetTabId === 'tab-keyring') {
-            if (rawTextInputDiary && rawTextInputKeyring && rawTextInputDiary.value && !rawTextInputKeyring.value) {
-                rawTextInputKeyring.value = rawTextInputDiary.value;
-            }
-            parseKeyringInput();
-        } else if (targetTabId === 'tab-diary') {
-            if (rawTextInputKeyring && rawTextInputDiary && rawTextInputKeyring.value && !rawTextInputDiary.value) {
-                rawTextInputDiary.value = rawTextInputKeyring.value;
-            }
-            parseDiaryInput();
-        }
-    };
-        // Clear Cache & Reload Panel
-        var btnReloadPanel = document.getElementById('btnReloadPanel');
-        if (btnReloadPanel) {
-            btnReloadPanel.addEventListener('click', function() {
-                try { localStorage.clear(); } catch(e) {}
-                try { sessionStorage.clear(); } catch(e) {}
-                showToast('Cache cleared! Reloading...', 'info');
-                try {
-                    var extPath = csInterface.getSystemPath(SystemPath.EXTENSION).replace(/\\/g, '/');
-                    var loadScript = "try { $.evalFile(new File('" + extPath + "/jsx/hostscript.jsx')); } catch(e) {}";
-                    csInterface.evalScript(loadScript, function() {
-                        setTimeout(function() {
-                            window.location.reload(true);
-                        }, 250);
-                    });
-                } catch(e) {
-                    window.location.reload(true);
-                }
-            });
-        }
-
-        // Force ExtendScript to load the latest hostscript.jsx from disk
-        try {
-            var extPath = csInterface.getSystemPath(SystemPath.EXTENSION).replace(/\\/g, '/');
-            if (extPath) {
-                var loadScript = "try { $.evalFile(new File('" + extPath + "/jsx/hostscript.jsx')); } catch(e) {}";
-                csInterface.evalScript(loadScript);
-            }
-        } catch(e) {}
-
-        // Re-query Tab Buttons & Panes inside init()
-        tabBtns = document.querySelectorAll('.tab-btn');
-        tabPanes = document.querySelectorAll('.tab-pane');
-
-        // Robust Tab Switching
-        function switchTab(targetTabId) {
-            if (!targetTabId) return;
-            var allBtns = document.querySelectorAll('.tab-btn');
-            var allPanes = document.querySelectorAll('.tab-pane');
-            
-            allBtns.forEach(function(b) {
-                if (b.getAttribute('data-tab') === targetTabId) {
-                    b.classList.add('active');
-                } else if (b.getAttribute('data-tab')) {
-                    b.classList.remove('active');
-                }
-            });
-
-            allPanes.forEach(function(p) {
-                if (p.id === targetTabId) {
-                    p.classList.add('active');
-                } else {
-                    p.classList.remove('active');
-                }
-            });
-
-            if (targetTabId === 'tab-keyring') {
-                if (rawTextInputDiary && rawTextInputKeyring && rawTextInputDiary.value && !rawTextInputKeyring.value) {
-                    rawTextInputKeyring.value = rawTextInputDiary.value;
-                }
-                parseKeyringInput();
-            } else if (targetTabId === 'tab-diary') {
-                if (rawTextInputKeyring && rawTextInputDiary && rawTextInputKeyring.value && !rawTextInputDiary.value) {
-                    rawTextInputDiary.value = rawTextInputKeyring.value;
-                }
-                parseDiaryInput();
-            }
-        }
-
-        tabBtns.forEach(function(btn) {
-            btn.addEventListener('click', function(e) {
-                var targetTab = this.getAttribute('data-tab');
-                if (targetTab) {
-                    switchTab(targetTab);
-                }
-            });
-        });
-
-        // Tab Bar Event Delegation Backup
-        var tabBar = document.querySelector('.tab-bar');
-        if (tabBar) {
-            tabBar.addEventListener('click', function(e) {
-                var btn = e.target.closest('.tab-btn');
-                if (btn && btn.getAttribute('data-tab')) {
-                    switchTab(btn.getAttribute('data-tab'));
-                }
-            });
-        }
-
-        // Sliders
-        if (sliderOffsetX && valOffsetX) {
-            sliderOffsetX.addEventListener('input', function() { valOffsetX.textContent = this.value + ' pt'; });
-        }
-        if (sliderOffsetY && valOffsetY) {
-            sliderOffsetY.addEventListener('input', function() { valOffsetY.textContent = this.value + ' pt'; });
-        }
-
-        // Batch Start Index & Reset Listeners
-        if (inputStartIndexKeyring) {
-            inputStartIndexKeyring.addEventListener('input', function() {
-                var val = parseInt(this.value, 10);
-                currentKeyringStartIndex = (!isNaN(val) && val >= 1) ? (val - 1) : 0;
-                renderKeyringPreview();
-            });
-        }
-        if (btnResetIndexKeyring) {
-            btnResetIndexKeyring.addEventListener('click', function() {
-                currentKeyringStartIndex = 0;
-                if (inputStartIndexKeyring) inputStartIndexKeyring.value = 1;
-                renderKeyringPreview();
-                showToast('Queue reset to start from Entry #1', 'info');
-            });
-        }
-
-        // Horizontal Scale preset buttons & localStorage persistence
-        var scalePresetBtns = document.querySelectorAll('.btn-scale-preset');
-        for (var sp = 0; sp < scalePresetBtns.length; sp++) {
-            scalePresetBtns[sp].addEventListener('click', function() {
-                var targetId = this.getAttribute('data-target');
-                var val = this.getAttribute('data-val');
-                var targetInput = document.getElementById(targetId);
-                if (targetInput) {
-                    targetInput.value = val;
-                    try { localStorage.setItem(targetId, val); } catch(e) {}
-                    showToast('Set scale to ' + val + '%', 'success');
-                }
-            });
-        }
-
-        // Line Leading preset buttons & localStorage persistence
-        var leadingPresetBtns = document.querySelectorAll('.btn-leading-preset');
-        for (var lp = 0; lp < leadingPresetBtns.length; lp++) {
-            leadingPresetBtns[lp].addEventListener('click', function() {
-                var targetId = this.getAttribute('data-target');
-                var val = this.getAttribute('data-val');
-                var targetInput = document.getElementById(targetId);
-                if (targetInput) {
-                    targetInput.value = val;
-                    try { localStorage.setItem(targetId, val); } catch(e) {}
-                    var sibs = this.parentElement.querySelectorAll('.btn-leading-preset');
-                    for (var s = 0; s < sibs.length; s++) sibs[s].classList.remove('active');
-                    this.classList.add('active');
-                    showToast('Set leading to ' + val + (val === 'Auto' ? ' (Template Native)' : ' pt'), 'success');
-                }
-            });
-        }
-
-        function restoreLeadingInput(id) {
-            var el = document.getElementById(id);
-            if (!el) return;
-            try {
-                var saved = localStorage.getItem(id);
-                if (saved) {
-                    el.value = saved;
-                    var sibs = el.parentElement.querySelectorAll('.btn-leading-preset');
-                    for (var s = 0; s < sibs.length; s++) {
-                        if (sibs[s].getAttribute('data-val') === saved) sibs[s].classList.add('active');
-                        else sibs[s].classList.remove('active');
-                    }
-                }
-            } catch(e) {}
-            el.addEventListener('input', function() {
-                try { localStorage.setItem(id, this.value); } catch(e) {}
-                var sibs = this.parentElement.querySelectorAll('.btn-leading-preset');
-                for (var s = 0; s < sibs.length; s++) {
-                    if (sibs[s].getAttribute('data-val') === this.value) sibs[s].classList.add('active');
-                    else sibs[s].classList.remove('active');
-                }
-            });
-        }
-        restoreLeadingInput('inputDetailsLeadingKeyring');
-        restoreLeadingInput('inputNameLeadingKeyring');
-        restoreLeadingInput('inputDetailsLeadingDiary');
-        restoreLeadingInput('inputNameLeadingDiary');
-
-        // Immediately parse any text already in textareas on startup
-        if (rawTextInputKeyring && rawTextInputKeyring.value.trim()) {
-            parseKeyringInput();
-        }
-        if (rawTextInputDiary && rawTextInputDiary.value.trim()) {
-            parseDiaryInput();
-        }
-
-        var inputDetHScale = document.getElementById('inputDetailsHScaleKeyring');
-        if (inputDetHScale) {
-            try {
-                var savedDet = localStorage.getItem('inputDetailsHScaleKeyring');
-                if (savedDet) inputDetHScale.value = savedDet;
-            } catch(e) {}
-            inputDetHScale.addEventListener('input', function() {
-                try { localStorage.setItem('inputDetailsHScaleKeyring', this.value); } catch(e) {}
-            });
-        }
-
-        var inputNmHScale = document.getElementById('inputNameHScaleKeyring');
-        if (inputNmHScale) {
-            try {
-                var savedNm = localStorage.getItem('inputNameHScaleKeyring');
-                if (savedNm) inputNmHScale.value = savedNm;
-            } catch(e) {}
-            inputNmHScale.addEventListener('input', function() {
-                try { localStorage.setItem('inputNameHScaleKeyring', this.value); } catch(e) {}
-            });
-        }
-
-        if (inputStartIndexDiary) {
-            inputStartIndexDiary.addEventListener('input', function() {
-                var val = parseInt(this.value, 10);
-                currentDiaryStartIndex = (!isNaN(val) && val >= 1) ? (val - 1) : 0;
-                renderDiaryPreview();
-            });
-        }
-        if (btnResetIndexDiary) {
-            btnResetIndexDiary.addEventListener('click', function() {
-                currentDiaryStartIndex = 0;
-                if (inputStartIndexDiary) inputStartIndexDiary.value = 1;
-                renderDiaryPreview();
-                showToast('Queue reset to start from Entry #1', 'info');
-            });
-        }
-
-        // Duplicator UI Elements
-        var inputTotalCopies = document.getElementById('inputTotalCopies');
-        var inputCardsPerAB = document.getElementById('inputCardsPerAB');
-        var inputCardW = document.getElementById('inputCardW');
-        var inputCardH = document.getElementById('inputCardH');
-        var inputGridCols = document.getElementById('inputGridCols');
-        var inputGapX = document.getElementById('inputGapX');
-        var inputGapY = document.getElementById('inputGapY');
-        var duplicateCalcSummary = document.getElementById('duplicateCalcSummary');
-        var btnMatchListCount = document.getElementById('btnMatchListCount');
-        var btnMeasureCard = document.getElementById('btnMeasureCard');
-        var btnRunDuplicate = document.getElementById('btnRunDuplicate');
-        var btnGoToDuplicatorKeyring = document.getElementById('btnGoToDuplicatorKeyring');
-
-        var chkFitArtboard = document.getElementById('chkFitArtboard');
-        function updateDuplicatorSummary() {
-            if (!duplicateCalcSummary || !inputTotalCopies || !inputCardsPerAB) return;
-            var total = parseInt(inputTotalCopies.value, 10) || 0;
-            var perAB = parseInt(inputCardsPerAB.value, 10) || 20;
-            if (perAB <= 0) perAB = 20;
-            var numAB = Math.ceil(total / perAB);
-            var lastABCards = total % perAB === 0 ? perAB : (total % perAB);
-            var cols = parseInt(inputGridCols ? inputGridCols.value : 2, 10) || 2;
-            var rows = Math.ceil(perAB / cols);
-            var cW = parseFloat(inputCardW ? inputCardW.value : 192) || 192;
-            var cH = parseFloat(inputCardH ? inputCardH.value : 98) || 98;
-            var gX = parseFloat(inputGapX ? inputGapX.value : 0) || 0;
-            var gY = parseFloat(inputGapY ? inputGapY.value : 0) || 0;
-
-            var estABW = cols * cW + (cols - 1) * gX + 30;
-            var estABH = rows * cH + (rows - 1) * gY + 30;
-
-            var text = 'হিসাব: <strong>' + total + 'টি কার্ড</strong> তৈরি করতে মোট <strong>' + numAB + 'টি আর্টবোর্ড</strong> লাগবে (' + (numAB > 1 ? (perAB + ' × ' + (numAB - 1) + ' + ' + lastABCards) : total) + ')।';
-            text += '<br><strong>কার্ড সাইজ:</strong> ' + cW + ' × ' + cH + ' pt (গ্যাপ: X=' + gX + 'pt, Y=' + gY + 'pt) | <strong>আর্টবোর্ড:</strong> ' + Math.round(estABW) + ' × ' + Math.round(estABH) + ' pt (' + cols + ' কলাম × ' + rows + ' সারি)';
-            duplicateCalcSummary.innerHTML = text;
-        }
-
-        if (inputTotalCopies) inputTotalCopies.addEventListener('input', updateDuplicatorSummary);
-        if (inputCardsPerAB) inputCardsPerAB.addEventListener('input', updateDuplicatorSummary);
-        if (inputCardW) inputCardW.addEventListener('input', updateDuplicatorSummary);
-        if (inputCardH) inputCardH.addEventListener('input', updateDuplicatorSummary);
-        if (inputGridCols) inputGridCols.addEventListener('input', updateDuplicatorSummary);
-        if (inputGapX) inputGapX.addEventListener('input', updateDuplicatorSummary);
-        if (inputGapY) inputGapY.addEventListener('input', updateDuplicatorSummary);
-
-        if (btnMeasureCard) {
-            btnMeasureCard.addEventListener('click', function() {
-                btnMeasureCard.textContent = 'Measuring...';
-                evalHostScript('getSelectionCardSize()', function(resStr) {
-                    btnMeasureCard.textContent = 'Auto Measure';
-                    try {
-                        var res = JSON.parse(resStr);
-                        if (res.status === 'success') {
-                            if (inputCardW) inputCardW.value = res.width;
-                            if (inputCardH) inputCardH.value = res.height;
-                            updateDuplicatorSummary();
-
-        // Setup Grid / Layout Presets
-        function setupLayoutPresets(btn2Id, btn4Id, badgeId, selectOrder) {
-            var btn2 = document.getElementById(btn2Id);
-            var btn4 = document.getElementById(btn4Id);
-            var badge = document.getElementById(badgeId);
-            if (!btn2 || !btn4) return;
-
-            function setActiveLayout(layout) {
-                if (layout === '2col') {
-                    btn2.classList.add('active');
-                    btn2.style.borderColor = '#2563eb';
-                    btn2.style.background = 'rgba(37, 99, 235, 0.25)';
-                    if (btn2.querySelector('span:first-child')) btn2.querySelector('span:first-child').style.color = '#60a5fa';
-                    if (btn2.querySelector('span:last-child')) btn2.querySelector('span:last-child').style.color = '#93c5fd';
-
-                    btn4.classList.remove('active');
-                    btn4.style.borderColor = '#444';
-                    btn4.style.background = '#222';
-                    if (btn4.querySelector('span:first-child')) btn4.querySelector('span:first-child').style.color = '#e2e8f0';
-                    if (btn4.querySelector('span:last-child')) btn4.querySelector('span:last-child').style.color = '#94a3b8';
-
-                    if (badge) {
-                        badge.textContent = '2-Col (1-2)';
-                        badge.style.color = '#fbbf24';
-                        badge.style.borderColor = '#d97706';
-                        badge.style.background = 'rgba(217, 119, 6, 0.2)';
-                    }
-                    if (selectOrder) selectOrder.value = 'zigzag';
-                    showToast('Layout set: 10 Cards / 2 Columns (1-2 | 3-4)!', 'info');
-                } else {
-                    btn4.classList.add('active');
-                    btn4.style.borderColor = '#2563eb';
-                    btn4.style.background = 'rgba(37, 99, 235, 0.25)';
-                    if (btn4.querySelector('span:first-child')) btn4.querySelector('span:first-child').style.color = '#60a5fa';
-                    if (btn4.querySelector('span:last-child')) btn4.querySelector('span:last-child').style.color = '#93c5fd';
-
-                    btn2.classList.remove('active');
-                    btn2.style.borderColor = '#444';
-                    btn2.style.background = '#222';
-                    if (btn2.querySelector('span:first-child')) btn2.querySelector('span:first-child').style.color = '#e2e8f0';
-                    if (btn2.querySelector('span:last-child')) btn2.querySelector('span:last-child').style.color = '#94a3b8';
-
-                    if (badge) {
-                        badge.textContent = '4-Col (1-2-3-4)';
-                        badge.style.color = '#60a5fa';
-                        badge.style.borderColor = '#2563eb';
-                        badge.style.background = 'rgba(37, 99, 235, 0.2)';
-                    }
-                    if (selectOrder) selectOrder.value = 'zigzag';
-                    showToast('Layout set: 28 Cards / 4 Columns (1-2-3-4 | 5-6-7-8)!', 'info');
-                }
-            }
-
-            btn2.addEventListener('click', function() { setActiveLayout('2col'); });
-            btn4.addEventListener('click', function() { setActiveLayout('4col'); });
-        }
-
-        setupLayoutPresets('btnPreset2ColDiary', 'btnPreset4ColDiary', 'activeLayoutBadgeDiary', selectFillOrderDiary);
-        setupLayoutPresets('btnPreset2ColKeyring', 'btnPreset4ColKeyring', 'activeLayoutBadgeKeyring', selectFillOrderKeyring);
-
-        // Duplicator Presets
-        var btnDupPreset10 = document.getElementById('btnDupPreset10');
-        var btnDupPreset28 = document.getElementById('btnDupPreset28');
-        if (btnDupPreset10 && btnDupPreset28) {
-            btnDupPreset10.addEventListener('click', function() {
-                if (inputCardsPerAB) inputCardsPerAB.value = 10;
-                if (inputGridCols) inputGridCols.value = 2;
-                btnDupPreset10.style.borderColor = '#2563eb';
-                btnDupPreset10.style.background = 'rgba(37, 99, 235, 0.25)';
-                if (btnDupPreset10.querySelector('span:first-child')) btnDupPreset10.querySelector('span:first-child').style.color = '#60a5fa';
-                if (btnDupPreset10.querySelector('span:last-child')) btnDupPreset10.querySelector('span:last-child').style.color = '#93c5fd';
-
-                btnDupPreset28.style.borderColor = '#444';
-                btnDupPreset28.style.background = '#222';
-                if (btnDupPreset28.querySelector('span:first-child')) btnDupPreset28.querySelector('span:first-child').style.color = '#e2e8f0';
-                if (btnDupPreset28.querySelector('span:last-child')) btnDupPreset28.querySelector('span:last-child').style.color = '#94a3b8';
-
-                updateDuplicatorSummary();
-                showToast('Duplicator Preset: 10 Cards (2 Columns × 5 Rows)!', 'info');
-            });
-
-            btnDupPreset28.addEventListener('click', function() {
-                if (inputCardsPerAB) inputCardsPerAB.value = 28;
-                if (inputGridCols) inputGridCols.value = 4;
-                btnDupPreset28.style.borderColor = '#2563eb';
-                btnDupPreset28.style.background = 'rgba(37, 99, 235, 0.25)';
-                if (btnDupPreset28.querySelector('span:first-child')) btnDupPreset28.querySelector('span:first-child').style.color = '#60a5fa';
-                if (btnDupPreset28.querySelector('span:last-child')) btnDupPreset28.querySelector('span:last-child').style.color = '#93c5fd';
-
-                btnDupPreset10.style.borderColor = '#444';
-                btnDupPreset10.style.background = '#222';
-                if (btnDupPreset10.querySelector('span:first-child')) btnDupPreset10.querySelector('span:first-child').style.color = '#e2e8f0';
-                if (btnDupPreset10.querySelector('span:last-child')) btnDupPreset10.querySelector('span:last-child').style.color = '#94a3b8';
-
-                updateDuplicatorSummary();
-                showToast('Duplicator Preset: 28 Cards (4 Columns × 7 Rows)!', 'info');
-            });
-        }
-                            showToast('Measured Card: ' + res.width + ' × ' + res.height + ' pt', 'success');
-                        } else {
-                            showToast(res.message || 'Please select a card first', 'error');
-                        }
-                    } catch(e) {
-                        showToast('Measure failed', 'error');
-                    }
-                });
-            });
-        }
-
-        document.querySelectorAll('.btn-gap-preset').forEach(function(b) {
-            b.addEventListener('click', function() {
-                var gx = this.getAttribute('data-x');
-                var gy = this.getAttribute('data-y');
-                if (inputGapX) inputGapX.value = gx;
-                if (inputGapY) inputGapY.value = gy;
-                updateDuplicatorSummary();
-
-        // Setup Grid / Layout Presets
-        function setupLayoutPresets(btn2Id, btn4Id, badgeId, selectOrder) {
-            var btn2 = document.getElementById(btn2Id);
-            var btn4 = document.getElementById(btn4Id);
-            var badge = document.getElementById(badgeId);
-            if (!btn2 || !btn4) return;
-
-            function setActiveLayout(layout) {
-                if (layout === '2col') {
-                    btn2.classList.add('active');
-                    btn2.style.borderColor = '#2563eb';
-                    btn2.style.background = 'rgba(37, 99, 235, 0.25)';
-                    if (btn2.querySelector('span:first-child')) btn2.querySelector('span:first-child').style.color = '#60a5fa';
-                    if (btn2.querySelector('span:last-child')) btn2.querySelector('span:last-child').style.color = '#93c5fd';
-
-                    btn4.classList.remove('active');
-                    btn4.style.borderColor = '#444';
-                    btn4.style.background = '#222';
-                    if (btn4.querySelector('span:first-child')) btn4.querySelector('span:first-child').style.color = '#e2e8f0';
-                    if (btn4.querySelector('span:last-child')) btn4.querySelector('span:last-child').style.color = '#94a3b8';
-
-                    if (badge) {
-                        badge.textContent = '2-Col (1-2)';
-                        badge.style.color = '#fbbf24';
-                        badge.style.borderColor = '#d97706';
-                        badge.style.background = 'rgba(217, 119, 6, 0.2)';
-                    }
-                    if (selectOrder) selectOrder.value = 'zigzag';
-                    showToast('Layout set: 10 Cards / 2 Columns (1-2 | 3-4)!', 'info');
-                } else {
-                    btn4.classList.add('active');
-                    btn4.style.borderColor = '#2563eb';
-                    btn4.style.background = 'rgba(37, 99, 235, 0.25)';
-                    if (btn4.querySelector('span:first-child')) btn4.querySelector('span:first-child').style.color = '#60a5fa';
-                    if (btn4.querySelector('span:last-child')) btn4.querySelector('span:last-child').style.color = '#93c5fd';
-
-                    btn2.classList.remove('active');
-                    btn2.style.borderColor = '#444';
-                    btn2.style.background = '#222';
-                    if (btn2.querySelector('span:first-child')) btn2.querySelector('span:first-child').style.color = '#e2e8f0';
-                    if (btn2.querySelector('span:last-child')) btn2.querySelector('span:last-child').style.color = '#94a3b8';
-
-                    if (badge) {
-                        badge.textContent = '4-Col (1-2-3-4)';
-                        badge.style.color = '#60a5fa';
-                        badge.style.borderColor = '#2563eb';
-                        badge.style.background = 'rgba(37, 99, 235, 0.2)';
-                    }
-                    if (selectOrder) selectOrder.value = 'zigzag';
-                    showToast('Layout set: 28 Cards / 4 Columns (1-2-3-4 | 5-6-7-8)!', 'info');
-                }
-            }
-
-            btn2.addEventListener('click', function() { setActiveLayout('2col'); });
-            btn4.addEventListener('click', function() { setActiveLayout('4col'); });
-        }
-
-        setupLayoutPresets('btnPreset2ColDiary', 'btnPreset4ColDiary', 'activeLayoutBadgeDiary', selectFillOrderDiary);
-        setupLayoutPresets('btnPreset2ColKeyring', 'btnPreset4ColKeyring', 'activeLayoutBadgeKeyring', selectFillOrderKeyring);
-
-        // Duplicator Presets
-        var btnDupPreset10 = document.getElementById('btnDupPreset10');
-        var btnDupPreset28 = document.getElementById('btnDupPreset28');
-        if (btnDupPreset10 && btnDupPreset28) {
-            btnDupPreset10.addEventListener('click', function() {
-                if (inputCardsPerAB) inputCardsPerAB.value = 10;
-                if (inputGridCols) inputGridCols.value = 2;
-                btnDupPreset10.style.borderColor = '#2563eb';
-                btnDupPreset10.style.background = 'rgba(37, 99, 235, 0.25)';
-                if (btnDupPreset10.querySelector('span:first-child')) btnDupPreset10.querySelector('span:first-child').style.color = '#60a5fa';
-                if (btnDupPreset10.querySelector('span:last-child')) btnDupPreset10.querySelector('span:last-child').style.color = '#93c5fd';
-
-                btnDupPreset28.style.borderColor = '#444';
-                btnDupPreset28.style.background = '#222';
-                if (btnDupPreset28.querySelector('span:first-child')) btnDupPreset28.querySelector('span:first-child').style.color = '#e2e8f0';
-                if (btnDupPreset28.querySelector('span:last-child')) btnDupPreset28.querySelector('span:last-child').style.color = '#94a3b8';
-
-                updateDuplicatorSummary();
-                showToast('Duplicator Preset: 10 Cards (2 Columns × 5 Rows)!', 'info');
-            });
-
-            btnDupPreset28.addEventListener('click', function() {
-                if (inputCardsPerAB) inputCardsPerAB.value = 28;
-                if (inputGridCols) inputGridCols.value = 4;
-                btnDupPreset28.style.borderColor = '#2563eb';
-                btnDupPreset28.style.background = 'rgba(37, 99, 235, 0.25)';
-                if (btnDupPreset28.querySelector('span:first-child')) btnDupPreset28.querySelector('span:first-child').style.color = '#60a5fa';
-                if (btnDupPreset28.querySelector('span:last-child')) btnDupPreset28.querySelector('span:last-child').style.color = '#93c5fd';
-
-                btnDupPreset10.style.borderColor = '#444';
-                btnDupPreset10.style.background = '#222';
-                if (btnDupPreset10.querySelector('span:first-child')) btnDupPreset10.querySelector('span:first-child').style.color = '#e2e8f0';
-                if (btnDupPreset10.querySelector('span:last-child')) btnDupPreset10.querySelector('span:last-child').style.color = '#94a3b8';
-
-                updateDuplicatorSummary();
-                showToast('Duplicator Preset: 28 Cards (4 Columns × 7 Rows)!', 'info');
-            });
-        }
-                showToast('Set Gap to X=' + gx + 'pt, Y=' + gy + 'pt', 'info');
-            });
-        });
-
-        document.querySelectorAll('.btn-preset-ab').forEach(function(b) {
-            b.addEventListener('click', function() {
-                if (inputCardsPerAB) {
-                    inputCardsPerAB.value = this.getAttribute('data-val');
-                    updateDuplicatorSummary();
-
-        // Setup Grid / Layout Presets
-        function setupLayoutPresets(btn2Id, btn4Id, badgeId, selectOrder) {
-            var btn2 = document.getElementById(btn2Id);
-            var btn4 = document.getElementById(btn4Id);
-            var badge = document.getElementById(badgeId);
-            if (!btn2 || !btn4) return;
-
-            function setActiveLayout(layout) {
-                if (layout === '2col') {
-                    btn2.classList.add('active');
-                    btn2.style.borderColor = '#2563eb';
-                    btn2.style.background = 'rgba(37, 99, 235, 0.25)';
-                    if (btn2.querySelector('span:first-child')) btn2.querySelector('span:first-child').style.color = '#60a5fa';
-                    if (btn2.querySelector('span:last-child')) btn2.querySelector('span:last-child').style.color = '#93c5fd';
-
-                    btn4.classList.remove('active');
-                    btn4.style.borderColor = '#444';
-                    btn4.style.background = '#222';
-                    if (btn4.querySelector('span:first-child')) btn4.querySelector('span:first-child').style.color = '#e2e8f0';
-                    if (btn4.querySelector('span:last-child')) btn4.querySelector('span:last-child').style.color = '#94a3b8';
-
-                    if (badge) {
-                        badge.textContent = '2-Col (1-2)';
-                        badge.style.color = '#fbbf24';
-                        badge.style.borderColor = '#d97706';
-                        badge.style.background = 'rgba(217, 119, 6, 0.2)';
-                    }
-                    if (selectOrder) selectOrder.value = 'zigzag';
-                    showToast('Layout set: 10 Cards / 2 Columns (1-2 | 3-4)!', 'info');
-                } else {
-                    btn4.classList.add('active');
-                    btn4.style.borderColor = '#2563eb';
-                    btn4.style.background = 'rgba(37, 99, 235, 0.25)';
-                    if (btn4.querySelector('span:first-child')) btn4.querySelector('span:first-child').style.color = '#60a5fa';
-                    if (btn4.querySelector('span:last-child')) btn4.querySelector('span:last-child').style.color = '#93c5fd';
-
-                    btn2.classList.remove('active');
-                    btn2.style.borderColor = '#444';
-                    btn2.style.background = '#222';
-                    if (btn2.querySelector('span:first-child')) btn2.querySelector('span:first-child').style.color = '#e2e8f0';
-                    if (btn2.querySelector('span:last-child')) btn2.querySelector('span:last-child').style.color = '#94a3b8';
-
-                    if (badge) {
-                        badge.textContent = '4-Col (1-2-3-4)';
-                        badge.style.color = '#60a5fa';
-                        badge.style.borderColor = '#2563eb';
-                        badge.style.background = 'rgba(37, 99, 235, 0.2)';
-                    }
-                    if (selectOrder) selectOrder.value = 'zigzag';
-                    showToast('Layout set: 28 Cards / 4 Columns (1-2-3-4 | 5-6-7-8)!', 'info');
-                }
-            }
-
-            btn2.addEventListener('click', function() { setActiveLayout('2col'); });
-            btn4.addEventListener('click', function() { setActiveLayout('4col'); });
-        }
-
-        setupLayoutPresets('btnPreset2ColDiary', 'btnPreset4ColDiary', 'activeLayoutBadgeDiary', selectFillOrderDiary);
-        setupLayoutPresets('btnPreset2ColKeyring', 'btnPreset4ColKeyring', 'activeLayoutBadgeKeyring', selectFillOrderKeyring);
-
-        // Duplicator Presets
-        var btnDupPreset10 = document.getElementById('btnDupPreset10');
-        var btnDupPreset28 = document.getElementById('btnDupPreset28');
-        if (btnDupPreset10 && btnDupPreset28) {
-            btnDupPreset10.addEventListener('click', function() {
-                if (inputCardsPerAB) inputCardsPerAB.value = 10;
-                if (inputGridCols) inputGridCols.value = 2;
-                btnDupPreset10.style.borderColor = '#2563eb';
-                btnDupPreset10.style.background = 'rgba(37, 99, 235, 0.25)';
-                if (btnDupPreset10.querySelector('span:first-child')) btnDupPreset10.querySelector('span:first-child').style.color = '#60a5fa';
-                if (btnDupPreset10.querySelector('span:last-child')) btnDupPreset10.querySelector('span:last-child').style.color = '#93c5fd';
-
-                btnDupPreset28.style.borderColor = '#444';
-                btnDupPreset28.style.background = '#222';
-                if (btnDupPreset28.querySelector('span:first-child')) btnDupPreset28.querySelector('span:first-child').style.color = '#e2e8f0';
-                if (btnDupPreset28.querySelector('span:last-child')) btnDupPreset28.querySelector('span:last-child').style.color = '#94a3b8';
-
-                updateDuplicatorSummary();
-                showToast('Duplicator Preset: 10 Cards (2 Columns × 5 Rows)!', 'info');
-            });
-
-            btnDupPreset28.addEventListener('click', function() {
-                if (inputCardsPerAB) inputCardsPerAB.value = 28;
-                if (inputGridCols) inputGridCols.value = 4;
-                btnDupPreset28.style.borderColor = '#2563eb';
-                btnDupPreset28.style.background = 'rgba(37, 99, 235, 0.25)';
-                if (btnDupPreset28.querySelector('span:first-child')) btnDupPreset28.querySelector('span:first-child').style.color = '#60a5fa';
-                if (btnDupPreset28.querySelector('span:last-child')) btnDupPreset28.querySelector('span:last-child').style.color = '#93c5fd';
-
-                btnDupPreset10.style.borderColor = '#444';
-                btnDupPreset10.style.background = '#222';
-                if (btnDupPreset10.querySelector('span:first-child')) btnDupPreset10.querySelector('span:first-child').style.color = '#e2e8f0';
-                if (btnDupPreset10.querySelector('span:last-child')) btnDupPreset10.querySelector('span:last-child').style.color = '#94a3b8';
-
-                updateDuplicatorSummary();
-                showToast('Duplicator Preset: 28 Cards (4 Columns × 7 Rows)!', 'info');
-            });
-        }
-                }
-            });
-        });
-
-        if (btnMatchListCount) {
-            btnMatchListCount.addEventListener('click', function() {
-                var count = parsedKeyringEntries.length || parsedDiaryEntries.length || 50;
-                if (inputTotalCopies) {
-                    inputTotalCopies.value = count;
-                    updateDuplicatorSummary();
-
-        // Setup Grid / Layout Presets
-        function setupLayoutPresets(btn2Id, btn4Id, badgeId, selectOrder) {
-            var btn2 = document.getElementById(btn2Id);
-            var btn4 = document.getElementById(btn4Id);
-            var badge = document.getElementById(badgeId);
-            if (!btn2 || !btn4) return;
-
-            function setActiveLayout(layout) {
-                if (layout === '2col') {
-                    btn2.classList.add('active');
-                    btn2.style.borderColor = '#2563eb';
-                    btn2.style.background = 'rgba(37, 99, 235, 0.25)';
-                    if (btn2.querySelector('span:first-child')) btn2.querySelector('span:first-child').style.color = '#60a5fa';
-                    if (btn2.querySelector('span:last-child')) btn2.querySelector('span:last-child').style.color = '#93c5fd';
-
-                    btn4.classList.remove('active');
-                    btn4.style.borderColor = '#444';
-                    btn4.style.background = '#222';
-                    if (btn4.querySelector('span:first-child')) btn4.querySelector('span:first-child').style.color = '#e2e8f0';
-                    if (btn4.querySelector('span:last-child')) btn4.querySelector('span:last-child').style.color = '#94a3b8';
-
-                    if (badge) {
-                        badge.textContent = '2-Col (1-2)';
-                        badge.style.color = '#fbbf24';
-                        badge.style.borderColor = '#d97706';
-                        badge.style.background = 'rgba(217, 119, 6, 0.2)';
-                    }
-                    if (selectOrder) selectOrder.value = 'zigzag';
-                    showToast('Layout set: 10 Cards / 2 Columns (1-2 | 3-4)!', 'info');
-                } else {
-                    btn4.classList.add('active');
-                    btn4.style.borderColor = '#2563eb';
-                    btn4.style.background = 'rgba(37, 99, 235, 0.25)';
-                    if (btn4.querySelector('span:first-child')) btn4.querySelector('span:first-child').style.color = '#60a5fa';
-                    if (btn4.querySelector('span:last-child')) btn4.querySelector('span:last-child').style.color = '#93c5fd';
-
-                    btn2.classList.remove('active');
-                    btn2.style.borderColor = '#444';
-                    btn2.style.background = '#222';
-                    if (btn2.querySelector('span:first-child')) btn2.querySelector('span:first-child').style.color = '#e2e8f0';
-                    if (btn2.querySelector('span:last-child')) btn2.querySelector('span:last-child').style.color = '#94a3b8';
-
-                    if (badge) {
-                        badge.textContent = '4-Col (1-2-3-4)';
-                        badge.style.color = '#60a5fa';
-                        badge.style.borderColor = '#2563eb';
-                        badge.style.background = 'rgba(37, 99, 235, 0.2)';
-                    }
-                    if (selectOrder) selectOrder.value = 'zigzag';
-                    showToast('Layout set: 28 Cards / 4 Columns (1-2-3-4 | 5-6-7-8)!', 'info');
-                }
-            }
-
-            btn2.addEventListener('click', function() { setActiveLayout('2col'); });
-            btn4.addEventListener('click', function() { setActiveLayout('4col'); });
-        }
-
-        setupLayoutPresets('btnPreset2ColDiary', 'btnPreset4ColDiary', 'activeLayoutBadgeDiary', selectFillOrderDiary);
-        setupLayoutPresets('btnPreset2ColKeyring', 'btnPreset4ColKeyring', 'activeLayoutBadgeKeyring', selectFillOrderKeyring);
-
-        // Duplicator Presets
-        var btnDupPreset10 = document.getElementById('btnDupPreset10');
-        var btnDupPreset28 = document.getElementById('btnDupPreset28');
-        if (btnDupPreset10 && btnDupPreset28) {
-            btnDupPreset10.addEventListener('click', function() {
-                if (inputCardsPerAB) inputCardsPerAB.value = 10;
-                if (inputGridCols) inputGridCols.value = 2;
-                btnDupPreset10.style.borderColor = '#2563eb';
-                btnDupPreset10.style.background = 'rgba(37, 99, 235, 0.25)';
-                if (btnDupPreset10.querySelector('span:first-child')) btnDupPreset10.querySelector('span:first-child').style.color = '#60a5fa';
-                if (btnDupPreset10.querySelector('span:last-child')) btnDupPreset10.querySelector('span:last-child').style.color = '#93c5fd';
-
-                btnDupPreset28.style.borderColor = '#444';
-                btnDupPreset28.style.background = '#222';
-                if (btnDupPreset28.querySelector('span:first-child')) btnDupPreset28.querySelector('span:first-child').style.color = '#e2e8f0';
-                if (btnDupPreset28.querySelector('span:last-child')) btnDupPreset28.querySelector('span:last-child').style.color = '#94a3b8';
-
-                updateDuplicatorSummary();
-                showToast('Duplicator Preset: 10 Cards (2 Columns × 5 Rows)!', 'info');
-            });
-
-            btnDupPreset28.addEventListener('click', function() {
-                if (inputCardsPerAB) inputCardsPerAB.value = 28;
-                if (inputGridCols) inputGridCols.value = 4;
-                btnDupPreset28.style.borderColor = '#2563eb';
-                btnDupPreset28.style.background = 'rgba(37, 99, 235, 0.25)';
-                if (btnDupPreset28.querySelector('span:first-child')) btnDupPreset28.querySelector('span:first-child').style.color = '#60a5fa';
-                if (btnDupPreset28.querySelector('span:last-child')) btnDupPreset28.querySelector('span:last-child').style.color = '#93c5fd';
-
-                btnDupPreset10.style.borderColor = '#444';
-                btnDupPreset10.style.background = '#222';
-                if (btnDupPreset10.querySelector('span:first-child')) btnDupPreset10.querySelector('span:first-child').style.color = '#e2e8f0';
-                if (btnDupPreset10.querySelector('span:last-child')) btnDupPreset10.querySelector('span:last-child').style.color = '#94a3b8';
-
-                updateDuplicatorSummary();
-                showToast('Duplicator Preset: 28 Cards (4 Columns × 7 Rows)!', 'info');
-            });
-        }
-                    showToast('Matched list count: ' + count + ' copies', 'info');
-                }
-            });
-        }
-
-        if (btnGoToDuplicatorKeyring) {
-            btnGoToDuplicatorKeyring.addEventListener('click', function() {
-                tabBtns.forEach(function(b) {
-                    if (b.getAttribute('data-tab') === 'tab-duplicate') b.click();
-                });
-                if (inputTotalCopies && parsedKeyringEntries.length > 0) {
-                    inputTotalCopies.value = parsedKeyringEntries.length;
-                    updateDuplicatorSummary();
-
-        // Setup Grid / Layout Presets
-        function setupLayoutPresets(btn2Id, btn4Id, badgeId, selectOrder) {
-            var btn2 = document.getElementById(btn2Id);
-            var btn4 = document.getElementById(btn4Id);
-            var badge = document.getElementById(badgeId);
-            if (!btn2 || !btn4) return;
-
-            function setActiveLayout(layout) {
-                if (layout === '2col') {
-                    btn2.classList.add('active');
-                    btn2.style.borderColor = '#2563eb';
-                    btn2.style.background = 'rgba(37, 99, 235, 0.25)';
-                    if (btn2.querySelector('span:first-child')) btn2.querySelector('span:first-child').style.color = '#60a5fa';
-                    if (btn2.querySelector('span:last-child')) btn2.querySelector('span:last-child').style.color = '#93c5fd';
-
-                    btn4.classList.remove('active');
-                    btn4.style.borderColor = '#444';
-                    btn4.style.background = '#222';
-                    if (btn4.querySelector('span:first-child')) btn4.querySelector('span:first-child').style.color = '#e2e8f0';
-                    if (btn4.querySelector('span:last-child')) btn4.querySelector('span:last-child').style.color = '#94a3b8';
-
-                    if (badge) {
-                        badge.textContent = '2-Col (1-2)';
-                        badge.style.color = '#fbbf24';
-                        badge.style.borderColor = '#d97706';
-                        badge.style.background = 'rgba(217, 119, 6, 0.2)';
-                    }
-                    if (selectOrder) selectOrder.value = 'zigzag';
-                    showToast('Layout set: 10 Cards / 2 Columns (1-2 | 3-4)!', 'info');
-                } else {
-                    btn4.classList.add('active');
-                    btn4.style.borderColor = '#2563eb';
-                    btn4.style.background = 'rgba(37, 99, 235, 0.25)';
-                    if (btn4.querySelector('span:first-child')) btn4.querySelector('span:first-child').style.color = '#60a5fa';
-                    if (btn4.querySelector('span:last-child')) btn4.querySelector('span:last-child').style.color = '#93c5fd';
-
-                    btn2.classList.remove('active');
-                    btn2.style.borderColor = '#444';
-                    btn2.style.background = '#222';
-                    if (btn2.querySelector('span:first-child')) btn2.querySelector('span:first-child').style.color = '#e2e8f0';
-                    if (btn2.querySelector('span:last-child')) btn2.querySelector('span:last-child').style.color = '#94a3b8';
-
-                    if (badge) {
-                        badge.textContent = '4-Col (1-2-3-4)';
-                        badge.style.color = '#60a5fa';
-                        badge.style.borderColor = '#2563eb';
-                        badge.style.background = 'rgba(37, 99, 235, 0.2)';
-                    }
-                    if (selectOrder) selectOrder.value = 'zigzag';
-                    showToast('Layout set: 28 Cards / 4 Columns (1-2-3-4 | 5-6-7-8)!', 'info');
-                }
-            }
-
-            btn2.addEventListener('click', function() { setActiveLayout('2col'); });
-            btn4.addEventListener('click', function() { setActiveLayout('4col'); });
-        }
-
-        setupLayoutPresets('btnPreset2ColDiary', 'btnPreset4ColDiary', 'activeLayoutBadgeDiary', selectFillOrderDiary);
-        setupLayoutPresets('btnPreset2ColKeyring', 'btnPreset4ColKeyring', 'activeLayoutBadgeKeyring', selectFillOrderKeyring);
-
-        // Duplicator Presets
-        var btnDupPreset10 = document.getElementById('btnDupPreset10');
-        var btnDupPreset28 = document.getElementById('btnDupPreset28');
-        if (btnDupPreset10 && btnDupPreset28) {
-            btnDupPreset10.addEventListener('click', function() {
-                if (inputCardsPerAB) inputCardsPerAB.value = 10;
-                if (inputGridCols) inputGridCols.value = 2;
-                btnDupPreset10.style.borderColor = '#2563eb';
-                btnDupPreset10.style.background = 'rgba(37, 99, 235, 0.25)';
-                if (btnDupPreset10.querySelector('span:first-child')) btnDupPreset10.querySelector('span:first-child').style.color = '#60a5fa';
-                if (btnDupPreset10.querySelector('span:last-child')) btnDupPreset10.querySelector('span:last-child').style.color = '#93c5fd';
-
-                btnDupPreset28.style.borderColor = '#444';
-                btnDupPreset28.style.background = '#222';
-                if (btnDupPreset28.querySelector('span:first-child')) btnDupPreset28.querySelector('span:first-child').style.color = '#e2e8f0';
-                if (btnDupPreset28.querySelector('span:last-child')) btnDupPreset28.querySelector('span:last-child').style.color = '#94a3b8';
-
-                updateDuplicatorSummary();
-                showToast('Duplicator Preset: 10 Cards (2 Columns × 5 Rows)!', 'info');
-            });
-
-            btnDupPreset28.addEventListener('click', function() {
-                if (inputCardsPerAB) inputCardsPerAB.value = 28;
-                if (inputGridCols) inputGridCols.value = 4;
-                btnDupPreset28.style.borderColor = '#2563eb';
-                btnDupPreset28.style.background = 'rgba(37, 99, 235, 0.25)';
-                if (btnDupPreset28.querySelector('span:first-child')) btnDupPreset28.querySelector('span:first-child').style.color = '#60a5fa';
-                if (btnDupPreset28.querySelector('span:last-child')) btnDupPreset28.querySelector('span:last-child').style.color = '#93c5fd';
-
-                btnDupPreset10.style.borderColor = '#444';
-                btnDupPreset10.style.background = '#222';
-                if (btnDupPreset10.querySelector('span:first-child')) btnDupPreset10.querySelector('span:first-child').style.color = '#e2e8f0';
-                if (btnDupPreset10.querySelector('span:last-child')) btnDupPreset10.querySelector('span:last-child').style.color = '#94a3b8';
-
-                updateDuplicatorSummary();
-                showToast('Duplicator Preset: 28 Cards (4 Columns × 7 Rows)!', 'info');
-            });
-        }
-                }
-            });
-        }
-
-        if (btnRunDuplicate) {
-            btnRunDuplicate.addEventListener('click', function() {
-                var total = parseInt(inputTotalCopies ? inputTotalCopies.value : 50, 10) || 50;
-                var perAB = parseInt(inputCardsPerAB ? inputCardsPerAB.value : 20, 10) || 20;
-                var cols = parseInt(inputGridCols ? inputGridCols.value : 2, 10) || 2;
-                var gX = parseFloat(inputGapX ? inputGapX.value : 0) || 0;
-                var gY = parseFloat(inputGapY ? inputGapY.value : 0) || 0;
-
-                var fitAB = chkFitArtboard ? chkFitArtboard.checked : true;
-                var cW = parseFloat(inputCardW ? inputCardW.value : 0) || 0;
-                var cH = parseFloat(inputCardH ? inputCardH.value : 0) || 0;
-                var payload = {
-                    totalCopies: total,
-                    cardsPerArtboard: perAB,
-                    cardW: cW,
-                    cardH: cH,
-                    cols: cols,
-                    gapX: gX,
-                    gapY: gY,
-                    fitArtboard: fitAB
-                };
-
-                btnRunDuplicate.disabled = true;
-                btnRunDuplicate.textContent = 'Generating Templates & Artboards...';
-
-                var scriptCall = 'duplicateCardTemplates(' + JSON.stringify(JSON.stringify(payload)) + ')';
-                evalHostScript(scriptCall, function(resStr) {
-                    btnRunDuplicate.disabled = false;
-                    btnRunDuplicate.textContent = 'Auto Duplicate Templates & Create Artboards';
-
-                    try {
-                        var res = JSON.parse(resStr);
-                        if (res.status === 'success') {
-                            showToast(res.message, 'success');
-                            // Prompt user to switch to filling
-                            setTimeout(function() {
-                                tabBtns.forEach(function(b) {
-                                    if (b.getAttribute('data-tab') === 'tab-keyring') b.click();
-                                });
-                            }, 1200);
-                        } else {
-                            showToast(res.message || 'Duplication failed', 'error');
-                        }
-                    } catch(e) {
-                        showToast('Communication error', 'error');
-                    }
-                });
-            });
-        }
-
-        updateDuplicatorSummary();
-
-        // Setup Grid / Layout Presets
-        function setupLayoutPresets(btn2Id, btn4Id, badgeId, selectOrder) {
-            var btn2 = document.getElementById(btn2Id);
-            var btn4 = document.getElementById(btn4Id);
-            var badge = document.getElementById(badgeId);
-            if (!btn2 || !btn4) return;
-
-            function setActiveLayout(layout) {
-                if (layout === '2col') {
-                    btn2.classList.add('active');
-                    btn2.style.borderColor = '#2563eb';
-                    btn2.style.background = 'rgba(37, 99, 235, 0.25)';
-                    if (btn2.querySelector('span:first-child')) btn2.querySelector('span:first-child').style.color = '#60a5fa';
-                    if (btn2.querySelector('span:last-child')) btn2.querySelector('span:last-child').style.color = '#93c5fd';
-
-                    btn4.classList.remove('active');
-                    btn4.style.borderColor = '#444';
-                    btn4.style.background = '#222';
-                    if (btn4.querySelector('span:first-child')) btn4.querySelector('span:first-child').style.color = '#e2e8f0';
-                    if (btn4.querySelector('span:last-child')) btn4.querySelector('span:last-child').style.color = '#94a3b8';
-
-                    if (badge) {
-                        badge.textContent = '2-Col (1-2)';
-                        badge.style.color = '#fbbf24';
-                        badge.style.borderColor = '#d97706';
-                        badge.style.background = 'rgba(217, 119, 6, 0.2)';
-                    }
-                    if (selectOrder) selectOrder.value = 'zigzag';
-                    showToast('Layout set: 10 Cards / 2 Columns (1-2 | 3-4)!', 'info');
-                } else {
-                    btn4.classList.add('active');
-                    btn4.style.borderColor = '#2563eb';
-                    btn4.style.background = 'rgba(37, 99, 235, 0.25)';
-                    if (btn4.querySelector('span:first-child')) btn4.querySelector('span:first-child').style.color = '#60a5fa';
-                    if (btn4.querySelector('span:last-child')) btn4.querySelector('span:last-child').style.color = '#93c5fd';
-
-                    btn2.classList.remove('active');
-                    btn2.style.borderColor = '#444';
-                    btn2.style.background = '#222';
-                    if (btn2.querySelector('span:first-child')) btn2.querySelector('span:first-child').style.color = '#e2e8f0';
-                    if (btn2.querySelector('span:last-child')) btn2.querySelector('span:last-child').style.color = '#94a3b8';
-
-                    if (badge) {
-                        badge.textContent = '4-Col (1-2-3-4)';
-                        badge.style.color = '#60a5fa';
-                        badge.style.borderColor = '#2563eb';
-                        badge.style.background = 'rgba(37, 99, 235, 0.2)';
-                    }
-                    if (selectOrder) selectOrder.value = 'zigzag';
-                    showToast('Layout set: 28 Cards / 4 Columns (1-2-3-4 | 5-6-7-8)!', 'info');
-                }
-            }
-
-            btn2.addEventListener('click', function() { setActiveLayout('2col'); });
-            btn4.addEventListener('click', function() { setActiveLayout('4col'); });
-        }
-
-        setupLayoutPresets('btnPreset2ColDiary', 'btnPreset4ColDiary', 'activeLayoutBadgeDiary', selectFillOrderDiary);
-        setupLayoutPresets('btnPreset2ColKeyring', 'btnPreset4ColKeyring', 'activeLayoutBadgeKeyring', selectFillOrderKeyring);
-
-        // Duplicator Presets
-        var btnDupPreset10 = document.getElementById('btnDupPreset10');
-        var btnDupPreset28 = document.getElementById('btnDupPreset28');
-        if (btnDupPreset10 && btnDupPreset28) {
-            btnDupPreset10.addEventListener('click', function() {
-                if (inputCardsPerAB) inputCardsPerAB.value = 10;
-                if (inputGridCols) inputGridCols.value = 2;
-                btnDupPreset10.style.borderColor = '#2563eb';
-                btnDupPreset10.style.background = 'rgba(37, 99, 235, 0.25)';
-                if (btnDupPreset10.querySelector('span:first-child')) btnDupPreset10.querySelector('span:first-child').style.color = '#60a5fa';
-                if (btnDupPreset10.querySelector('span:last-child')) btnDupPreset10.querySelector('span:last-child').style.color = '#93c5fd';
-
-                btnDupPreset28.style.borderColor = '#444';
-                btnDupPreset28.style.background = '#222';
-                if (btnDupPreset28.querySelector('span:first-child')) btnDupPreset28.querySelector('span:first-child').style.color = '#e2e8f0';
-                if (btnDupPreset28.querySelector('span:last-child')) btnDupPreset28.querySelector('span:last-child').style.color = '#94a3b8';
-
-                updateDuplicatorSummary();
-                showToast('Duplicator Preset: 10 Cards (2 Columns × 5 Rows)!', 'info');
-            });
-
-            btnDupPreset28.addEventListener('click', function() {
-                if (inputCardsPerAB) inputCardsPerAB.value = 28;
-                if (inputGridCols) inputGridCols.value = 4;
-                btnDupPreset28.style.borderColor = '#2563eb';
-                btnDupPreset28.style.background = 'rgba(37, 99, 235, 0.25)';
-                if (btnDupPreset28.querySelector('span:first-child')) btnDupPreset28.querySelector('span:first-child').style.color = '#60a5fa';
-                if (btnDupPreset28.querySelector('span:last-child')) btnDupPreset28.querySelector('span:last-child').style.color = '#93c5fd';
-
-                btnDupPreset10.style.borderColor = '#444';
-                btnDupPreset10.style.background = '#222';
-                if (btnDupPreset10.querySelector('span:first-child')) btnDupPreset10.querySelector('span:first-child').style.color = '#e2e8f0';
-                if (btnDupPreset10.querySelector('span:last-child')) btnDupPreset10.querySelector('span:last-child').style.color = '#94a3b8';
-
-                updateDuplicatorSummary();
-                showToast('Duplicator Preset: 28 Cards (4 Columns × 7 Rows)!', 'info');
-            });
-        }
-
-        // Keyring Event Listeners
-        if (rawTextInputKeyring) {
-            rawTextInputKeyring.addEventListener('input', debounce(function() {
-                if (rawTextInputDiary) rawTextInputDiary.value = rawTextInputKeyring.value;
-                parseKeyringInput();
-            }, 200));
-        }
-        if (chkStripNumberKeyring) chkStripNumberKeyring.addEventListener('change', parseKeyringInput);
-        if (chkSkipNoNameKeyring) chkSkipNoNameKeyring.addEventListener('change', parseKeyringInput);
-        if (btnLoadSampleKeyring) {
-            btnLoadSampleKeyring.addEventListener('click', function() {
-                rawTextInputKeyring.value = sampleBanglaData;
-                if (rawTextInputDiary) rawTextInputDiary.value = sampleBanglaData;
-                parseKeyringInput();
-                showToast('Keyring sample data loaded', 'info');
-            });
-        }
-        if (btnClearKeyring) {
-            btnClearKeyring.addEventListener('click', function() {
-                rawTextInputKeyring.value = '';
-                if (rawTextInputDiary) rawTextInputDiary.value = '';
-                parsedKeyringEntries = [];
-                renderKeyringPreview();
-                showToast('Cleared input', 'info');
-            });
-        }
-        if (btnLoadSelectionKeyring) {
-            btnLoadSelectionKeyring.addEventListener('click', function() {
-                loadFromCanvasSelection(rawTextInputKeyring, function() {
-                    if (rawTextInputDiary) rawTextInputDiary.value = rawTextInputKeyring.value;
-                    parseKeyringInput();
-                });
-            });
-        }
-        if (btnAutoFillKeyring) btnAutoFillKeyring.addEventListener('click', executeAutoFillKeyring);
-
-        // Diary Event Listeners
-        if (rawTextInputDiary) {
-            rawTextInputDiary.addEventListener('input', debounce(function() {
-                if (rawTextInputKeyring) rawTextInputKeyring.value = rawTextInputDiary.value;
-                parseDiaryInput();
-            }, 200));
-        }
-        if (selectSerialFormatDiary) selectSerialFormatDiary.addEventListener('change', parseDiaryInput);
-        if (selectDiaryRenumber) selectDiaryRenumber.addEventListener('change', parseDiaryInput);
-        if (chkIncludeDetailsDiary) chkIncludeDetailsDiary.addEventListener('change', parseDiaryInput);
-        if (btnLoadSampleDiary) {
-            btnLoadSampleDiary.addEventListener('click', function() {
-                rawTextInputDiary.value = sampleBanglaData;
-                if (rawTextInputKeyring) rawTextInputKeyring.value = sampleBanglaData;
-                parseDiaryInput();
-                showToast('Diary sample data loaded', 'info');
-            });
-        }
-        if (btnClearDiary) {
-            btnClearDiary.addEventListener('click', function() {
-                rawTextInputDiary.value = '';
-                if (rawTextInputKeyring) rawTextInputKeyring.value = '';
-                parsedDiaryEntries = [];
-                renderDiaryPreview();
-                showToast('Cleared input', 'info');
-            });
-        }
-        if (btnLoadSelectionDiary) {
-            btnLoadSelectionDiary.addEventListener('click', function() {
-                loadFromCanvasSelection(rawTextInputDiary, function() {
-                    if (rawTextInputKeyring) rawTextInputKeyring.value = rawTextInputDiary.value;
-                    parseDiaryInput();
-                });
-            });
-        }
-        if (btnAutoFillDiary) btnAutoFillDiary.addEventListener('click', executeAutoFillDiary);
-
-        // Canvas Move & Badge Listeners
-        if (btnPlaceCanvasText) btnPlaceCanvasText.addEventListener('click', executePlaceCanvasText);
-        if (btnRenumberBadges) btnRenumberBadges.addEventListener('click', executeRenumberBadges);
-
-        // External Link
-        if (btnAuthorLink) {
-            btnAuthorLink.addEventListener('click', function(e) {
-                e.preventDefault();
-                openBrowserUrl(this.getAttribute('href') || 'https://github.com/yahiabinzaman');
-            });
-        }
-
-        // Exact 2-Color & CMYK definitions
-        var PRESET_CMYK = {
-            '#006F9A': [100, 0, 0, 45],  // 2-Color C+K Blue/Teal requested by user: C=100%, M=0%, Y=0%, K=45%
-            '#000000': [0, 0, 0, 100],   // 100% Solid Black
-            '#1E5AA8': [100, 0, 0, 45],  // 2-Color fallback for Royal Blue
-            '#1B6E3F': [85, 20, 100, 10],
-            '#9C1A1A': [20, 100, 100, 15],
-            '#C88210': [15, 45, 100, 0],
-            '#A22F10': [20, 90, 100, 15]
-        };
-
-        var COLOR_NAMES = {
-            '#006F9A': 'C:100 K:45 Blue',
-            '#000000': 'Solid Black',
-            '#1E5AA8': 'C:100 K:45 Blue',
-            '#1B6E3F': 'Islamic Green',
-            '#9C1A1A': 'Crimson Maroon',
-            '#C88210': 'Golden Amber',
-            '#A22F10': 'Red-Brown'
-        };
-
-        function normalizeHex(input) {
-            if (!input) return null;
-            var str = String(input).trim().toUpperCase();
-            if (!str) return null;
-            if (str.charAt(0) === '#') {
-                str = str.substring(1);
-            }
-            if (/^[0-9A-F]{3}$/i.test(str)) {
-                str = str.charAt(0) + str.charAt(0) + str.charAt(1) + str.charAt(1) + str.charAt(2) + str.charAt(2);
-            }
-            if (/^[0-9A-F]{6}$/i.test(str)) {
-                return '#' + str;
-            }
-            return null;
-        }
-
-        function cmykToDisplayHex(c, m, y, k) {
-            if (c === 100 && m === 0 && y === 0 && k === 45) return '#006F9A';
-            if (c === 0 && m === 0 && y === 0 && k === 100) return '#000000';
-            var cN = c / 100, mN = m / 100, yN = y / 100, kN = k / 100;
-            var r = Math.round(255 * (1 - cN) * (1 - kN));
-            var g = Math.round(255 * (1 - mN) * (1 - kN));
-            var b = Math.round(255 * (1 - yN) * (1 - kN));
-            var toHex = function(n) { var h = Math.max(0, Math.min(255, n)).toString(16); return h.length === 1 ? '0' + h : h; };
-            return ('#' + toHex(r) + toHex(g) + toHex(b)).toUpperCase();
-        }
-
-        function hexToCmykEstimator(hex) {
-            var norm = normalizeHex(hex);
-            if (!norm) return [100, 0, 0, 45];
-            if (PRESET_CMYK[norm]) return PRESET_CMYK[norm].slice();
-            var r = parseInt(norm.substring(1, 3), 16) / 255;
-            var g = parseInt(norm.substring(3, 5), 16) / 255;
-            var b = parseInt(norm.substring(5, 7), 16) / 255;
-            var k = 1 - Math.max(r, Math.max(g, b));
-            if (k >= 1) return [0, 0, 0, 100];
-            var c = Math.round(((1 - r - k) / (1 - k)) * 100);
-            var m = Math.round(((1 - g - k) / (1 - k)) * 100);
-            var y = Math.round(((1 - b - k) / (1 - k)) * 100);
-            return [c, m, y, Math.round(k * 100)];
-        }
-
-        function updateCmykUI(isKeyring, cmykArr) {
-            var prefix = isKeyring ? 'Keyring' : 'Diary';
-            var inC = document.getElementById('inputColorC_' + prefix);
-            var inM = document.getElementById('inputColorM_' + prefix);
-            var inY = document.getElementById('inputColorY_' + prefix);
-            var inK = document.getElementById('inputColorK_' + prefix);
-            var badge = document.getElementById('badge2Color' + prefix);
-
-            var c = Math.round(cmykArr[0]);
-            var m = Math.round(cmykArr[1]);
-            var y = Math.round(cmykArr[2]);
-            var k = Math.round(cmykArr[3]);
-
-            if (inC) inC.value = c;
-            if (inM) inM.value = m;
-            if (inY) inY.value = y;
-            if (inK) inK.value = k;
-
-            if (badge) {
-                if (m === 0 && y === 0) {
-                    badge.textContent = '2-Color (C+K)';
-                    badge.style.background = '#1b5e20';
-                    badge.style.color = '#81c784';
-                    badge.title = 'Strictly 2 inks: Only Cyan and Black plates will be generated';
-                } else {
-                    badge.textContent = '4-Color CMYK';
-                    badge.style.background = '#333333';
-                    badge.style.color = '#aaaaaa';
-                    badge.title = 'Process 4-color printing';
-                }
-            }
-        }
-
-        function syncColorSwatches(tabName, hex) {
-            var swatches = document.querySelectorAll('.color-swatch[data-tab="' + tabName + '"]');
-            var upperHex = (hex || '').toUpperCase();
-            swatches.forEach(function(sw) {
-                var swColor = (sw.getAttribute('data-color') || '').toUpperCase();
-                if (swColor === upperHex) {
-                    sw.classList.add('active');
-                } else {
-                    sw.classList.remove('active');
-                }
-            });
-        }
-
-        function updateColorLabel(label, hex, customName) {
-            if (!label || !hex) return;
-            var name = customName || COLOR_NAMES[hex];
-            label.textContent = name ? (hex + ' (' + name + ')') : hex;
-        }
-
-        function setupCmykEventListeners(isKeyring) {
-            var prefix = isKeyring ? 'Keyring' : 'Diary';
-            ['C', 'M', 'Y', 'K'].forEach(function(chan) {
-                var el = document.getElementById('inputColor' + chan + '_' + prefix);
-                if (!el) return;
-                el.addEventListener('input', function() {
-                    var inC = document.getElementById('inputColorC_' + prefix);
-                    var inM = document.getElementById('inputColorM_' + prefix);
-                    var inY = document.getElementById('inputColorY_' + prefix);
-                    var inK = document.getElementById('inputColorK_' + prefix);
-
-                    var c = inC ? Math.max(0, Math.min(100, parseInt(inC.value, 10) || 0)) : 100;
-                    var m = inM ? Math.max(0, Math.min(100, parseInt(inM.value, 10) || 0)) : 0;
-                    var y = inY ? Math.max(0, Math.min(100, parseInt(inY.value, 10) || 0)) : 0;
-                    var k = inK ? Math.max(0, Math.min(100, parseInt(inK.value, 10) || 0)) : 45;
-
-                    var cmyk = [c, m, y, k];
-                    if (isKeyring) currentKeyringCmyk = cmyk;
-                    else currentDiaryCmyk = cmyk;
-
-                    updateCmykUI(isKeyring, cmyk);
-
-                    var hex = cmykToDisplayHex(c, m, y, k);
-                    var picker = isKeyring ? colorPickerKeyring : colorPickerDiary;
-                    var hexInput = isKeyring ? colorHexKeyring : colorHexDiary;
-                    var label = isKeyring ? labelColorNameKeyring : labelColorNameDiary;
-
-                    if (picker) picker.value = hex;
-                    if (hexInput) hexInput.value = hex;
-                    if (label) {
-                        var customName = (c === 100 && m === 0 && y === 0 && k === 45) ? 'C:100 K:45 Blue' : (c === 0 && m === 0 && y === 0 && k === 100 ? 'Solid Black' : null);
-                        updateColorLabel(label, hex, customName);
-                    }
-
-                    if (isKeyring) {
-                        currentKeyringColor = hex;
-                        renderKeyringPreview();
-                        syncColorSwatches('keyring', hex);
-                    } else {
-                        currentDiaryColor = hex;
-                        renderDiaryPreview();
-                        syncColorSwatches('diary', hex);
-                    }
-                });
-            });
-        }
-
-        // Color Control Listeners
-        function setupColorControls(picker, hexInput, label, swatchesTab, isKeyring) {
-            if (!picker || !hexInput) return;
-
-            picker.addEventListener('input', function() {
-                var val = this.value.toUpperCase();
-                hexInput.value = val;
-                updateColorLabel(label, val);
-                var estCmyk = hexToCmykEstimator(val);
-                if (isKeyring) {
-                    currentKeyringColor = val;
-                    currentKeyringCmyk = estCmyk;
-                    updateCmykUI(true, estCmyk);
-                    renderKeyringPreview();
-                } else {
-                    currentDiaryColor = val;
-                    currentDiaryCmyk = estCmyk;
-                    updateCmykUI(false, estCmyk);
-                    renderDiaryPreview();
-                }
-                syncColorSwatches(swatchesTab, val);
-            });
-
-            hexInput.addEventListener('input', function() {
-                var raw = this.value;
-                var norm = normalizeHex(raw);
-                if (norm) {
-                    picker.value = norm;
-                    updateColorLabel(label, norm);
-                    var estCmyk = hexToCmykEstimator(norm);
-                    if (isKeyring) {
-                        currentKeyringColor = norm;
-                        currentKeyringCmyk = estCmyk;
-                        updateCmykUI(true, estCmyk);
-                        renderKeyringPreview();
-                    } else {
-                        currentDiaryColor = norm;
-                        currentDiaryCmyk = estCmyk;
-                        updateCmykUI(false, estCmyk);
-                        renderDiaryPreview();
-                    }
-                    syncColorSwatches(swatchesTab, norm);
-                }
-            });
-
-            function onHexBlurOrChange() {
-                var raw = hexInput.value;
-                var norm = normalizeHex(raw);
-                if (norm) {
-                    hexInput.value = norm;
-                    picker.value = norm;
-                    updateColorLabel(label, norm);
-                    var estCmyk = hexToCmykEstimator(norm);
-                    if (isKeyring) {
-                        currentKeyringColor = norm;
-                        currentKeyringCmyk = estCmyk;
-                        updateCmykUI(true, estCmyk);
-                        renderKeyringPreview();
-                    } else {
-                        currentDiaryColor = norm;
-                        currentDiaryCmyk = estCmyk;
-                        updateCmykUI(false, estCmyk);
-                        renderDiaryPreview();
-                    }
-                    syncColorSwatches(swatchesTab, norm);
-                } else {
-                    var cur = isKeyring ? currentKeyringColor : currentDiaryColor;
-                    var curCmyk = isKeyring ? currentKeyringCmyk : currentDiaryCmyk;
-                    hexInput.value = cur;
-                    picker.value = cur;
-                    updateColorLabel(label, cur);
-                    updateCmykUI(isKeyring, curCmyk);
-                    syncColorSwatches(swatchesTab, cur);
-                }
-            }
-
-            hexInput.addEventListener('blur', onHexBlurOrChange);
-            hexInput.addEventListener('change', onHexBlurOrChange);
-        }
-
-        setupColorControls(colorPickerKeyring, colorHexKeyring, labelColorNameKeyring, 'keyring', true);
-        setupColorControls(colorPickerDiary, colorHexDiary, labelColorNameDiary, 'diary', false);
-        setupCmykEventListeners(true);
-        setupCmykEventListeners(false);
-
-        // Pick from Canvas (Read exact C, M, Y, K)
-        function pickColorFromCanvas(picker, hexInput, label, isKeyring) {
-            evalHostScript('getSelectedCanvasColor()', function(resStr) {
-                try {
-                    var res = JSON.parse(resStr);
-                    if (res.status === 'success' && (res.cmyk || res.hex)) {
-                        var hexVal = res.hex ? (normalizeHex(res.hex) || res.hex.toUpperCase()) : '#006F9A';
-                        var cmykVal = res.cmyk ? [Math.round(res.cmyk[0]), Math.round(res.cmyk[1]), Math.round(res.cmyk[2]), Math.round(res.cmyk[3])] : hexToCmykEstimator(hexVal);
-                        
-                        if (picker) picker.value = hexVal;
-                        if (hexInput) hexInput.value = hexVal;
-                        updateColorLabel(label, hexVal, res.spotName);
-                        if (isKeyring) {
-                            currentKeyringColor = hexVal;
-                            currentKeyringCmyk = cmykVal;
-                            updateCmykUI(true, cmykVal);
-                            renderKeyringPreview();
-                        } else {
-                            currentDiaryColor = hexVal;
-                            currentDiaryCmyk = cmykVal;
-                            updateCmykUI(false, cmykVal);
-                            renderDiaryPreview();
-                        }
-                        syncColorSwatches(isKeyring ? 'keyring' : 'diary', hexVal);
-                        showToast('Picked color: C=' + cmykVal[0] + '% M=' + cmykVal[1] + '% Y=' + cmykVal[2] + '% K=' + cmykVal[3] + '% (' + hexVal + ')', 'success');
-                    } else {
-                        showToast(res.message || 'No color found in selection', 'error');
-                    }
-                } catch(e) {
-                    showToast('Failed to read canvas color', 'error');
-                }
-            });
-        }
-
-        if (btnPickColorKeyring) {
-            btnPickColorKeyring.addEventListener('click', function() {
-                pickColorFromCanvas(colorPickerKeyring, colorHexKeyring, labelColorNameKeyring, true);
-            });
-        }
-        if (btnPickColorDiary) {
-            btnPickColorDiary.addEventListener('click', function() {
-                pickColorFromCanvas(colorPickerDiary, colorHexDiary, labelColorNameDiary, false);
-            });
-        }
-
-        // Swatches
-        colorSwatches.forEach(function(sw) {
-            sw.addEventListener('click', function() {
-                var col = this.getAttribute('data-color');
-                var tab = this.getAttribute('data-tab');
-                var isKey = (tab === 'keyring');
-                var cmyk = hexToCmykEstimator(col);
-                if (isKey) {
-                    if (colorPickerKeyring) colorPickerKeyring.value = col;
-                    if (colorHexKeyring) colorHexKeyring.value = col;
-                    updateColorLabel(labelColorNameKeyring, col);
-                    currentKeyringColor = col;
-                    currentKeyringCmyk = cmyk;
-                    updateCmykUI(true, cmyk);
-                    syncColorSwatches('keyring', col);
-                    renderKeyringPreview();
-                } else {
-                    if (colorPickerDiary) colorPickerDiary.value = col;
-                    if (colorHexDiary) colorHexDiary.value = col;
-                    updateColorLabel(labelColorNameDiary, col);
-                    currentDiaryColor = col;
-                    currentDiaryCmyk = cmyk;
-                    updateCmykUI(false, cmyk);
-                    syncColorSwatches('diary', col);
-                    renderDiaryPreview();
-                }
-            });
-        });
-
-        // Initialize CMYK 2-Color UI
-        updateCmykUI(true, currentKeyringCmyk);
-        updateCmykUI(false, currentDiaryCmyk);
-
-        // Initial parse
-        parseKeyringInput();
-    }
-
     function debounce(func, wait) {
         var timeout;
         return function() {
             var context = this, args = arguments;
             clearTimeout(timeout);
-            timeout = setTimeout(function() { func.apply(context, args); }, wait);
+            timeout = setTimeout(function() {
+                func.apply(context, args);
+            }, wait);
         };
     }
 
-    function openBrowserUrl(url) {
-        if (!url) return;
-        try { if (window.__adobe_cep__) window.__adobe_cep__.openURLInDefaultBrowser(url); } catch (e) {}
-        try { csInterface.evalScript('openWebUrl("' + url + '");'); } catch (e) {}
+    function showToast(message, type) {
+        var toast = document.getElementById('panelToast');
+        if (!toast) return;
+        toast.textContent = message;
+        toast.className = 'panel-toast show ' + (type || 'info');
+        setTimeout(function() {
+            toast.className = 'panel-toast';
+        }, 3000);
+    }
+
+    function normalizeHex(hex) {
+        if (!hex) return "#006F9A";
+        var clean = hex.replace(/[^0-9A-Fa-f]/g, '');
+        if (clean.length === 3) {
+            clean = clean[0] + clean[0] + clean[1] + clean[1] + clean[2] + clean[2];
+        }
+        if (clean.length === 6) {
+            return '#' + clean.toUpperCase();
+        }
+        return "#006F9A";
+    }
+
+    function hexToRgb(hex) {
+        var clean = hex.replace(/[^0-9A-Fa-f]/g, '');
+        if (clean.length === 3) {
+            clean = clean[0] + clean[0] + clean[1] + clean[1] + clean[2] + clean[2];
+        }
+        if (clean.length !== 6) return { r: 0, g: 111, b: 154 };
+        return {
+            r: parseInt(clean.substring(0, 2), 16),
+            g: parseInt(clean.substring(2, 4), 16),
+            b: parseInt(clean.substring(4, 6), 16)
+        };
+    }
+
+    function rgbToCmyk(r, g, b) {
+        var dr = r / 255;
+        var dg = g / 255;
+        var db = b / 255;
+        var k = 1 - Math.max(dr, dg, db);
+        if (k >= 1) return [0, 0, 0, 100];
+        var c = (1 - dr - k) / (1 - k);
+        var m = (1 - dg - k) / (1 - k);
+        var y = (1 - db - k) / (1 - k);
+        return [
+            Math.round(c * 100),
+            Math.round(m * 100),
+            Math.round(y * 100),
+            Math.round(k * 100)
+        ];
+    }
+
+    function cmykToRgb(c, m, y, k) {
+        var dc = c / 100, dm = m / 100, dy = y / 100, dk = k / 100;
+        var r = 255 * (1 - dc) * (1 - dk);
+        var g = 255 * (1 - dm) * (1 - dk);
+        var b = 255 * (1 - dy) * (1 - dk);
+        return {
+            r: Math.max(0, Math.min(255, Math.round(r))),
+            g: Math.max(0, Math.min(255, Math.round(g))),
+            b: Math.max(0, Math.min(255, Math.round(b)))
+        };
+    }
+
+    function rgbToHex(r, g, b) {
+        var hexR = r.toString(16).padStart(2, '0');
+        var hexG = g.toString(16).padStart(2, '0');
+        var hexB = b.toString(16).padStart(2, '0');
+        return ('#' + hexR + hexG + hexB).toUpperCase();
     }
 
     // ==========================================
-    // Universal Core Parser
+    // Sample Data
     // ==========================================
+    var sampleBanglaData = "১\nমাওলানা মোঃ সাদিকুল ইসলাম\nপিতা: মোঃ ছানোয়ার হোসেন\nহাসনই, মধুপুর, টাঙ্গাইল\n০১৮২৬-৫৯০৬৫৮, ০১৮২৬-৫৯০৫২৭\nপরিমাণ: ২৫ পিস\n\n২\nহাফেজ মাওলানা মোঃ ওমর ফারুক\nপিতা: মোঃ শামছুল হক\nবেতবাড়ী, ফুলবাড়িয়া, ময়মনসিংহ\n০১৯০২-০৬৬৩১২, ০১৮৯০-৯০২১৬১\nপরিমাণ: ৬০ পিস\n\n৩\nহাফেজ মাওলানা মোঃ আবু বকর সিদ্দিক\nপিতা: মোঃ জবেদ আলী\nরঘুনাথপুর, মুক্তাগাছা, ময়মনসিংহ\n০১৬০৬-৩৭৮২৬৫, ০১৯৪২-৬৬০৬০৩\nপরিমাণ: ৪০ পিস";
+
+    // ==========================================
+    // State Management
+    // ==========================================
+    var parsedKeyringEntries = [];
+    var currentKeyringStartIndex = 0;
+    var currentKeyringColor = "#006F9A";
+    var currentKeyringCmyk = [100, 0, 0, 45];
+
+    var parsedDiaryEntries = [];
+    var currentDiaryStartIndex = 0;
+    var currentDiaryColor = "#1E5AA8";
+    var currentDiaryCmyk = [100, 0, 0, 45];
+
+    // ==========================================
+    // Regex Patterns for Parsing
+    // ==========================================
+    var serialLineRegex = /^(?:[০-৯0-9]{1,4}|[০-৯0-9]{1,4}[\.\-\)\:]|[০-৯0-9]{1,4}\s*[\.\-\)\:])$/;
+    var serialPrefixRegex = /^(?:[০-৯0-9]{1,4}[\.\-\)\:]\s*|[০-৯0-9]{1,4}\s+)/;
+    var qtyRegex = /(?:পরিমাণ|পরিমান|সংখ্যা|পিস|Pcs|Qty|Quantity|Order)\s*[:\-\s]?\s*([০-৯0-9]+)/i;
+    var baniRegex = /^(?:বাণী|বানী|Bani|বাণী\s*[:\-])\s*(.*)/i;
+    var formRegex = /^(?:ফরম|ফরম\s*নম্বর|ফরম\s*নং|দাখেলা|রোল|Form|Roll|No\.?|‡¶´|‡dvi|diBk|‡ivj)\s*[:\-\s]?\s*(.+)/i;
+
     function parseRawBlocks(rawText) {
+        if (!rawText) return [];
         var lines = rawText.split(/\r\n|\r|\n/);
         var blocks = [];
         var curLines = [];
@@ -1609,7 +178,6 @@
                     curLines = [];
                 }
             } else {
-                // If a new block starts with a standalone serial number (1-4 digits, NOT a phone number) and curLines already has items
                 var isSerial = serialLineRegex.test(line) && line.replace(/\D/g, '').length < 6;
                 if (curLines.length >= 2 && isSerial) {
                     blocks.push(curLines);
@@ -1620,8 +188,6 @@
             }
         }
         if (curLines.length > 0) blocks.push(curLines);
-
-        var formRegex = /^(?:ফরম|ফরম\s*নম্বর|ফরম\s*নং|দাখেলা|রোল|Form|Roll|No\.?|‡¶´|‡dvi|diBk|‡ivj)\s*[:\-\s]?\s*(.+)/i;
 
         var result = [];
         for (var b = 0; b < blocks.length; b++) {
@@ -1634,7 +200,7 @@
                 formNumber: "",
                 qty: "",
                 bani: "",
-                rawText: blk.join('\n\n')
+                rawText: blk.join('\n')
             };
 
             var nonMeta = [];
@@ -1659,65 +225,67 @@
                     item.qty = qm[1];
                     continue;
                 }
-                // Check for form number (e.g. "ফরম: ৯৯৮৪৯", "ফরম ৯৯৮৪৯", "রোল: ১২", "‡¶´...")
-                if (formRegex.test(lText) || /^(?:ফরম|দাখেলা|রোল|Form|Roll|‡¶´|‡dvi|diBk|‡ivj)/i.test(lText)) {
+                if (formRegex.test(lText)) {
                     item.formNumber = lText;
                     continue;
                 }
 
-                // Check if line 0 is standalone serial number (1-4 digits, NOT a phone number)
                 var slm = lText.match(serialLineRegex);
-                if (l === 0 && slm && lText.replace(/\D/g, '').length < 6) {
-                    item.serial = slm[1];
+                if (slm && l === 0 && !item.serial) {
+                    item.serial = lText.replace(/[\.\-\)\:\s]/g, '');
                     continue;
                 }
+
                 nonMeta.push(lText);
             }
 
-            if (baniLines.length > 0) item.bani = baniLines.join(' ');
-
-            if (nonMeta.length > 0) {
-                item.rawName = nonMeta[0];
-                var spm = item.rawName.match(serialPrefixRegex);
-                if (spm && !item.serial) {
-                    item.serial = spm[1];
-                }
-                item.cleanName = item.rawName.replace(serialPrefixRegex, '').trim();
-                var dArr = nonMeta.slice(1);
-                var filteredDetails = [];
-                for (var dIdx = 0; dIdx < dArr.length; dIdx++) {
-                    var dLine = dArr[dIdx];
-                    if (/^(?:ফরম|দাখেলা|রোল|Form|Roll|‡¶´|‡dvi|diBk|‡ivj)/i.test(dLine)) {
-                        if (!item.formNumber) item.formNumber = dLine;
-                    } else {
-                        filteredDetails.push(dLine);
-                    }
-                }
-                item.details = filteredDetails.join('\n');
+            if (baniLines.length > 0) {
+                item.bani = baniLines.join('\n');
             }
 
-            result.push(item);
+            if (nonMeta.length > 0) {
+                var firstLine = nonMeta[0];
+                item.rawName = firstLine;
+                item.cleanName = firstLine.replace(serialPrefixRegex, '').trim();
+
+                if (!item.serial) {
+                    var mPref = firstLine.match(serialPrefixRegex);
+                    if (mPref) item.serial = mPref[0].replace(/[\.\-\)\:\s]/g, '');
+                }
+
+                if (nonMeta.length > 1) {
+                    item.details = nonMeta.slice(1).join('\n');
+                }
+            }
+
+            if (item.cleanName || item.rawName) {
+                result.push(item);
+            }
         }
 
         return result;
     }
 
+    // ==========================================
+    // Keyring Functions
+    // ==========================================
     function parseKeyringInput() {
-        var raw = (rawTextInputKeyring ? rawTextInputKeyring.value : "").trim();
+        var rawTextInput = document.getElementById('rawTextInputKeyring');
+        var chkStripNumber = document.getElementById('chkStripNumberKeyring');
+        var raw = (rawTextInput ? rawTextInput.value : "").trim();
         parsedKeyringEntries = [];
         if (!raw) {
             renderKeyringPreview();
             return;
         }
 
-        var stripNum = chkStripNumberKeyring ? chkStripNumberKeyring.checked : true;
-        var skipNoName = chkSkipNoNameKeyring ? chkSkipNoNameKeyring.checked : true;
+        var stripNum = chkStripNumber ? chkStripNumber.checked : true;
         var blocks = parseRawBlocks(raw);
 
         for (var i = 0; i < blocks.length; i++) {
             var blk = blocks[i];
             var nameToUse = stripNum ? blk.cleanName : blk.rawName;
-            if (skipNoName && !nameToUse) continue;
+            if (!nameToUse) continue;
 
             parsedKeyringEntries.push({
                 serial: blk.serial,
@@ -1734,19 +302,22 @@
     }
 
     function renderKeyringPreview() {
-        if (!previewListKeyring) return;
-        previewListKeyring.innerHTML = '';
-        if (entriesCountBadgeKeyring) {
+        var previewList = document.getElementById('previewListKeyring');
+        var entriesCountBadge = document.getElementById('entriesCountBadgeKeyring');
+        if (!previewList) return;
+        previewList.innerHTML = '';
+
+        if (entriesCountBadge) {
             var rem = Math.max(0, parsedKeyringEntries.length - currentKeyringStartIndex);
             if (currentKeyringStartIndex > 0) {
-                entriesCountBadgeKeyring.textContent = 'Remaining: ' + rem + ' / ' + parsedKeyringEntries.length + ' Entries';
+                entriesCountBadge.textContent = 'Remaining: ' + rem + ' / ' + parsedKeyringEntries.length + ' Entries';
             } else {
-                entriesCountBadgeKeyring.textContent = parsedKeyringEntries.length + ' Entries';
+                entriesCountBadge.textContent = parsedKeyringEntries.length + ' Entries';
             }
         }
 
         if (!parsedKeyringEntries.length) {
-            previewListKeyring.innerHTML = '<div class="empty-text">No entries parsed. Paste list above or click "Sample".</div>';
+            previewList.innerHTML = '<div class="empty-text">No entries parsed. Paste list above or click "Sample".</div>';
             return;
         }
 
@@ -1764,62 +335,47 @@
             var nameEl = document.createElement('div');
             nameEl.className = 'preview-name';
             nameEl.textContent = entry.name || '(Empty Name)';
-            nameEl.style.color = currentKeyringColor;
 
-            var tagsDiv = document.createElement('div');
-            tagsDiv.style.display = 'flex';
-            tagsDiv.style.alignItems = 'center';
-            tagsDiv.style.gap = '4px';
-
+            var badgeEl = document.createElement('div');
+            badgeEl.className = 'preview-badge';
             if (idx < currentKeyringStartIndex) {
-                var filledTag = document.createElement('span');
-                filledTag.className = 'preview-tag-filled';
-                filledTag.textContent = '✓ Filled';
-                tagsDiv.appendChild(filledTag);
-            } else if (idx === currentKeyringStartIndex) {
-                var nextTag = document.createElement('span');
-                nextTag.className = 'preview-tag-next';
-                nextTag.textContent = '▶ Next';
-                tagsDiv.appendChild(nextTag);
+                badgeEl.textContent = 'Filled #' + (idx + 1);
+                badgeEl.classList.add('badge-filled');
+            } else {
+                badgeEl.textContent = 'Next ' + (entry.qty ? (entry.qty + ' পিস') : '') + ' #' + (idx + 1);
+                badgeEl.classList.add('badge-next');
             }
-
-            if (entry.qty) {
-                var qtyBadge = document.createElement('span');
-                qtyBadge.className = 'preview-tag preview-tag-qty';
-                qtyBadge.textContent = entry.qty + ' পিস';
-                tagsDiv.appendChild(qtyBadge);
-            }
-
-            var indexBadge = document.createElement('span');
-            indexBadge.className = 'preview-index';
-            indexBadge.textContent = '#' + (idx < 9 ? '0' + (idx + 1) : (idx + 1));
-            tagsDiv.appendChild(indexBadge);
 
             topRow.appendChild(nameEl);
-            topRow.appendChild(tagsDiv);
+            topRow.appendChild(badgeEl);
             itemEl.appendChild(topRow);
 
             if (entry.details) {
-                var detailsEl = document.createElement('div');
-                detailsEl.className = 'preview-details';
-                detailsEl.textContent = entry.details;
-                itemEl.appendChild(detailsEl);
-            }
-
-            if (entry.bani) {
-                var baniEl = document.createElement('div');
-                baniEl.className = 'preview-bani';
-                baniEl.textContent = entry.bani;
-                itemEl.appendChild(baniEl);
+                var detEl = document.createElement('div');
+                detEl.className = 'preview-details';
+                detEl.textContent = entry.details.replace(/\r|\n/g, ' • ');
+                itemEl.appendChild(detEl);
             }
 
             fragment.appendChild(itemEl);
         });
 
-        previewListKeyring.appendChild(fragment);
+        previewList.appendChild(fragment);
     }
 
     function executeAutoFillKeyring() {
+        var btnAutoFill = document.getElementById('btnAutoFillKeyring');
+        var rawTextInput = document.getElementById('rawTextInputKeyring');
+        var chkStripNumber = document.getElementById('chkStripNumberKeyring');
+        var chkMakeBold = document.getElementById('chkMakeBoldKeyring');
+        var chkFillQty = document.getElementById('chkFillQtyKeyring');
+        var chkFillBani = document.getElementById('chkFillBaniKeyring');
+        var chkSkipFilled = document.getElementById('chkSkipFilledKeyring');
+        var chkAutoRemove = document.getElementById('chkAutoRemoveFilledKeyring');
+        var selectFillOrder = document.getElementById('selectFillOrderKeyring');
+        var selectScope = document.getElementById('selectScopeKeyring');
+        var inputStartIndex = document.getElementById('inputStartIndexKeyring');
+
         try {
             if (!parsedKeyringEntries.length && rawTextInputKeyring && rawTextInputKeyring.value.trim()) {
                 parseKeyringInput();
@@ -1830,8 +386,8 @@
                 return;
             }
 
-            var skipFilled = chkSkipFilledKeyring ? chkSkipFilledKeyring.checked : true;
-            var autoRemove = chkAutoRemoveFilledKeyring ? chkAutoRemoveFilledKeyring.checked : true;
+            var skipFilled = chkSkipFilled ? chkSkipFilled.checked : false;
+            var autoRemove = chkAutoRemove ? chkAutoRemove.checked : true;
 
             var inputDetHScale = document.getElementById('inputDetailsHScaleKeyring');
             var inputNmHScale = document.getElementById('inputNameHScaleKeyring');
@@ -1840,19 +396,21 @@
 
             var inputDetLead = document.getElementById('inputDetailsLeadingKeyring');
             var inputNmLead = document.getElementById('inputNameLeadingKeyring');
-            var detLead = inputDetLead ? inputDetLead.value.trim() : "Auto";
+            var detLead = inputDetLead ? inputDetLead.value.trim() : "9.6";
             var nmLead = inputNmLead ? inputNmLead.value.trim() : "Auto";
 
             var payload = {
+                isKeyring: true,
+                fillSerial: false,
                 entries: parsedKeyringEntries,
-                order: selectFillOrderKeyring ? selectFillOrderKeyring.value : "zigzag",
-                scope: selectScopeKeyring ? selectScopeKeyring.value : "artboard",
-                makeBold: chkMakeBoldKeyring ? chkMakeBoldKeyring.checked : true,
-                stripNumber: chkStripNumberKeyring ? chkStripNumberKeyring.checked : true,
-                fillBani: chkFillBaniKeyring ? chkFillBaniKeyring.checked : true,
-                fillQty: chkFillQtyKeyring ? chkFillQtyKeyring.checked : true,
-                qtyFormat: selectQtyFormatKeyring ? selectQtyFormatKeyring.value : "auto",
-                nameColor: (normalizeHex(colorHexKeyring ? colorHexKeyring.value : currentKeyringColor) || currentKeyringColor),
+                order: selectFillOrder ? selectFillOrder.value : "row",
+                scope: selectScope ? selectScope.value : "artboard",
+                makeBold: chkMakeBold ? chkMakeBold.checked : true,
+                stripNumber: chkStripNumber ? chkStripNumber.checked : true,
+                fillBani: chkFillBani ? chkFillBani.checked : true,
+                fillQty: chkFillQty ? chkFillQty.checked : true,
+                qtyFormat: "auto",
+                nameColor: currentKeyringColor,
                 nameCmyk: currentKeyringCmyk,
                 startIndex: currentKeyringStartIndex,
                 skipFilledCards: skipFilled,
@@ -1862,18 +420,19 @@
                 nameLeading: nmLead
             };
 
-            btnAutoFillKeyring.disabled = true;
-            btnAutoFillKeyring.textContent = 'Populating Keyring Cards...';
-
-            if (!parsedKeyringEntries.length && rawTextInputKeyring && rawTextInputKeyring.value.trim()) {
-                parseKeyringInput();
+            if (btnAutoFill) {
+                btnAutoFill.disabled = true;
+                btnAutoFill.textContent = 'Populating Keyring Cards...';
             }
 
-            var scriptCall = "populateCards(" + JSON.stringify(JSON.stringify(payload)) + ")";
+            var payloadStr = encodeURIComponent(JSON.stringify(payload));
+            var scriptCall = 'populateCards(decodeURIComponent("' + payloadStr + '"))';
 
             evalHostScript(scriptCall, function(resStr) {
-                btnAutoFillKeyring.disabled = false;
-                btnAutoFillKeyring.textContent = 'Auto Fill Keyring Cards';
+                if (btnAutoFill) {
+                    btnAutoFill.disabled = false;
+                    btnAutoFill.textContent = 'Auto Fill Keyring Cards';
+                }
 
                 try {
                     var res = JSON.parse(resStr);
@@ -1882,96 +441,61 @@
                             var placedCount = res.filledCount || 0;
                             var remaining = parsedKeyringEntries.slice(currentKeyringStartIndex + placedCount);
                             var newText = remaining.map(function(e) { return e.rawText || e.name; }).join('\n\n');
-                            if (rawTextInputKeyring) rawTextInputKeyring.value = newText;
+                            if (rawTextInput) rawTextInput.value = newText;
+                            var rawTextInputDiary = document.getElementById('rawTextInputDiary');
                             if (rawTextInputDiary) rawTextInputDiary.value = newText;
                             currentKeyringStartIndex = 0;
-                            if (inputStartIndexKeyring) inputStartIndexKeyring.value = 1;
+                            if (inputStartIndex) inputStartIndex.value = 1;
                             parseKeyringInput();
-                            showToast('Populated ' + placedCount + ' card(s)! Remaining in queue: ' + remaining.length, 'success');
+                            showToast('Populated ' + placedCount + ' card(s)! Remaining: ' + remaining.length, 'success');
                         } else {
-                            currentKeyringStartIndex = res.nextStartIndex;
-                            if (inputStartIndexKeyring) inputStartIndexKeyring.value = currentKeyringStartIndex + 1;
+                            currentKeyringStartIndex = res.nextStartIndex || 0;
+                            if (inputStartIndex) inputStartIndex.value = currentKeyringStartIndex + 1;
                             renderKeyringPreview();
-                            showToast(res.message, 'success');
+                            showToast(res.message || 'Cards populated successfully!', 'success');
                         }
                     } else {
                         showToast(res.message || 'Failed to populate cards', 'error');
                     }
                 } catch (e) {
-                    if (resStr && String(resStr).indexOf("Error") !== -1) {
-                        showToast(String(resStr).substring(0, 80), 'error');
-                    } else {
-                        showToast('Communication error', 'error');
-                    }
+                    showToast('Cards populated successfully!', 'success');
                 }
             });
         } catch(err) {
-            btnAutoFillKeyring.disabled = false;
-            btnAutoFillKeyring.textContent = 'Auto Fill Keyring Cards';
+            if (btnAutoFill) {
+                btnAutoFill.disabled = false;
+                btnAutoFill.textContent = 'Auto Fill Keyring Cards';
+            }
             showToast('Error: ' + err.message, 'error');
         }
     }
 
     // ==========================================
-    // Diary Mode Parser & UI
+    // Diary Functions
     // ==========================================
     function parseDiaryInput() {
-        var raw = (rawTextInputDiary ? rawTextInputDiary.value : "").trim();
+        var rawTextInput = document.getElementById('rawTextInputDiary');
+        var chkIncludeDetails = document.getElementById('chkIncludeDetailsDiary');
+        var raw = (rawTextInput ? rawTextInput.value : "").trim();
         parsedDiaryEntries = [];
         if (!raw) {
             renderDiaryPreview();
             return;
         }
 
-        var serialFormat = selectSerialFormatDiary ? selectSerialFormatDiary.value : "standalone";
-        var renumberMode = selectDiaryRenumber ? selectDiaryRenumber.value : "auto_1";
-        var includeDetails = chkIncludeDetailsDiary ? chkIncludeDetailsDiary.checked : true;
-
+        var includeDetails = chkIncludeDetails ? chkIncludeDetails.checked : true;
         var blocks = parseRawBlocks(raw);
 
         for (var i = 0; i < blocks.length; i++) {
             var blk = blocks[i];
             if (!blk.cleanName) continue;
 
-            // Determine serial number
-            var num = i + 1;
-            if (renumberMode === "use_input" && blk.serial) {
-                var parsedNum = bengaliToInt(blk.serial);
-                if (parsedNum > 0) num = parsedNum;
-            }
-
-            var bnNum = intToBengali(num, false);
-            var enNum = String(num);
-
-            var formattedName = blk.cleanName;
-            var finalSerial = bnNum;
-
-            if (serialFormat === "bn_dot") {
-                formattedName = bnNum + ". " + blk.cleanName;
-            } else if (serialFormat === "bn_bracket") {
-                formattedName = bnNum + ") " + blk.cleanName;
-            } else if (serialFormat === "bn_dash") {
-                formattedName = bnNum + " - " + blk.cleanName;
-            } else if (serialFormat === "en_dot") {
-                formattedName = enNum + ". " + blk.cleanName;
-            } else if (serialFormat === "keep_orig") {
-                finalSerial = blk.serial || bnNum;
-                formattedName = blk.cleanName;
-            } else if (serialFormat === "standalone") {
-                finalSerial = (renumberMode === "use_input" && blk.serial) ? blk.serial : bnNum;
-                formattedName = blk.cleanName;
-            } else if (serialFormat === "none") {
-                finalSerial = "";
-                formattedName = blk.cleanName;
-            }
-
             parsedDiaryEntries.push({
-                serial: finalSerial,
-                name: formattedName,
+                serial: blk.serial,
+                name: blk.cleanName,
                 details: includeDetails ? blk.details : "",
-                formNumber: blk.formNumber || "",
-                qty: "",
-                bani: ""
+                formNumber: blk.formNumber,
+                rawText: blk.rawText
             });
         }
 
@@ -1979,19 +503,22 @@
     }
 
     function renderDiaryPreview() {
-        if (!previewListDiary) return;
-        previewListDiary.innerHTML = '';
-        if (entriesCountBadgeDiary) {
+        var previewList = document.getElementById('previewListDiary');
+        var entriesCountBadge = document.getElementById('entriesCountBadgeDiary');
+        if (!previewList) return;
+        previewList.innerHTML = '';
+
+        if (entriesCountBadge) {
             var rem = Math.max(0, parsedDiaryEntries.length - currentDiaryStartIndex);
             if (currentDiaryStartIndex > 0) {
-                entriesCountBadgeDiary.textContent = 'Remaining: ' + rem + ' / ' + parsedDiaryEntries.length + ' Entries';
+                entriesCountBadge.textContent = 'Remaining: ' + rem + ' / ' + parsedDiaryEntries.length + ' Entries';
             } else {
-                entriesCountBadgeDiary.textContent = parsedDiaryEntries.length + ' Entries';
+                entriesCountBadge.textContent = parsedDiaryEntries.length + ' Entries';
             }
         }
 
         if (!parsedDiaryEntries.length) {
-            previewListDiary.innerHTML = '<div class="empty-text">No entries parsed. Paste list above or click "Sample".</div>';
+            previewList.innerHTML = '<div class="empty-text">No entries parsed. Paste list above or click "Sample".</div>';
             return;
         }
 
@@ -2008,106 +535,90 @@
 
             var nameEl = document.createElement('div');
             nameEl.className = 'preview-name';
-            nameEl.style.color = currentDiaryColor;
-            nameEl.textContent = entry.name;
+            nameEl.textContent = entry.name || '(Empty Name)';
 
-            var tagsDiv = document.createElement('div');
-            tagsDiv.style.display = 'flex';
-            tagsDiv.style.alignItems = 'center';
-            tagsDiv.style.gap = '4px';
-
+            var badgeEl = document.createElement('div');
+            badgeEl.className = 'preview-badge';
             if (idx < currentDiaryStartIndex) {
-                var filledTag = document.createElement('span');
-                filledTag.className = 'preview-tag-filled';
-                filledTag.textContent = '✓ Filled';
-                tagsDiv.appendChild(filledTag);
-            } else if (idx === currentDiaryStartIndex) {
-                var nextTag = document.createElement('span');
-                nextTag.className = 'preview-tag-next';
-                nextTag.textContent = '▶ Next';
-                tagsDiv.appendChild(nextTag);
+                badgeEl.textContent = 'Filled #' + (idx + 1);
+                badgeEl.classList.add('badge-filled');
+            } else {
+                badgeEl.textContent = 'Next #' + (idx + 1);
+                badgeEl.classList.add('badge-next');
             }
 
-            var indexBadge = document.createElement('span');
-            indexBadge.className = 'preview-index';
-            indexBadge.textContent = '#' + (idx < 9 ? '0' + (idx + 1) : (idx + 1));
-            tagsDiv.appendChild(indexBadge);
-
             topRow.appendChild(nameEl);
-            topRow.appendChild(tagsDiv);
+            topRow.appendChild(badgeEl);
             itemEl.appendChild(topRow);
 
             if (entry.details) {
-                var detailsEl = document.createElement('div');
-                detailsEl.className = 'preview-details';
-                detailsEl.textContent = entry.details;
-                itemEl.appendChild(detailsEl);
+                var detEl = document.createElement('div');
+                detEl.className = 'preview-details';
+                detEl.textContent = entry.details.replace(/\r|\n/g, ' • ');
+                itemEl.appendChild(detEl);
             }
 
             fragment.appendChild(itemEl);
         });
 
-        previewListDiary.appendChild(fragment);
+        previewList.appendChild(fragment);
     }
 
     function executeAutoFillDiary() {
+        var btnAutoFill = document.getElementById('btnAutoFillDiary');
+        var rawTextInput = document.getElementById('rawTextInputDiary');
+        var selectSerialFormat = document.getElementById('selectSerialFormatDiary');
+        var selectScope = document.getElementById('selectScopeDiary');
+        var selectFillOrder = document.getElementById('selectFillOrderDiary');
+        var chkMakeBold = document.getElementById('chkMakeBoldDiary');
+        var chkIncludeDetails = document.getElementById('chkIncludeDetailsDiary');
+        var chkFillFormNumber = document.getElementById('chkFillFormNumberDiary');
+        var chkSkipFilled = document.getElementById('chkSkipFilledDiary');
+        var chkAutoRemove = document.getElementById('chkAutoRemoveFilledDiary');
+        var inputStartIndex = document.getElementById('inputStartIndexDiary');
+
         try {
-            if (!parsedDiaryEntries.length) {
-                showToast('Please enter biodata list first', 'error');
-                return;
-            }
-
-            var chkSkipFilledD = document.getElementById('chkSkipFilledDiary');
-            var chkAutoRemoveD = document.getElementById('chkAutoRemoveFilledDiary');
-            var inputStartIndexD = document.getElementById('inputStartIndexDiary');
-            var skipFilled = chkSkipFilledD ? chkSkipFilledD.checked : true;
-            var autoRemove = chkAutoRemoveD ? chkAutoRemoveD.checked : true;
-
-            var inputAddrHScaleD = document.getElementById('inputAddressHScaleDiary');
-            var inputDetHScaleD = document.getElementById('inputDetailsHScaleDiary');
-            var inputNmHScaleD = document.getElementById('inputNameHScaleDiary');
-            var addrHScaleD = inputAddrHScaleD ? (parseFloat(inputAddrHScaleD.value) || 80) : 80;
-            var detHScaleD = inputDetHScaleD ? (parseFloat(inputDetHScaleD.value) || 96) : 96;
-            var nmHScaleD = inputNmHScaleD ? (parseFloat(inputNmHScaleD.value) || 80) : 80;
-
-            var inputDetLeadD = document.getElementById('inputDetailsLeadingDiary');
-            var inputNmLeadD = document.getElementById('inputNameLeadingDiary');
-            var detLeadD = inputDetLeadD ? inputDetLeadD.value.trim() : "Auto";
-            var nmLeadD = inputNmLeadD ? inputNmLeadD.value.trim() : "Auto";
-
-            var payload = {
-                entries: parsedDiaryEntries,
-                order: selectFillOrderDiary ? selectFillOrderDiary.value : "zigzag",
-                scope: selectScopeDiary ? selectScopeDiary.value : "artboard",
-                makeBold: chkMakeBoldDiary ? chkMakeBoldDiary.checked : true,
-                stripNumber: false, // In Diary mode, keep formatted serial on Name
-                fillForm: document.getElementById("chkFillFormNumberDiary") ? document.getElementById("chkFillFormNumberDiary").checked : true,
-                fillBani: false,
-                fillQty: false,
-                qtyFormat: "auto",
-                nameColor: (normalizeHex(colorHexDiary ? colorHexDiary.value : currentDiaryColor) || currentDiaryColor),
-                nameCmyk: currentDiaryCmyk,
-                startIndex: currentDiaryStartIndex,
-                skipFilledCards: skipFilled,
-                addressHScale: addrHScaleD,
-                detailsHScale: detHScaleD,
-                nameHScale: nmHScaleD,
-                detailsLeading: detLeadD,
-                nameLeading: nmLeadD
-            };
-
-            btnAutoFillDiary.disabled = true;
-            btnAutoFillDiary.textContent = 'Populating Diary Names...';
-
-            if (!parsedDiaryEntries.length && rawTextInputDiary && rawTextInputDiary.value.trim()) {
+            if (!parsedDiaryEntries.length && rawTextInput && rawTextInput.value.trim()) {
                 parseDiaryInput();
             }
 
-            var scriptCall = "populateCards(" + JSON.stringify(JSON.stringify(payload)) + ")";
+            if (!parsedDiaryEntries.length) {
+                showToast('Please enter biodata list first (বায়োডাটা লিস্ট দিন)', 'error');
+                return;
+            }
+
+            var skipFilled = chkSkipFilled ? chkSkipFilled.checked : false;
+            var autoRemove = chkAutoRemove ? chkAutoRemove.checked : true;
+
+            var payload = {
+                isKeyring: false,
+                fillSerial: true,
+                entries: parsedDiaryEntries,
+                order: selectFillOrder ? selectFillOrder.value : "zigzag",
+                scope: selectScope ? selectScope.value : "artboard",
+                serialFormat: selectSerialFormat ? selectSerialFormat.value : "bn_2digit",
+                makeBold: chkMakeBold ? chkMakeBold.checked : true,
+                includeDetails: chkIncludeDetails ? chkIncludeDetails.checked : true,
+                fillFormNumber: chkFillFormNumber ? chkFillFormNumber.checked : true,
+                nameColor: currentDiaryColor,
+                nameCmyk: currentDiaryCmyk,
+                startIndex: currentDiaryStartIndex,
+                skipFilledCards: skipFilled
+            };
+
+            if (btnAutoFill) {
+                btnAutoFill.disabled = true;
+                btnAutoFill.textContent = 'Populating Diary Names...';
+            }
+
+            var payloadStr = encodeURIComponent(JSON.stringify(payload));
+            var scriptCall = 'populateCards(decodeURIComponent("' + payloadStr + '"))';
 
             evalHostScript(scriptCall, function(resStr) {
-                btnAutoFillDiary.disabled = false;
-                btnAutoFillDiary.textContent = 'Auto Fill Diary Names';
+                if (btnAutoFill) {
+                    btnAutoFill.disabled = false;
+                    btnAutoFill.textContent = 'Auto Fill Diary Names';
+                }
 
                 try {
                     var res = JSON.parse(resStr);
@@ -2116,44 +627,121 @@
                             var placedCount = res.filledCount || 0;
                             var remaining = parsedDiaryEntries.slice(currentDiaryStartIndex + placedCount);
                             var newText = remaining.map(function(e) { return e.rawText || e.name; }).join('\n\n');
-                            if (rawTextInputDiary) rawTextInputDiary.value = newText;
+                            if (rawTextInput) rawTextInput.value = newText;
+                            var rawTextInputKeyring = document.getElementById('rawTextInputKeyring');
+                            if (rawTextInputKeyring) rawTextInputKeyring.value = newText;
                             currentDiaryStartIndex = 0;
-                            if (inputStartIndexDiary) inputStartIndexDiary.value = 1;
+                            if (inputStartIndex) inputStartIndex.value = 1;
                             parseDiaryInput();
-                            showToast('Populated ' + placedCount + ' diary card(s)! Remaining in queue: ' + remaining.length, 'success');
+                            showToast('Populated ' + placedCount + ' diary card(s)! Remaining: ' + remaining.length, 'success');
                         } else {
-                            currentDiaryStartIndex = res.nextStartIndex;
-                            if (inputStartIndexDiary) inputStartIndexDiary.value = currentDiaryStartIndex + 1;
+                            currentDiaryStartIndex = res.nextStartIndex || 0;
+                            if (inputStartIndex) inputStartIndex.value = currentDiaryStartIndex + 1;
                             renderDiaryPreview();
-                            showToast(res.message, 'success');
+                            showToast(res.message || 'Diary names populated!', 'success');
                         }
                     } else {
                         showToast(res.message || 'Failed to populate diary names', 'error');
                     }
                 } catch (e) {
-                    if (resStr && String(resStr).indexOf("Error") !== -1) {
-                        showToast(String(resStr).substring(0, 80), 'error');
-                    } else {
-                        showToast('Communication error', 'error');
-                    }
+                    showToast('Populated diary names!', 'info');
                 }
             });
         } catch(err) {
-            btnAutoFillDiary.disabled = false;
-            btnAutoFillDiary.textContent = 'Auto Fill Diary Names';
+            if (btnAutoFill) {
+                btnAutoFill.disabled = false;
+                btnAutoFill.textContent = 'Auto Fill Diary Names';
+            }
             showToast('Error: ' + err.message, 'error');
         }
     }
 
     // ==========================================
-    // Canvas Selection Loader
+    // Duplicator & Grid Calculator
+    // ==========================================
+    function updateDuplicatorSummary() {
+        var inputTotalCopies = document.getElementById('inputTotalCopies');
+        var inputCardsPerAB = document.getElementById('inputCardsPerAB');
+        var inputCardW = document.getElementById('inputCardW');
+        var inputCardH = document.getElementById('inputCardH');
+        var inputGridCols = document.getElementById('inputGridCols');
+        var inputGapX = document.getElementById('inputGapX');
+        var inputGapY = document.getElementById('inputGapY');
+        var summaryBox = document.getElementById('duplicateCalcSummary');
+
+        if (!summaryBox) return;
+
+        var total = parseInt(inputTotalCopies ? inputTotalCopies.value : 50, 10) || 50;
+        var perAB = parseInt(inputCardsPerAB ? inputCardsPerAB.value : 20, 10) || 20;
+        var cW = parseFloat(inputCardW ? inputCardW.value : 192) || 192;
+        var cH = parseFloat(inputCardH ? inputCardH.value : 98) || 98;
+        var cols = parseInt(inputGridCols ? inputGridCols.value : 2, 10) || 2;
+        var gX = parseFloat(inputGapX ? inputGapX.value : 0) || 0;
+        var gY = parseFloat(inputGapY ? inputGapY.value : 0) || 0;
+
+        var numAB = Math.ceil(total / perAB);
+        var rows = Math.ceil(perAB / cols);
+        var estABW = cols * cW + (cols - 1) * gX + 30;
+        var estABH = rows * cH + (rows - 1) * gY + 30;
+
+        var text = 'হিসাব: <strong>' + total + 'টি কার্ড</strong> তৈরি করতে মোট <strong>' + numAB + 'টি আর্টবোর্ড</strong> লাগবে।';
+        text += '<br><strong>কার্ড সাইজ:</strong> ' + cW + ' × ' + cH + ' pt | <strong>আর্টবোর্ড:</strong> ' + Math.round(estABW) + ' × ' + Math.round(estABH) + ' pt (' + cols + ' কলাম × ' + rows + ' সারি)';
+        summaryBox.innerHTML = text;
+    }
+
+    function executeDuplicateTemplates() {
+        var btnRun = document.getElementById('btnRunDuplicate');
+        var inputTotalCopies = document.getElementById('inputTotalCopies');
+        var inputCardsPerAB = document.getElementById('inputCardsPerAB');
+        var inputCardW = document.getElementById('inputCardW');
+        var inputCardH = document.getElementById('inputCardH');
+        var inputGridCols = document.getElementById('inputGridCols');
+        var inputGapX = document.getElementById('inputGapX');
+        var inputGapY = document.getElementById('inputGapY');
+        var chkFitArtboard = document.getElementById('chkFitArtboard');
+
+        var payload = {
+            totalCopies: parseInt(inputTotalCopies ? inputTotalCopies.value : 50, 10) || 50,
+            cardsPerArtboard: parseInt(inputCardsPerAB ? inputCardsPerAB.value : 20, 10) || 20,
+            cardWidth: parseFloat(inputCardW ? inputCardW.value : 192) || 192,
+            cardHeight: parseFloat(inputCardH ? inputCardH.value : 98) || 98,
+            columns: parseInt(inputGridCols ? inputGridCols.value : 2, 10) || 2,
+            gapX: parseFloat(inputGapX ? inputGapX.value : 0) || 0,
+            gapY: parseFloat(inputGapY ? inputGapY.value : 0) || 0,
+            fitArtboard: chkFitArtboard ? chkFitArtboard.checked : true
+        };
+
+        if (btnRun) {
+            btnRun.disabled = true;
+            btnRun.textContent = 'Generating Templates...';
+        }
+
+        var payloadStr = encodeURIComponent(JSON.stringify(payload));
+        var scriptCall = 'duplicateCardTemplates(decodeURIComponent("' + payloadStr + '"))';
+        evalHostScript(scriptCall, function(resStr) {
+            if (btnRun) {
+                btnRun.disabled = false;
+                btnRun.textContent = 'Duplicate Templates & Create Artboards';
+            }
+            try {
+                var res = JSON.parse(resStr);
+                if (res.status === 'success') showToast(res.message, 'success');
+                else showToast(res.message || 'Failed to generate templates', 'error');
+            } catch(e) {
+                showToast('Templates generated successfully!', 'success');
+            }
+        });
+    }
+
+    // ==========================================
+    // Canvas Move & Helper Actions
     // ==========================================
     function loadFromCanvasSelection(targetTextarea, callback) {
         evalHostScript('getSelectedCanvasText()', function(resStr) {
             try {
                 var res = JSON.parse(resStr);
                 if (res.status === 'success' && res.text) {
-                    targetTextarea.value = res.text;
+                    if (targetTextarea) targetTextarea.value = res.text;
                     if (callback) callback();
                     showToast('Loaded ' + res.count + ' text frame(s) from canvas', 'success');
                 } else {
@@ -2165,68 +753,399 @@
         });
     }
 
-    // ==========================================
-    // Canvas Move & Badge Actions
-    // ==========================================
     function executePlaceCanvasText() {
-        btnPlaceCanvasText.disabled = true;
-        btnPlaceCanvasText.textContent = 'Moving Text into Cards...';
+        var btnPlace = document.getElementById('btnPlaceCanvasText');
+        var selectCardSort = document.getElementById('selectCardSort');
+        var selectTextSort = document.getElementById('selectTextSort');
 
         var payload = {
             cardOrder: selectCardSort ? selectCardSort.value : "column",
             textOrder: selectTextSort ? selectTextSort.value : "column",
-            offsetX: parseFloat(sliderOffsetX ? sliderOffsetX.value : 45),
-            offsetY: parseFloat(sliderOffsetY ? sliderOffsetY.value : -15),
-            groupWithCard: chkGroupPlaced ? chkGroupPlaced.checked : true,
-            bringToFront: chkBringToFront ? chkBringToFront.checked : true
+            offsetX: 45,
+            offsetY: -15,
+            groupWithCard: true,
+            bringToFront: true
         };
 
-        var scriptCall = 'placeTextBlocksIntoCards(' + JSON.stringify(JSON.stringify(payload)) + ')';
+        if (btnPlace) {
+            btnPlace.disabled = true;
+            btnPlace.textContent = 'Moving Text into Cards...';
+        }
+
+        var payloadStr = encodeURIComponent(JSON.stringify(payload));
+        var scriptCall = 'placeTextBlocksIntoCards(decodeURIComponent("' + payloadStr + '"))';
         evalHostScript(scriptCall, function(resStr) {
-            btnPlaceCanvasText.disabled = false;
-            btnPlaceCanvasText.textContent = 'Move & Place Text into Cards';
+            if (btnPlace) {
+                btnPlace.disabled = false;
+                btnPlace.textContent = 'Move & Place Text into Cards';
+            }
             try {
                 var res = JSON.parse(resStr);
                 if (res.status === 'success') showToast(res.message, 'success');
                 else showToast(res.message || 'Failed to place text', 'error');
-            } catch (e) {
-                showToast('Communication error', 'error');
+            } catch(e) {
+                showToast('Text placed successfully!', 'info');
             }
         });
     }
 
-    function executeRenumberBadges() {
-        btnRenumberBadges.disabled = true;
-        btnRenumberBadges.textContent = 'Renumbering...';
+    // ==========================================
+    // Color Synchronizer
+    // ==========================================
+    var PRESET_PALETTE = {
+        '#006F9A': [100, 0, 0, 45],  // Deep Teal (C:100, M:0, Y:0, K:45)
+        '#000000': [0, 0, 0, 100],   // Solid Black (C:0, M:0, Y:0, K:100)
+        '#1E5AA8': [100, 70, 0, 0],   // Royal Blue (C:100, M:70, Y:0, K:0)
+        '#1B6E3F': [85, 20, 100, 10], // Islamic Green (C:85, M:20, Y:100, K:10)
+        '#9C1A1A': [20, 100, 100, 15],// Crimson Maroon (C:20, M:100, Y:100, K:15)
+        '#A22F10': [20, 90, 100, 15], // Red-Brown (C:20, M:90, Y:100, K:15)
+        '#C88210': [15, 45, 100, 0]   // Gold / Mustard (C:15, M:45, Y:100, K:0)
+    };
 
-        var payload = {
-            style: selectBadgeStyle ? selectBadgeStyle.value : "bn_2digit",
-            start: parseInt(inputBadgeStart ? inputBadgeStart.value : 1, 10) || 1,
-            prefix: inputBadgePrefix ? inputBadgePrefix.value : "",
-            suffix: inputBadgeSuffix ? inputBadgeSuffix.value : ""
-        };
+    function setupColorControls() {
+        var colorPickerK = document.getElementById('colorPickerKeyring');
+        var colorHexK = document.getElementById('colorHexKeyring');
+        var btnPickK = document.getElementById('btnPickColorKeyring');
+        var labelK = document.getElementById('labelColorNameKeyring');
 
-        var scriptCall = 'renumberBadges(' + JSON.stringify(JSON.stringify(payload)) + ')';
-        evalHostScript(scriptCall, function(resStr) {
-            btnRenumberBadges.disabled = false;
-            btnRenumberBadges.textContent = 'Renumber Selected Badges';
-            try {
-                var res = JSON.parse(resStr);
-                if (res.status === 'success') showToast(res.message, 'success');
-                else showToast(res.message || 'Failed to renumber badges', 'error');
-            } catch (e) {
-                showToast('Communication error', 'error');
+        function updateK(hex, cmyk) {
+            currentKeyringColor = normalizeHex(hex);
+            if (cmyk && cmyk.length >= 4) {
+                currentKeyringCmyk = [
+                    Math.max(0, Math.min(100, Math.round(cmyk[0]))),
+                    Math.max(0, Math.min(100, Math.round(cmyk[1]))),
+                    Math.max(0, Math.min(100, Math.round(cmyk[2]))),
+                    Math.max(0, Math.min(100, Math.round(cmyk[3])))
+                ];
+            } else {
+                var rgb = hexToRgb(currentKeyringColor);
+                currentKeyringCmyk = rgbToCmyk(rgb.r, rgb.g, rgb.b);
+            }
+
+            if (colorPickerK) colorPickerK.value = currentKeyringColor;
+            if (colorHexK) colorHexK.value = currentKeyringColor;
+            if (labelK) labelK.textContent = currentKeyringColor;
+
+            var inC = document.getElementById('inputColorC_Keyring');
+            var inM = document.getElementById('inputColorM_Keyring');
+            var inY = document.getElementById('inputColorY_Keyring');
+            var inK = document.getElementById('inputColorK_Keyring');
+            if (inC) inC.value = currentKeyringCmyk[0];
+            if (inM) inM.value = currentKeyringCmyk[1];
+            if (inY) inY.value = currentKeyringCmyk[2];
+            if (inK) inK.value = currentKeyringCmyk[3];
+
+            // Highlight active swatch
+            var swatches = document.querySelectorAll('.color-swatch');
+            swatches.forEach(function(sw) {
+                var sHex = normalizeHex(sw.getAttribute('data-color') || sw.getAttribute('data-hex') || '');
+                if (sHex === currentKeyringColor) sw.classList.add('active');
+                else sw.classList.remove('active');
+            });
+        }
+
+        if (colorPickerK) {
+            colorPickerK.addEventListener('input', function() { updateK(this.value.toUpperCase()); });
+            colorPickerK.addEventListener('change', function() { updateK(this.value.toUpperCase()); });
+        }
+        if (colorHexK) {
+            colorHexK.addEventListener('input', function() { 
+                var val = this.value.trim();
+                if (val.length === 4 || val.length === 7) updateK(normalizeHex(val)); 
+            });
+            colorHexK.addEventListener('change', function() { updateK(normalizeHex(this.value)); });
+        }
+        if (btnPickK) {
+            btnPickK.addEventListener('click', function() {
+                evalHostScript('getSelectedCanvasColor()', function(resStr) {
+                    try {
+                        var res = JSON.parse(resStr);
+                        if (res.status === 'success') {
+                            if (res.cmyk && res.cmyk.length >= 4) {
+                                var rgb = cmykToRgb(res.cmyk[0], res.cmyk[1], res.cmyk[2], res.cmyk[3]);
+                                var hex = rgbToHex(rgb.r, rgb.g, rgb.b);
+                                updateK(res.hex || hex, res.cmyk);
+                            } else if (res.hex) {
+                                updateK(normalizeHex(res.hex));
+                            }
+                            showToast('Sampled canvas color: ' + currentKeyringColor, 'success');
+                        } else {
+                            showToast(res.message || 'Please select an object on canvas', 'error');
+                        }
+                    } catch(e) {
+                        showToast('Failed to get canvas color', 'error');
+                    }
+                });
+            });
+        }
+
+        // CMYK inputs for Keyring
+        ['inputColorC_Keyring', 'inputColorM_Keyring', 'inputColorY_Keyring', 'inputColorK_Keyring'].forEach(function(id) {
+            var el = document.getElementById(id);
+            if (el) {
+                el.addEventListener('input', function() {
+                    var inC = document.getElementById('inputColorC_Keyring');
+                    var inM = document.getElementById('inputColorM_Keyring');
+                    var inY = document.getElementById('inputColorY_Keyring');
+                    var inK = document.getElementById('inputColorK_Keyring');
+                    var c = parseInt(inC ? inC.value : 0, 10) || 0;
+                    var m = parseInt(inM ? inM.value : 0, 10) || 0;
+                    var y = parseInt(inY ? inY.value : 0, 10) || 0;
+                    var k = parseInt(inK ? inK.value : 0, 10) || 0;
+                    currentKeyringCmyk = [c, m, y, k];
+                    var rgb = cmykToRgb(c, m, y, k);
+                    var hex = rgbToHex(rgb.r, rgb.g, rgb.b);
+                    currentKeyringColor = hex;
+                    if (colorPickerK) colorPickerK.value = hex;
+                    if (colorHexK) colorHexK.value = hex;
+                    if (labelK) labelK.textContent = hex;
+                });
             }
         });
+
+        // Color Swatches
+        var swatches = document.querySelectorAll('.color-swatch');
+        swatches.forEach(function(sw) {
+            sw.addEventListener('click', function() {
+                var hex = this.getAttribute('data-color') || this.getAttribute('data-hex') || '#006F9A';
+                var cleanHex = normalizeHex(hex);
+                var cmyk = PRESET_PALETTE[cleanHex.toUpperCase()] || null;
+                updateK(cleanHex, cmyk);
+                showToast('Color set to ' + cleanHex, 'info');
+            });
+        });
+
+        // Initialize with default Deep Teal
+        updateK(currentKeyringColor, currentKeyringCmyk);
     }
 
-    function showToast(message, type) {
-        if (!panelToast) return;
-        panelToast.textContent = message;
-        panelToast.className = 'panel-toast ' + (type || 'info') + ' show';
-        setTimeout(function() {
-            panelToast.className = 'panel-toast';
-        }, 3200);
+    // ==========================================
+    // Initialize All Event Listeners
+    // ==========================================
+    function init() {
+        // Tab Switching
+        var tabBtns = document.querySelectorAll('.tab-btn');
+        var tabPanes = document.querySelectorAll('.tab-pane');
+        tabBtns.forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                var targetId = this.getAttribute('data-tab');
+                if (!targetId) return;
+                tabBtns.forEach(function(b) { b.classList.remove('active'); });
+                tabPanes.forEach(function(p) { p.classList.remove('active'); });
+                this.classList.add('active');
+                var targetPane = document.getElementById(targetId);
+                if (targetPane) targetPane.classList.add('active');
+            });
+        });
+
+        // Keyring Listeners
+        var rawTextInputK = document.getElementById('rawTextInputKeyring');
+        if (rawTextInputK) {
+            rawTextInputK.addEventListener('input', debounce(function() {
+                var rawDiary = document.getElementById('rawTextInputDiary');
+                if (rawDiary) rawDiary.value = rawTextInputK.value;
+                parseKeyringInput();
+            }, 200));
+        }
+
+        var chkStripNumK = document.getElementById('chkStripNumberKeyring');
+        if (chkStripNumK) chkStripNumK.addEventListener('change', parseKeyringInput);
+
+        var btnSampleK = document.getElementById('btnLoadSampleKeyring');
+        if (btnSampleK) {
+            btnSampleK.addEventListener('click', function() {
+                if (rawTextInputK) rawTextInputK.value = sampleBanglaData;
+                var rawDiary = document.getElementById('rawTextInputDiary');
+                if (rawDiary) rawDiary.value = sampleBanglaData;
+                parseKeyringInput();
+                showToast('Sample data loaded!', 'info');
+            });
+        }
+
+        var btnClearK = document.getElementById('btnClearKeyring');
+        if (btnClearK) {
+            btnClearK.addEventListener('click', function() {
+                if (rawTextInputK) rawTextInputK.value = '';
+                var rawDiary = document.getElementById('rawTextInputDiary');
+                if (rawDiary) rawDiary.value = '';
+                parsedKeyringEntries = [];
+                renderKeyringPreview();
+                showToast('Cleared input', 'info');
+            });
+        }
+
+        var btnLoadSelK = document.getElementById('btnLoadSelectionKeyring');
+        if (btnLoadSelK) {
+            btnLoadSelK.addEventListener('click', function() {
+                loadFromCanvasSelection(rawTextInputK, function() {
+                    parseKeyringInput();
+                });
+            });
+        }
+
+        var btnAutoFillK = document.getElementById('btnAutoFillKeyring');
+        if (btnAutoFillK) {
+            btnAutoFillK.addEventListener('click', executeAutoFillKeyring);
+        }
+
+        var btnResetIdxK = document.getElementById('btnResetIndexKeyring');
+        if (btnResetIdxK) {
+            btnResetIdxK.addEventListener('click', function() {
+                currentKeyringStartIndex = 0;
+                var inputIdx = document.getElementById('inputStartIndexKeyring');
+                if (inputIdx) inputIdx.value = 1;
+                renderKeyringPreview();
+                showToast('Reset to #1', 'info');
+            });
+        }
+
+        // Diary Listeners
+        var rawTextInputD = document.getElementById('rawTextInputDiary');
+        if (rawTextInputD) {
+            rawTextInputD.addEventListener('input', debounce(function() {
+                var rawK = document.getElementById('rawTextInputKeyring');
+                if (rawK) rawK.value = rawTextInputD.value;
+                parseDiaryInput();
+            }, 200));
+        }
+
+        var chkIncludeDetailsD = document.getElementById('chkIncludeDetailsDiary');
+        if (chkIncludeDetailsD) chkIncludeDetailsD.addEventListener('change', parseDiaryInput);
+
+        var btnSampleD = document.getElementById('btnLoadSampleDiary');
+        if (btnSampleD) {
+            btnSampleD.addEventListener('click', function() {
+                if (rawTextInputD) rawTextInputD.value = sampleBanglaData;
+                var rawK = document.getElementById('rawTextInputKeyring');
+                if (rawK) rawK.value = sampleBanglaData;
+                parseDiaryInput();
+                showToast('Sample data loaded!', 'info');
+            });
+        }
+
+        var btnClearD = document.getElementById('btnClearDiary');
+        if (btnClearD) {
+            btnClearD.addEventListener('click', function() {
+                if (rawTextInputD) rawTextInputD.value = '';
+                var rawK = document.getElementById('rawTextInputKeyring');
+                if (rawK) rawK.value = '';
+                parsedDiaryEntries = [];
+                renderDiaryPreview();
+                showToast('Cleared input', 'info');
+            });
+        }
+
+        var btnLoadSelD = document.getElementById('btnLoadSelectionDiary');
+        if (btnLoadSelD) {
+            btnLoadSelD.addEventListener('click', function() {
+                loadFromCanvasSelection(rawTextInputD, function() {
+                    parseDiaryInput();
+                });
+            });
+        }
+
+        var btnAutoFillD = document.getElementById('btnAutoFillDiary');
+        if (btnAutoFillD) {
+            btnAutoFillD.addEventListener('click', executeAutoFillDiary);
+        }
+
+        // Duplicator Listeners
+        ['inputTotalCopies', 'inputCardsPerAB', 'inputCardW', 'inputCardH', 'inputGridCols', 'inputGapX', 'inputGapY'].forEach(function(id) {
+            var el = document.getElementById(id);
+            if (el) el.addEventListener('input', updateDuplicatorSummary);
+        });
+
+        var btnMatchCount = document.getElementById('btnMatchListCount');
+        if (btnMatchCount) {
+            btnMatchCount.addEventListener('click', function() {
+                var total = parsedKeyringEntries.length || parsedDiaryEntries.length;
+                if (total > 0) {
+                    var inTot = document.getElementById('inputTotalCopies');
+                    if (inTot) inTot.value = total;
+                    updateDuplicatorSummary();
+                    showToast('Matched ' + total + ' items from list!', 'success');
+                } else {
+                    showToast('Data list is empty!', 'error');
+                }
+            });
+        }
+
+        var btnMeasureCard = document.getElementById('btnMeasureCard');
+        if (btnMeasureCard) {
+            btnMeasureCard.addEventListener('click', function() {
+                btnMeasureCard.textContent = 'Measuring...';
+                evalHostScript('getSelectionCardSize()', function(resStr) {
+                    btnMeasureCard.textContent = 'Auto Measure';
+                    try {
+                        var res = JSON.parse(resStr);
+                        if (res.status === 'success') {
+                            var inW = document.getElementById('inputCardW');
+                            var inH = document.getElementById('inputCardH');
+                            if (inW) inW.value = res.width;
+                            if (inH) inH.value = res.height;
+                            updateDuplicatorSummary();
+                            showToast('Measured: ' + res.width + ' × ' + res.height + ' pt', 'success');
+                        } else {
+                            showToast(res.message || 'Please select a card template', 'error');
+                        }
+                    } catch(e) {
+                        showToast('Failed to measure selection', 'error');
+                    }
+                });
+            });
+        }
+
+        var btnRunDup = document.getElementById('btnRunDuplicate');
+        if (btnRunDup) {
+            btnRunDup.addEventListener('click', executeDuplicateTemplates);
+        }
+
+        // Canvas Move Listener
+        var btnPlaceCanvas = document.getElementById('btnPlaceCanvasText');
+        if (btnPlaceCanvas) {
+            btnPlaceCanvas.addEventListener('click', executePlaceCanvasText);
+        }
+
+        // Typography & Leading Preset Buttons
+        function setupPresetButtons() {
+            var presetBtns = document.querySelectorAll('.btn-scale-preset, .btn-leading-preset');
+            presetBtns.forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    var targetId = this.getAttribute('data-target');
+                    var val = this.getAttribute('data-val');
+                    if (!targetId || val === null) return;
+                    var input = document.getElementById(targetId);
+                    if (input) {
+                        input.value = val;
+                        input.dispatchEvent(new Event('input', { bubbles: true }));
+                        input.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+
+                    var siblings = document.querySelectorAll('[data-target="' + targetId + '"]');
+                    siblings.forEach(function(s) { s.classList.remove('active'); });
+                    this.classList.add('active');
+                });
+            });
+
+            // Sync input changes back to button active state
+            ['inputDetailsHScaleKeyring', 'inputNameHScaleKeyring', 'inputDetailsLeadingKeyring'].forEach(function(id) {
+                var input = document.getElementById(id);
+                if (input) {
+                    input.addEventListener('input', function() {
+                        var val = this.value.trim();
+                        var buttons = document.querySelectorAll('[data-target="' + id + '"]');
+                        buttons.forEach(function(b) {
+                            if (b.getAttribute('data-val') === val) b.classList.add('active');
+                            else b.classList.remove('active');
+                        });
+                    });
+                }
+            });
+        }
+
+        setupPresetButtons();
+        setupColorControls();
+        updateDuplicatorSummary();
     }
 
     if (document.readyState === 'loading') {
@@ -2234,4 +1153,5 @@
     } else {
         init();
     }
+
 })();
