@@ -11,6 +11,267 @@
     var bnDigits = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
 
     // ==========================================
+    // CEP Keyboard & Clipboard Engine
+    // ==========================================
+    try {
+        if (window.__adobe_cep__ && window.__adobe_cep__.registerKeyEventsInterest) {
+            var keyEventsInterest = JSON.stringify([
+                { keyCode: 0, ctrlKey: false, altKey: false, shiftKey: false, metaKey: true },
+                { keyCode: 0, ctrlKey: true, altKey: false, shiftKey: false, metaKey: false }
+            ]);
+            window.__adobe_cep__.registerKeyEventsInterest(keyEventsInterest);
+        }
+    } catch (e) {}
+
+    function getSystemClipboardText(callback) {
+        if (typeof callback !== 'function') return;
+        var called = false;
+        function done(text) {
+            if (!called) {
+                called = true;
+                callback(text || '');
+            }
+        }
+
+        // Method 1: Modern Navigator Clipboard API (fastest & native)
+        if (navigator.clipboard && navigator.clipboard.readText) {
+            navigator.clipboard.readText().then(function(text) {
+                if (text) {
+                    done(text);
+                } else {
+                    tryAsyncChildProcess();
+                }
+            }).catch(function() {
+                tryAsyncChildProcess();
+            });
+            // 500ms safety timeout
+            setTimeout(function() { tryAsyncChildProcess(); }, 500);
+            return;
+        }
+
+        tryAsyncChildProcess();
+
+        function tryAsyncChildProcess() {
+            if (called) return;
+            try {
+                if (typeof require !== 'undefined') {
+                    var cp = require('child_process');
+                    if (process.platform === 'darwin') {
+                        cp.exec("pbpaste -Prefer txt", {
+                            env: Object.assign({}, process.env, { LANG: "en_US.UTF-8", LC_ALL: "en_US.UTF-8", LC_CTYPE: "UTF-8" }),
+                            encoding: 'utf8',
+                            timeout: 800,
+                            maxBuffer: 10 * 1024 * 1024
+                        }, function(err, stdout) {
+                            if (!err && stdout && stdout.length > 0) {
+                                done(stdout);
+                            } else {
+                                done('');
+                            }
+                        });
+                        return;
+                    } else if (process.platform === 'win32') {
+                        cp.exec('powershell.exe -NoProfile -Command "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; Get-Clipboard -Raw"', {
+                            encoding: 'utf8',
+                            timeout: 800,
+                            maxBuffer: 10 * 1024 * 1024
+                        }, function(err, stdout) {
+                            if (!err && stdout && stdout.length > 0) {
+                                done(stdout);
+                            } else {
+                                done('');
+                            }
+                        });
+                        return;
+                    }
+                }
+            } catch (e) {}
+
+            done('');
+        }
+    }
+
+    function setSystemClipboardText(text) {
+        if (!text) return;
+        try {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text);
+                return;
+            }
+        } catch (e) {}
+
+        try {
+            if (typeof require !== 'undefined') {
+                var cp = require('child_process');
+                if (process.platform === 'darwin') {
+                    var proc = cp.spawn('pbcopy');
+                    proc.stdin.write(text);
+                    proc.stdin.end();
+                    return;
+                } else if (process.platform === 'win32') {
+                    var proc = cp.spawn('clip');
+                    proc.stdin.write(text);
+                    proc.stdin.end();
+                    return;
+                }
+            }
+        } catch (e) {}
+
+        try {
+            var temp = document.createElement('textarea');
+            temp.value = text;
+            document.body.appendChild(temp);
+            temp.select();
+            document.execCommand('copy');
+            document.body.removeChild(temp);
+        } catch (e) {}
+    }
+
+    function insertTextIntoElement(target, text, replaceAll) {
+        if (!target) return;
+        target.focus();
+        if (replaceAll || !target.value) {
+            target.value = text;
+        } else {
+            var start = target.selectionStart !== undefined ? target.selectionStart : target.value.length;
+            var end = target.selectionEnd !== undefined ? target.selectionEnd : target.value.length;
+            var val = target.value;
+            target.value = val.substring(0, start) + text + val.substring(end);
+            target.selectionStart = target.selectionEnd = start + text.length;
+        }
+        target.dispatchEvent(new Event('input', { bubbles: true }));
+        target.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    function setupContextMenu() {
+        var menu = document.getElementById('customContextMenu');
+        var activeTarget = null;
+
+        document.addEventListener('contextmenu', function(e) {
+            var target = e.target;
+            if (target && (target.tagName === 'TEXTAREA' || target.tagName === 'INPUT')) {
+                e.preventDefault();
+                activeTarget = target;
+                if (!menu) return;
+                menu.style.display = 'block';
+                var x = e.clientX;
+                var y = e.clientY;
+                var maxW = window.innerWidth - 160;
+                var maxH = window.innerHeight - 150;
+                menu.style.left = Math.min(x, maxW) + 'px';
+                menu.style.top = Math.min(y, maxH) + 'px';
+            } else {
+                if (menu) menu.style.display = 'none';
+            }
+        });
+
+        document.addEventListener('click', function(e) {
+            if (menu && !menu.contains(e.target)) {
+                menu.style.display = 'none';
+            }
+        });
+
+        var btnPaste = document.getElementById('ctxMenuPaste');
+        if (btnPaste) {
+            btnPaste.addEventListener('click', function() {
+                if (menu) menu.style.display = 'none';
+                if (activeTarget) {
+                    getSystemClipboardText(function(clipText) {
+                        if (clipText) {
+                            insertTextIntoElement(activeTarget, clipText, false);
+                            showToast('Pasted from clipboard', 'info');
+                        } else {
+                            showToast('Clipboard is empty', 'error');
+                        }
+                    });
+                }
+            });
+        }
+
+        var btnCopy = document.getElementById('ctxMenuCopy');
+        if (btnCopy) {
+            btnCopy.addEventListener('click', function() {
+                if (menu) menu.style.display = 'none';
+                if (activeTarget) {
+                    var start = activeTarget.selectionStart;
+                    var end = activeTarget.selectionEnd;
+                    var selected = (start !== undefined && end !== undefined && start !== end) ? activeTarget.value.substring(start, end) : activeTarget.value;
+                    if (selected) {
+                        setSystemClipboardText(selected);
+                        showToast('Copied to clipboard', 'info');
+                    }
+                }
+            });
+        }
+
+        var btnCut = document.getElementById('ctxMenuCut');
+        if (btnCut) {
+            btnCut.addEventListener('click', function() {
+                if (menu) menu.style.display = 'none';
+                if (activeTarget) {
+                    var start = activeTarget.selectionStart;
+                    var end = activeTarget.selectionEnd;
+                    var selected = (start !== undefined && end !== undefined && start !== end) ? activeTarget.value.substring(start, end) : activeTarget.value;
+                    if (selected) {
+                        setSystemClipboardText(selected);
+                        insertTextIntoElement(activeTarget, '', false);
+                        showToast('Cut to clipboard', 'info');
+                    }
+                }
+            });
+        }
+
+        var btnSelectAll = document.getElementById('ctxMenuSelectAll');
+        if (btnSelectAll) {
+            btnSelectAll.addEventListener('click', function() {
+                if (menu) menu.style.display = 'none';
+                if (activeTarget) {
+                    activeTarget.focus();
+                    activeTarget.select();
+                }
+            });
+        }
+
+        var btnClear = document.getElementById('ctxMenuClear');
+        if (btnClear) {
+            btnClear.addEventListener('click', function() {
+                if (menu) menu.style.display = 'none';
+                if (activeTarget) {
+                    activeTarget.value = '';
+                    activeTarget.dispatchEvent(new Event('input', { bubbles: true }));
+                    activeTarget.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+            });
+        }
+    }
+
+    // Global keyboard listener to guarantee Cmd+V / Ctrl+V and Cmd+A / Ctrl+A work in all text inputs
+    window.addEventListener('keydown', function(e) {
+        var isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+        var isCmdOrCtrl = isMac ? e.metaKey : e.ctrlKey;
+        if (!isCmdOrCtrl) return;
+
+        var key = e.key ? e.key.toLowerCase() : '';
+        var active = document.activeElement;
+        var isInput = active && (active.tagName === 'TEXTAREA' || active.tagName === 'INPUT');
+
+        if (key === 'v') {
+            if (isInput) {
+                getSystemClipboardText(function(clipText) {
+                    if (clipText) {
+                        insertTextIntoElement(active, clipText, false);
+                    }
+                });
+            }
+        } else if (key === 'a') {
+            if (isInput) {
+                active.select();
+            }
+        }
+    });
+
+
+    // ==========================================
     // Core Utilities & Host Communication
     // ==========================================
     function evalHostScript(code, callback) {
@@ -377,7 +638,7 @@
         var inputStartIndex = document.getElementById('inputStartIndexKeyring');
 
         try {
-            if (!parsedKeyringEntries.length && rawTextInputKeyring && rawTextInputKeyring.value.trim()) {
+            if (!parsedKeyringEntries.length && rawTextInput && rawTextInput.value.trim()) {
                 parseKeyringInput();
             }
 
@@ -399,7 +660,17 @@
             var detLead = inputDetLead ? inputDetLead.value.trim() : "9.6";
             var nmLead = inputNmLead ? inputNmLead.value.trim() : "Auto";
 
+            var chkAutoFitK = document.getElementById('chkAutoFitKeyring');
+            var inputSafeWidthK = document.getElementById('inputSafeWidthKeyring');
+            var inputMinHScaleK = document.getElementById('inputMinHScaleKeyring');
+            var autoFitK = chkAutoFitK ? chkAutoFitK.checked : true;
+            var safeWidthK = inputSafeWidthK ? (parseFloat(inputSafeWidthK.value) || 45) : 45;
+            var minHScaleK = inputMinHScaleK ? (parseFloat(inputMinHScaleK.value) || 60) : 60;
+
             var payload = {
+                autoFit: autoFitK,
+                safeWidthMm: safeWidthK,
+                minHScale: minHScaleK,
                 isKeyring: true,
                 fillSerial: false,
                 entries: parsedKeyringEntries,
@@ -614,12 +885,24 @@
             var detHScaleD = inputDetHScaleD ? (parseFloat(inputDetHScaleD.value) || 85) : 85;
             var nmHScaleD = inputNmHScaleD ? (parseFloat(inputNmHScaleD.value) || 80) : 80;
 
-            var inputDetSizeD = document.getElementById('inputDetailsSizeDiary');
+            var inputNmSizeD = document.getElementById('inputNameSizeDiary');
+            var inputDetSizeD = document.getElementById('inputNameSizeDiary', 'inputDetailsSizeDiary');
             var inputDetLeadD = document.getElementById('inputDetailsLeadingDiary');
+            var nmSizeD = inputNmSizeD ? inputNmSizeD.value.trim() : "Auto";
             var detSizeD = inputDetSizeD ? inputDetSizeD.value.trim() : "Auto";
             var detLeadD = inputDetLeadD ? inputDetLeadD.value.trim() : "Auto";
 
+            var chkAutoFitD = document.getElementById('chkAutoFitDiary');
+            var inputSafeWidthD = document.getElementById('inputSafeWidthDiary');
+            var inputMinHScaleD = document.getElementById('inputMinHScaleDiary');
+            var autoFitD = chkAutoFitD ? chkAutoFitD.checked : true;
+            var safeWidthD = inputSafeWidthD ? (parseFloat(inputSafeWidthD.value) || 50) : 50;
+            var minHScaleD = inputMinHScaleD ? (parseFloat(inputMinHScaleD.value) || 60) : 60;
+
             var payload = {
+                autoFit: autoFitD,
+                safeWidthMm: safeWidthD,
+                minHScale: minHScaleD,
                 isKeyring: false,
                 fillSerial: true,
                 entries: parsedDiaryEntries,
@@ -635,6 +918,7 @@
                 skipFilledCards: skipFilled,
                 detailsHScale: detHScaleD,
                 nameHScale: nmHScaleD,
+                nameSize: nmSizeD,
                 detailsSize: detSizeD,
                 detailsLeading: detLeadD
             };
@@ -1057,6 +1341,23 @@
         var chkStripNumK = document.getElementById('chkStripNumberKeyring');
         if (chkStripNumK) chkStripNumK.addEventListener('change', parseKeyringInput);
 
+        var btnPasteK = document.getElementById('btnPasteKeyring');
+        if (btnPasteK) {
+            btnPasteK.addEventListener('click', function() {
+                getSystemClipboardText(function(clipText) {
+                    if (clipText && clipText.trim()) {
+                        if (rawTextInputK) rawTextInputK.value = clipText;
+                        var rawDiary = document.getElementById('rawTextInputDiary');
+                        if (rawDiary) rawDiary.value = clipText;
+                        parseKeyringInput();
+                        showToast('Pasted from clipboard!', 'success');
+                    } else {
+                        showToast('Clipboard is empty (ক্লিপবোর্ড খালি)', 'error');
+                    }
+                });
+            });
+        }
+
         var btnSampleK = document.getElementById('btnLoadSampleKeyring');
         if (btnSampleK) {
             btnSampleK.addEventListener('click', function() {
@@ -1117,6 +1418,23 @@
 
         var chkIncludeDetailsD = document.getElementById('chkIncludeDetailsDiary');
         if (chkIncludeDetailsD) chkIncludeDetailsD.addEventListener('change', parseDiaryInput);
+
+        var btnPasteD = document.getElementById('btnPasteDiary');
+        if (btnPasteD) {
+            btnPasteD.addEventListener('click', function() {
+                getSystemClipboardText(function(clipText) {
+                    if (clipText && clipText.trim()) {
+                        if (rawTextInputD) rawTextInputD.value = clipText;
+                        var rawK = document.getElementById('rawTextInputKeyring');
+                        if (rawK) rawK.value = clipText;
+                        parseDiaryInput();
+                        showToast('Pasted from clipboard!', 'success');
+                    } else {
+                        showToast('Clipboard is empty (ক্লিপবোর্ড খালি)', 'error');
+                    }
+                });
+            });
+        }
 
         var btnSampleD = document.getElementById('btnLoadSampleDiary');
         if (btnSampleD) {
@@ -1226,9 +1544,58 @@
             btnPlaceCanvas.addEventListener('click', executePlaceCanvasText);
         }
 
-        // Typography & Leading Preset Buttons
+        // Safe Width Pickers
+        var btnPickSWD = document.getElementById('btnPickSafeWidthDiary');
+        if (btnPickSWD) {
+            btnPickSWD.addEventListener('click', function() {
+                evalHostScript('getSelectedCanvasWidth()', function(resStr) {
+                    try {
+                        var res = JSON.parse(resStr);
+                        if (res.status === 'success') {
+                            var inputSW = document.getElementById('inputSafeWidthDiary');
+                            if (inputSW) {
+                                inputSW.value = res.widthMm;
+                                inputSW.dispatchEvent(new Event('input', { bubbles: true }));
+                                inputSW.dispatchEvent(new Event('change', { bubbles: true }));
+                            }
+                            showToast(res.message || ('Picked safe width: ' + res.widthMm + ' mm'), 'success');
+                        } else {
+                            showToast(res.message || 'Could not pick width from selection', 'error');
+                        }
+                    } catch(e) {
+                        showToast('Error picking width', 'error');
+                    }
+                });
+            });
+        }
+
+        var btnPickSWK = document.getElementById('btnPickSafeWidthKeyring');
+        if (btnPickSWK) {
+            btnPickSWK.addEventListener('click', function() {
+                evalHostScript('getSelectedCanvasWidth()', function(resStr) {
+                    try {
+                        var res = JSON.parse(resStr);
+                        if (res.status === 'success') {
+                            var inputSW = document.getElementById('inputSafeWidthKeyring');
+                            if (inputSW) {
+                                inputSW.value = res.widthMm;
+                                inputSW.dispatchEvent(new Event('input', { bubbles: true }));
+                                inputSW.dispatchEvent(new Event('change', { bubbles: true }));
+                            }
+                            showToast(res.message || ('Picked safe width: ' + res.widthMm + ' mm'), 'success');
+                        } else {
+                            showToast(res.message || 'Could not pick width from selection', 'error');
+                        }
+                    } catch(e) {
+                        showToast('Error picking width', 'error');
+                    }
+                });
+            });
+        }
+
+        // Typography, Leading & Safe Width Preset Buttons
         function setupPresetButtons() {
-            var presetBtns = document.querySelectorAll('.btn-scale-preset, .btn-leading-preset');
+            var presetBtns = document.querySelectorAll('.btn-scale-preset, .btn-leading-preset, .btn-safewidth-preset');
             presetBtns.forEach(function(btn) {
                 btn.addEventListener('click', function() {
                     var targetId = this.getAttribute('data-target');
@@ -1248,7 +1615,7 @@
             });
 
             // Sync input changes back to button active state
-            ['inputDetailsHScaleKeyring', 'inputNameHScaleKeyring', 'inputDetailsLeadingKeyring', 'inputDetailsHScaleDiary', 'inputNameHScaleDiary', 'inputDetailsSizeDiary', 'inputDetailsLeadingDiary'].forEach(function(id) {
+            ['inputDetailsHScaleKeyring', 'inputNameHScaleKeyring', 'inputDetailsLeadingKeyring', 'inputSafeWidthKeyring', 'inputDetailsHScaleDiary', 'inputNameHScaleDiary', 'inputNameSizeDiary', 'inputDetailsSizeDiary', 'inputDetailsLeadingDiary', 'inputSafeWidthDiary'].forEach(function(id) {
                 var input = document.getElementById(id);
                 if (input) {
                     input.addEventListener('input', function() {
@@ -1265,6 +1632,7 @@
 
         setupPresetButtons();
         setupColorControls();
+        setupContextMenu();
         updateDuplicatorSummary();
     }
 

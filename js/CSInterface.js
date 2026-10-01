@@ -68,3 +68,11 @@ CSInterface.prototype.getSystemPath = function(pathType) {
     }
     return path;
 };
+
+CSInterface.prototype.registerKeyEventsInterest = function(keyEventsInterest) {
+    if (window.__adobe_cep__ && window.__adobe_cep__.registerKeyEventsInterest) {
+        return window.__adobe_cep__.registerKeyEventsInterest(keyEventsInterest);
+    }
+};
+
+

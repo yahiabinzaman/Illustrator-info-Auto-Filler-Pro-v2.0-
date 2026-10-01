@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Name &amp; Card Auto-Filler</title>
-    <link rel="stylesheet" href="css/style.css?v=2.8.0">
+    <link rel="stylesheet" href="css/style.css?v=2.8.1">
     <script>
     function switchTab(tabId) {
         if (!tabId) return;
@@ -63,6 +63,7 @@
             <div class="section-header">
                 <span class="section-title">Data List (Unicode / ANSI)</span>
                 <div style="display: flex; gap: 4px;">
+                    <button id="btnPasteKeyring" class="btn btn-sm btn-accent" title="Paste text from clipboard">📋 Paste</button>
                     <button id="btnLoadSampleKeyring" class="btn btn-sm">Sample</button>
                     <button id="btnClearKeyring" class="btn btn-sm">Clear</button>
                 </div>
@@ -181,6 +182,37 @@ Example:
                 </div>
             </div>
 
+            <!-- Safe Margin & Auto-Fit Controls -->
+            <div class="control-group" style="margin-top: 4px; background: #222222; border: 1px solid #383838; border-radius: 3px; padding: 6px 8px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                    <label class="checkbox-label" style="font-weight: 600; color: #4fa3ff; margin-bottom: 0;">
+                        <input type="checkbox" id="chkAutoFitKeyring" checked>
+                        <span>Safe Margin Auto-Fit</span>
+                    </label>
+                    <button type="button" id="btnPickSafeWidthKeyring" class="btn btn-sm" title="Select a box, line or text on canvas to pick max width" style="padding: 2px 7px; font-size: 10px; background: #2f3b4c; border-color: #43648f; color: #a2d2ff;">
+                        🎯 Pick Width
+                    </button>
+                </div>
+                <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
+                    <div style="display: flex; align-items: center; gap: 3px;">
+                        <span style="font-size: 10px; color: #aaa;">Max Width:</span>
+                        <input type="number" id="inputSafeWidthKeyring" min="10" max="500" step="0.5" value="45" style="width: 48px; text-align: center; font-weight: bold;" title="Maximum width in mm. Text exceeding this will be automatically scaled/shrunk to fit.">
+                        <span style="font-size: 10px; color: #888;">mm</span>
+                    </div>
+                    <div style="display: flex; gap: 2px; align-items: center;">
+                        <button type="button" class="btn btn-sm btn-safewidth-preset" data-target="inputSafeWidthKeyring" data-val="35">35</button>
+                        <button type="button" class="btn btn-sm btn-safewidth-preset" data-target="inputSafeWidthKeyring" data-val="40">40</button>
+                        <button type="button" class="btn btn-sm btn-safewidth-preset active" data-target="inputSafeWidthKeyring" data-val="45">45</button>
+                        <button type="button" class="btn btn-sm btn-safewidth-preset" data-target="inputSafeWidthKeyring" data-val="50">50</button>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 3px; margin-left: auto;">
+                        <span style="font-size: 10px; color: #aaa;" title="Minimum horizontal scale before shrinking font size">Min Scale:</span>
+                        <input type="number" id="inputMinHScaleKeyring" min="30" max="90" value="60" style="width: 40px; text-align: center;" title="Minimum Horizontal Scale percentage">
+                        <span style="font-size: 10px; color: #888;">%</span>
+                    </div>
+                </div>
+            </div>
+
             <!-- Core Options -->
             <div class="checkbox-list" style="margin-top: 6px;">
                 <label class="checkbox-label">
@@ -233,6 +265,7 @@ Example:
             <div class="section-header">
                 <span class="section-title">Data List (Unicode / ANSI)</span>
                 <div style="display: flex; gap: 4px;">
+                    <button id="btnPasteDiary" class="btn btn-sm btn-accent" title="Paste text from clipboard">📋 Paste</button>
                     <button id="btnLoadSampleDiary" class="btn btn-sm">Sample</button>
                     <button id="btnClearDiary" class="btn btn-sm">Clear</button>
                 </div>
@@ -336,6 +369,18 @@ Example:
 
             <div class="grid-2" style="margin-top: 4px;">
                 <div class="control-group">
+                    <label for="inputNameSizeDiary">নামের সাইজ (Name Size)</label>
+                    <div style="display: flex; gap: 3px; align-items: center; flex-wrap: wrap;">
+                        <input type="text" id="inputNameSizeDiary" value="Auto" placeholder="Auto" style="width: 46px; text-align: center; font-weight: bold;" title="Auto copies size directly from template">
+                        <button type="button" class="btn btn-sm btn-leading-preset active" data-target="inputNameSizeDiary" data-val="Auto">Auto</button>
+                        <button type="button" class="btn btn-sm btn-leading-preset" data-target="inputNameSizeDiary" data-val="8.5">8.5</button>
+                        <button type="button" class="btn btn-sm btn-leading-preset" data-target="inputNameSizeDiary" data-val="9.25">9.25</button>
+                        <button type="button" class="btn btn-sm btn-leading-preset" data-target="inputNameSizeDiary" data-val="10">10</button>
+                        <button type="button" class="btn btn-sm btn-leading-preset" data-target="inputNameSizeDiary" data-val="11">11</button>
+                        <button type="button" class="btn btn-sm btn-leading-preset" data-target="inputNameSizeDiary" data-val="12">12</button>
+                    </div>
+                </div>
+                <div class="control-group">
                     <label for="inputDetailsSizeDiary">ঠিকানার সাইজ (Details Size)</label>
                     <div style="display: flex; gap: 3px; align-items: center; flex-wrap: wrap;">
                         <input type="text" id="inputDetailsSizeDiary" value="Auto" placeholder="Auto" style="width: 46px; text-align: center; font-weight: bold;" title="Auto copies size directly from template">
@@ -346,6 +391,8 @@ Example:
                         <button type="button" class="btn btn-sm btn-leading-preset" data-target="inputDetailsSizeDiary" data-val="12">12</button>
                     </div>
                 </div>
+            </div>
+            <div class="grid-2" style="margin-top: 4px;">
                 <div class="control-group">
                     <label for="inputDetailsLeadingDiary">লাইন লিডিং (Line Leading)</label>
                     <div style="display: flex; gap: 3px; align-items: center; flex-wrap: wrap;">
@@ -354,6 +401,38 @@ Example:
                         <button type="button" class="btn btn-sm btn-leading-preset" data-target="inputDetailsLeadingDiary" data-val="8.4">8.4</button>
                         <button type="button" class="btn btn-sm btn-leading-preset" data-target="inputDetailsLeadingDiary" data-val="11">11</button>
                         <button type="button" class="btn btn-sm btn-leading-preset" data-target="inputDetailsLeadingDiary" data-val="13">13</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Safe Margin & Auto-Fit Controls -->
+            <div class="control-group" style="margin-top: 6px; background: #222222; border: 1px solid #383838; border-radius: 3px; padding: 6px 8px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                    <label class="checkbox-label" style="font-weight: 600; color: #4fa3ff; margin-bottom: 0;">
+                        <input type="checkbox" id="chkAutoFitDiary" checked>
+                        <span>সেফ মার্জিন অটো-ফিট (Auto-Fit Long Text)</span>
+                    </label>
+                    <button type="button" id="btnPickSafeWidthDiary" class="btn btn-sm" title="Select a box, line or text on canvas to pick max width" style="padding: 2px 7px; font-size: 10px; background: #2f3b4c; border-color: #43648f; color: #a2d2ff;">
+                        🎯 Pick Width
+                    </button>
+                </div>
+                <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
+                    <div style="display: flex; align-items: center; gap: 3px;">
+                        <span style="font-size: 10px; color: #aaa;">Max Width:</span>
+                        <input type="number" id="inputSafeWidthDiary" min="10" max="500" step="0.5" value="50" style="width: 48px; text-align: center; font-weight: bold;" title="Maximum width in mm. Text exceeding this will be automatically scaled/shrunk to fit.">
+                        <span style="font-size: 10px; color: #888;">mm</span>
+                    </div>
+                    <div style="display: flex; gap: 2px; align-items: center;">
+                        <button type="button" class="btn btn-sm btn-safewidth-preset" data-target="inputSafeWidthDiary" data-val="40">40</button>
+                        <button type="button" class="btn btn-sm btn-safewidth-preset" data-target="inputSafeWidthDiary" data-val="45">45</button>
+                        <button type="button" class="btn btn-sm btn-safewidth-preset active" data-target="inputSafeWidthDiary" data-val="50">50</button>
+                        <button type="button" class="btn btn-sm btn-safewidth-preset" data-target="inputSafeWidthDiary" data-val="55">55</button>
+                        <button type="button" class="btn btn-sm btn-safewidth-preset" data-target="inputSafeWidthDiary" data-val="60">60</button>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 3px; margin-left: auto;">
+                        <span style="font-size: 10px; color: #aaa;" title="Minimum horizontal scale before shrinking font size">Min Scale:</span>
+                        <input type="number" id="inputMinHScaleDiary" min="30" max="90" value="60" style="width: 40px; text-align: center;" title="Minimum Horizontal Scale percentage">
+                        <span style="font-size: 10px; color: #888;">%</span>
                     </div>
                 </div>
             </div>
@@ -503,12 +582,22 @@ Example:
         <a href="https://github.com/yahiabinzaman" id="btn-author-link" onclick="openAuthorProfile(event); return false;" style="color: #888888; text-decoration: none; cursor: pointer;">
             Developed by <strong style="color: #1473e6; font-weight: 600;">Yahia Bin Zaman</strong>
         </a>
-        <span style="font-size: 10px; color: #555555; font-family: monospace;">v2.8.0</span>
+        <span style="font-size: 10px; color: #555555; font-family: monospace;">v2.8.1</span>
     </footer>
+
+    <!-- Custom Context Menu for Right-Click Cut/Copy/Paste/Select All -->
+    <div id="customContextMenu" class="custom-context-menu">
+        <div class="context-menu-item" id="ctxMenuPaste">📋 Paste (পেস্ট)</div>
+        <div class="context-menu-item" id="ctxMenuCopy">📄 Copy (কপি)</div>
+        <div class="context-menu-item" id="ctxMenuCut">✂️ Cut (কাট)</div>
+        <div class="context-menu-separator"></div>
+        <div class="context-menu-item" id="ctxMenuSelectAll">🔲 Select All (সব নির্বাচন)</div>
+        <div class="context-menu-item" id="ctxMenuClear">🗑️ Clear (মুছে ফেলুন)</div>
+    </div>
 
     <!-- Scripts -->
     <script src="js/CSInterface.js"></script>
-    <script src="js/main.js?v=2.8.0"></script>
+    <script src="js/main.js?v=2.8.1"></script>
 <script>
 function openAuthorProfile(e) {
     if (e) { e.preventDefault(); e.stopPropagation(); }

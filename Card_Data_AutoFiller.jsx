@@ -94,6 +94,74 @@ var CardAutoFiller = {
         return res > 0 ? res : -1;
     },
 
+        getSelectedCanvasWidth: function() {
+        if (!app.documents.length) {
+            return JSON.stringify({ status: "error", message: "No document open." });
+        }
+        var doc = app.activeDocument;
+        var sel = doc.selection;
+        if (!sel || (sel instanceof Array && sel.length === 0)) {
+            return JSON.stringify({ status: "error", message: "Please select an object or text frame to measure." });
+        }
+        var item = (sel instanceof Array) ? sel[0] : sel;
+        var wPt = 0;
+        try {
+            if (item.typename === "TextRange") {
+                wPt = item.width || (item.characters.length * item.characterAttributes.size * 0.5);
+            } else if (item.width) {
+                wPt = item.width;
+            } else if (item.visibleBounds) {
+                wPt = Math.abs(item.visibleBounds[2] - item.visibleBounds[0]);
+            }
+        } catch(e) {}
+        if (!wPt || wPt <= 0) {
+            return JSON.stringify({ status: "error", message: "Could not measure selected item width." });
+        }
+        var widthPt = Math.round(wPt * 10) / 10;
+        var widthMm = Math.round((wPt * 25.4 / 72.0) * 10) / 10;
+        return JSON.stringify({
+            status: "success",
+            widthMm: widthMm,
+            widthPt: widthPt,
+            message: "Picked safe width: " + widthMm + " mm (" + widthPt + " pt)"
+        });
+    },
+
+    fitTextFrameToWidth: function(textFrame, maxPt, baseHScale, minScale, baseFontSize) {
+        if (!textFrame || !maxPt || maxPt <= 0) return;
+        try {
+            var minSc = minScale || 55;
+            var numParas = textFrame.paragraphs.length;
+            if (numParas === 0) return;
+
+            for (var p = 0; p < numParas; p++) {
+                try {
+                    var para = textFrame.paragraphs[p];
+                    var pText = para.contents.replace(/^[\s\r\n]+|[\s\r\n]+$/g, "");
+                    if (!pText || para.characters.length === 0) continue;
+
+                    var firstCharAttr = para.characters[0].characterAttributes;
+                    var curHScale = firstCharAttr.horizontalScale || baseHScale || 100;
+                    var curSize = firstCharAttr.size || baseFontSize || 9.25;
+
+                    var charFactor = (p === 0) ? 0.52 : 0.50;
+                    var estParaWidthPt = pText.length * (curSize * charFactor) * (curHScale / 100.0);
+
+                    if (estParaWidthPt <= maxPt) {
+                        continue;
+                    }
+
+                    var targetScale = Math.floor(curHScale * (maxPt / estParaWidthPt) * 0.98 * 10) / 10;
+                    if (targetScale < minSc) targetScale = minSc;
+
+                    for (var c = 0; c < para.characters.length; c++) {
+                        try { para.characters[c].characterAttributes.horizontalScale = targetScale; } catch(ce) {}
+                    }
+                } catch(pe) {}
+            }
+        } catch(e) {}
+    },
+
     getSelectedCanvasColor: function() {
         if (!app.documents.length) {
             return JSON.stringify({ status: "error", message: "No document open." });
@@ -977,32 +1045,100 @@ var CardAutoFiller = {
     _fontCache: {},
 
     getBornomalaFonts: function() {
+        if (!this._fontCache) this._fontCache = {};
         if (this._fontCache["bornomala_default"]) return this._fontCache["bornomala_default"];
         var res = { bold: null, regular: null };
-        var bNames = ["Bornomala01MJ-Bold", "Bornomala-Bold", "Bornomala02MJ-Bold", "SutonnyMJ-Bold", "SutonnyMJ-Bold-Bold"];
-        var rNames = ["Bornomala01MJ-Regular", "Bornomala-Regular", "Bornomala", "Bornomala02MJ", "SutonnyMJ", "SutonnyMJ-Regular"];
+
+        // 1. Direct PostScript Name lookups
+        var bNames = [
+            "Bornomala-Bold",
+            "BornomalaANSI-Bold",
+            "Bornomala01MJ-Bold",
+            "Bornomala02MJ-Bold",
+            "Bornomala",
+            "SutonnyMJ-Bold",
+            "SutonnyMJ-Bold-Bold"
+        ];
+        var rNames = [
+            "Bornomala-Regular",
+            "BornomalaANSI-Regular",
+            "Bornomala01MJ-Regular",
+            "Bornomala02MJ-Regular",
+            "Bornomala",
+            "Bornomala ANSI",
+            "SutonnyMJ",
+            "SutonnyMJ-Regular"
+        ];
         
         for (var b = 0; b < bNames.length; b++) {
-            try { res.bold = app.textFonts.getByName(bNames[b]); if (res.bold) break; } catch(e) {}
+            try { 
+                var bf = app.textFonts.getByName(bNames[b]); 
+                if (bf) { res.bold = bf; break; } 
+            } catch(e) {}
         }
         for (var r = 0; r < rNames.length; r++) {
-            try { res.regular = app.textFonts.getByName(rNames[r]); if (res.regular) break; } catch(e) {}
+            try { 
+                var rf = app.textFonts.getByName(rNames[r]); 
+                if (rf) { res.regular = rf; break; } 
+            } catch(e) {}
         }
 
+        // 2. Search installed system fonts specifically for Bornomala / Sutonny
         if (!res.bold || !res.regular) {
             try {
-                for (var i = 0; i < Math.min(app.textFonts.length, 300); i++) {
+                for (var i = 0; i < app.textFonts.length; i++) {
                     var f = app.textFonts[i];
-                    var fn = f.name;
+                    var fn = f.name || "";
+                    var fam = f.family || "";
                     var fs = f.style || "";
-                    if (/bornomala|sutonny/i.test(fn)) {
-                        if (!res.bold && /bold/i.test(fn + fs)) res.bold = f;
-                        if (!res.regular && /regular|normal/i.test(fn + fs)) res.regular = f;
+                    var fullDesc = (fn + " " + fam + " " + fs).toLowerCase();
+                    
+                    if (fullDesc.indexOf("bornomala") !== -1 || fullDesc.indexOf("sutonny") !== -1) {
+                        if (!res.bold && (fs.toLowerCase().indexOf("bold") !== -1 || fn.toLowerCase().indexOf("bold") !== -1)) {
+                            res.bold = f;
+                        }
+                        if (!res.regular && (fs.toLowerCase().indexOf("regular") !== -1 || fn.toLowerCase().indexOf("regular") !== -1 || fs === "" || fs === "Normal")) {
+                            res.regular = f;
+                        }
                     }
                     if (res.bold && res.regular) break;
                 }
             } catch(e) {}
         }
+
+        // 3. Fallback: Search active document text frames specifically for Bornomala / Sutonny
+        if (!res.bold || !res.regular) {
+            try {
+                if (app.documents.length > 0) {
+                    var doc = app.activeDocument;
+                    for (var i = 0; i < doc.textFrames.length; i++) {
+                        try {
+                            var tf = doc.textFrames[i];
+                            if (tf.paragraphs.length > 0 && tf.paragraphs[0].characters.length > 0) {
+                                var f = tf.paragraphs[0].characters[0].characterAttributes.textFont;
+                                if (f) {
+                                    var fn = (f.name || "").toLowerCase();
+                                    var fam = (f.family || "").toLowerCase();
+                                    var fs = (f.style || "").toLowerCase();
+                                    if (fn.indexOf("bornomala") !== -1 || fam.indexOf("bornomala") !== -1 || fn.indexOf("sutonny") !== -1 || fam.indexOf("sutonny") !== -1) {
+                                        if (/bold/i.test(fn) || /bold/i.test(fs)) {
+                                            if (!res.bold) res.bold = f;
+                                        } else if (/regular|normal/i.test(fn) || /regular|normal/i.test(fs) || fs === "") {
+                                            if (!res.regular) res.regular = f;
+                                        }
+                                    }
+                                }
+                            }
+                        } catch(tfe) {}
+                        if (res.bold && res.regular) break;
+                    }
+                }
+            } catch(de) {}
+        }
+
+        if (res.bold && !res.regular) res.regular = res.bold;
+        if (!res.bold && res.regular) res.bold = res.regular;
+
         this._fontCache["bornomala_default"] = res;
         return res;
     },
@@ -1014,7 +1150,7 @@ var CardAutoFiller = {
         if (!fam) {
             try { fam = baseFont.name.split("-")[0]; } catch(e) {}
         }
-        if (!fam) return this.getBornomalaFonts();
+        if (!fam || /akhand|myriad/i.test(fam) || /akhand|myriad/i.test(baseFont.name)) return this.getBornomalaFonts();
 
         var cacheKey = fam.toLowerCase();
         if (this._fontCache[cacheKey]) {
@@ -1580,6 +1716,15 @@ var CardAutoFiller = {
         var userNameLeading = parseFloat(payload.nameLeading);
         var hasCustomNameLeading = (!isNaN(userNameLeading) && userNameLeading > 0);
 
+        var autoFit = (payload.autoFit !== false && payload.autoFit !== "false");
+        var safeWidthMm = parseFloat(payload.safeWidthMm || payload.safeWidth || payload.maxWidthMm || payload.maxWidth);
+        var safeWidthPt = 0;
+        if (!isNaN(safeWidthMm) && safeWidthMm > 0) {
+            safeWidthPt = safeWidthMm * 72.0 / 25.4;
+        }
+        var minHScale = parseFloat(payload.minHScale);
+        if (isNaN(minHScale) || minHScale <= 0) minHScale = 55;
+
         var cards = this.detectCards(scope);
         if (!cards.length) {
             return JSON.stringify({
@@ -1637,7 +1782,7 @@ var CardAutoFiller = {
                     var p0 = cTF.paragraphs[0];
                     if (p0 && p0.characterAttributes) {
                         var f0 = p0.characterAttributes.textFont;
-                        if (f0 && (!docBoldFont || f0.name.indexOf("Bold") !== -1)) docBoldFont = f0;
+                        if (f0 && !/akhand/i.test(f0.name) && (!docBoldFont || f0.name.indexOf("Bold") !== -1)) docBoldFont = f0;
                         var fc = p0.characterAttributes.fillColor;
                         if (!docNameColor && fc && fc.typename !== "NoColor") {
                             if (fc.typename === "SpotColor" || (fc.typename === "CMYKColor" && fc.magenta > 50)) {
@@ -1653,7 +1798,7 @@ var CardAutoFiller = {
                         var p1 = cTF.paragraphs[1];
                         if (p1 && p1.characterAttributes) {
                             var f1 = p1.characterAttributes.textFont;
-                            if (f1 && (!docRegularFont || f1.name.indexOf("Bold") === -1)) docRegularFont = f1;
+                            if (f1 && !/akhand/i.test(f1.name) && (!docRegularFont || f1.name.indexOf("Bold") === -1)) docRegularFont = f1;
                             if (!docDetailsLeading && p1.characterAttributes.leading > 0) {
                                 docDetailsLeading = p1.characterAttributes.leading;
                             }
@@ -2037,6 +2182,9 @@ var CardAutoFiller = {
                             nTr.paragraphAttributes.spaceBefore = 0;
                             nTr.paragraphAttributes.spaceAfter = 0;
                         } catch(nErr) {}
+                        if (autoFit && safeWidthPt > 0) {
+                            this.fitTextFrameToWidth(card.nameFrame, safeWidthPt, cardNameStyle.hScale, minHScale, cardNameStyle.size);
+                        }
 
                         if (cleanDetails) {
                             card.detailsFrame.contents = cleanDetails;
@@ -2082,9 +2230,10 @@ var CardAutoFiller = {
                         try {
                             if (card.nameFrame.paragraphs.length > 0) {
                                 var p0 = card.nameFrame.paragraphs[0];
-                                if (cardNameStyle.font) p0.characterAttributes.textFont = cardNameStyle.font;
-                                p0.characterAttributes.size = cardNameStyle.size;
-                                p0.characterAttributes.leading = cardNameStyle.leading;
+                                var nbFont = this.getFamilyFonts(cardNameStyle.font || globalBoldFont).bold || globalBoldFont;
+                                if (nbFont) p0.characterAttributes.textFont = nbFont;
+                                if (cardNameStyle.size > 0) p0.characterAttributes.size = cardNameStyle.size;
+                                if (cardNameStyle.leading > 0) p0.characterAttributes.leading = cardNameStyle.leading;
                                 p0.characterAttributes.horizontalScale = cardNameStyle.hScale;
                                 p0.characterAttributes.tracking = cardNameStyle.tracking;
                                 p0.characterAttributes.fillColor = cardNameStyle.color;
@@ -2097,15 +2246,20 @@ var CardAutoFiller = {
                             var numP = card.nameFrame.paragraphs.length;
                             for (var p = 1; p < numP; p++) {
                                 var pIt = card.nameFrame.paragraphs[p];
-                                if (cardDetStyle.font) pIt.characterAttributes.textFont = cardDetStyle.font;
-                                pIt.characterAttributes.size = cardDetStyle.size;
-                                pIt.characterAttributes.leading = cardDetStyle.leading;
+                                var ndFont = this.getFamilyFonts(cardDetStyle.font || globalRegularFont).regular || globalRegularFont;
+                                if (ndFont) pIt.characterAttributes.textFont = ndFont;
+                                if (cardDetStyle.size > 0) pIt.characterAttributes.size = cardDetStyle.size;
+                                if (cardDetStyle.leading > 0) pIt.characterAttributes.leading = cardDetStyle.leading;
                                 pIt.characterAttributes.horizontalScale = cardDetStyle.hScale;
                                 pIt.characterAttributes.tracking = cardDetStyle.tracking;
                                 pIt.characterAttributes.fillColor = cardDetStyle.color;
                                 if (cardDetStyle.just !== null) pIt.paragraphAttributes.justification = cardDetStyle.just;
                             }
                         } catch(pAddErr) {}
+
+                        if (autoFit && safeWidthPt > 0) {
+                            this.fitTextFrameToWidth(card.nameFrame, safeWidthPt, cardDetStyle.hScale, minHScale, cardDetStyle.size);
+                        }
                     }
                 }
             } catch (err) {}
@@ -2264,4 +2418,8 @@ function detectCards(scope) {
         status: "success",
         count: cards.length
     });
+}
+
+function getSelectedCanvasWidth() {
+    return CardAutoFiller.getSelectedCanvasWidth();
 }
