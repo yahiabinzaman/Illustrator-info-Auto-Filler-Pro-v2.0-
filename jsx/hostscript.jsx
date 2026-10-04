@@ -670,6 +670,28 @@ var CardAutoFiller = {
         var allTFs = [];
         this.collectTextFrames(candidateItems, allTFs);
 
+        // Deduplicate stacked ghost text frames sitting at the exact same position
+        var cleanAllTFs = [];
+        for (var a = 0; a < allTFs.length; a++) {
+            var atf = allTFs[a];
+            if (!atf || this.isItemHidden(atf)) continue;
+            var agb = atf.geometricBounds;
+            var isDup = false;
+            for (var c = 0; c < cleanAllTFs.length; c++) {
+                var cgb = cleanAllTFs[c].geometricBounds;
+                if (Math.abs(agb[0] - cgb[0]) < 2 && Math.abs(agb[1] - cgb[1]) < 2) {
+                    try {
+                        atf.contents = "";
+                        atf.remove();
+                    } catch(re) {}
+                    isDup = true;
+                    break;
+                }
+            }
+            if (!isDup) cleanAllTFs.push(atf);
+        }
+        allTFs = cleanAllTFs;
+
         // 1. Group-based card extraction
         for (var g = 0; g < candidateItems.length; g++) {
             var itm = candidateItems[g];
@@ -922,6 +944,28 @@ var CardAutoFiller = {
         var groupBottom = groupBounds ? groupBounds[3] : 0;
         var groupWidth = Math.abs(groupRight - groupLeft);
         var groupHeight = Math.abs(groupTop - groupBottom);
+
+        // Deduplicate stacked duplicate text frames sitting at the exact same position inside the group
+        var uniqueTFs = [];
+        for (var d = 0; d < tfs.length; d++) {
+            var dtf = tfs[d];
+            if (!dtf || this.isItemHidden(dtf)) continue;
+            var dgb = dtf.geometricBounds;
+            var isDup = false;
+            for (var u = 0; u < uniqueTFs.length; u++) {
+                var ugb = uniqueTFs[u].geometricBounds;
+                if (Math.abs(dgb[0] - ugb[0]) < 2 && Math.abs(dgb[1] - ugb[1]) < 2) {
+                    try {
+                        dtf.contents = "";
+                        dtf.remove();
+                    } catch(de) {}
+                    isDup = true;
+                    break;
+                }
+            }
+            if (!isDup) uniqueTFs.push(dtf);
+        }
+        tfs = uniqueTFs;
 
         for (var i = 0; i < tfs.length; i++) {
             var tf = tfs[i];
