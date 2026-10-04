@@ -127,35 +127,52 @@ var CardAutoFiller = {
         });
     },
 
-    fitTextFrameToWidth: function(textFrame, maxPt, baseHScale, minScale, baseFontSize) {
-        if (!textFrame || !maxPt || maxPt <= 0) return;
+    fitTextFrameToWidth: function(targetItem, maxPt, baseHScale, minScale, baseFontSize) {
+        if (!targetItem || !maxPt || maxPt <= 0) return;
         try {
-            var minSc = minScale || 55;
-            var numParas = textFrame.paragraphs.length;
-            if (numParas === 0) return;
+            var minSc = minScale || 50;
+            var paras = [];
+            if (targetItem.typename === "TextFrame") {
+                paras = targetItem.paragraphs;
+            } else if (targetItem.paragraphs) {
+                paras = targetItem.paragraphs;
+            } else if (targetItem.characters) {
+                paras = [targetItem];
+            }
+            if (!paras || paras.length === 0) return;
 
-            for (var p = 0; p < numParas; p++) {
+            for (var p = 0; p < paras.length; p++) {
                 try {
-                    var para = textFrame.paragraphs[p];
-                    var pText = para.contents.replace(/^[\s\r\n]+|[\s\r\n]+$/g, "");
-                    if (!pText || para.characters.length === 0) continue;
+                    var para = paras[p];
+                    var pText = para.contents ? para.contents.replace(/^[\s\r\n]+|[\s\r\n]+$/g, "") : "";
+                    if (!pText || !para.characters || para.characters.length === 0) continue;
 
                     var firstCharAttr = para.characters[0].characterAttributes;
                     var curHScale = firstCharAttr.horizontalScale || baseHScale || 100;
-                    var curSize = firstCharAttr.size || baseFontSize || 9.25;
+                    var curSize = firstCharAttr.size || baseFontSize || 11.0;
 
-                    var charFactor = (p === 0) ? 0.52 : 0.50;
+                    var charFactor = (p === 0) ? 0.53 : 0.50;
                     var estParaWidthPt = pText.length * (curSize * charFactor) * (curHScale / 100.0);
 
                     if (estParaWidthPt <= maxPt) {
                         continue;
                     }
 
-                    var targetScale = Math.floor(curHScale * (maxPt / estParaWidthPt) * 0.98 * 10) / 10;
-                    if (targetScale < minSc) targetScale = minSc;
-
-                    for (var c = 0; c < para.characters.length; c++) {
-                        try { para.characters[c].characterAttributes.horizontalScale = targetScale; } catch(ce) {}
+                    var targetScale = Math.floor(curHScale * (maxPt / estParaWidthPt) * 0.96 * 10) / 10;
+                    if (targetScale < minSc) {
+                        targetScale = minSc;
+                        // Reduce font size proportionally if minimum scale is reached
+                        var neededSize = Math.max(7.0, Math.floor(curSize * (maxPt / (estParaWidthPt * (targetScale / curHScale))) * 10) / 10);
+                        for (var c = 0; c < para.characters.length; c++) {
+                            try {
+                                para.characters[c].characterAttributes.horizontalScale = targetScale;
+                                para.characters[c].characterAttributes.size = neededSize;
+                            } catch(ce) {}
+                        }
+                    } else {
+                        for (var c = 0; c < para.characters.length; c++) {
+                            try { para.characters[c].characterAttributes.horizontalScale = targetScale; } catch(ce) {}
+                        }
                     }
                 } catch(pe) {}
             }
@@ -457,48 +474,65 @@ var CardAutoFiller = {
         return false;
     },
 
-    clusterProximityCards: function(textFrames) {
+    clusterProximityCards: function(textFrames, options) {
         if (!textFrames || textFrames.length === 0) return [];
         var cards = [];
-        var nameCandidates = [];
-        var otherFrames = [];
 
+        var validTFs = [];
         for (var i = 0; i < textFrames.length; i++) {
             var tf = textFrames[i];
             if (this.isItemHidden(tf)) continue;
             var cTxt = tf.contents || "";
             if (this.isBackSideText(cTxt)) continue;
+            validTFs.push(tf);
+        }
 
-            var clean = cTxt.replace(/\s+/g, "");
-            var num = this.bengaliToInt(clean);
-            if (clean.length <= 4 && num > 0) {
-                otherFrames.push({ tf: tf, type: "qty_or_serial", num: num });
-            } else if (/^(?:ফরম|দাখেলা|রোল|Form|Roll|‡¶´|‡dvi|diBk|‡ivj)/i.test(cTxt)) {
-                otherFrames.push({ tf: tf, type: "form" });
-            } else {
-                nameCandidates.push(tf);
+        if (validTFs.length === 0) return [];
+
+        // Sort all textframes top-to-bottom by Y, then left-to-right by X
+        validTFs.sort(function(a, b) {
+            var aGB = a.geometricBounds;
+            var bGB = b.geometricBounds;
+            if (Math.abs(bGB[1] - aGB[1]) > 30) return bGB[1] - aGB[1];
+            return aGB[0] - bGB[0];
+        });
+
+        // Group textframes that belong to the same spatial card bounding box
+        var clusters = [];
+        for (var v = 0; v < validTFs.length; v++) {
+            var vtf = validTFs[v];
+            var vgb = vtf.geometricBounds;
+            var vMidX = (vgb[0] + vgb[2]) / 2;
+            var vMidY = (vgb[1] + vgb[3]) / 2;
+
+            var placed = false;
+            for (var cl = 0; cl < clusters.length; cl++) {
+                var cCenter = clusters[cl].center;
+                if (Math.abs(cCenter[0] - vMidX) < 180 && Math.abs(cCenter[1] - vMidY) < 160) {
+                    clusters[cl].tfs.push(vtf);
+                    placed = true;
+                    break;
+                }
+            }
+            if (!placed) {
+                clusters.push({
+                    center: [vMidX, vMidY],
+                    tfs: [vtf]
+                });
             }
         }
 
-        if (nameCandidates.length === 0) nameCandidates = textFrames;
-
-        for (var n = 0; n < nameCandidates.length; n++) {
-            var ntf = nameCandidates[n];
-            var ngb = ntf.geometricBounds;
-            var card = {
-                nameFrame: ntf,
-                detailsFrame: null,
-                baniFrame: null,
-                qtyFrame: null,
-                badgeFrame: null,
-                serialFrame: null,
-                formFrame: null,
-                group: null,
-                bounds: ngb,
-                artboardIndex: 0
-            };
-            cards.push(card);
+        for (var k = 0; k < clusters.length; k++) {
+            var cTfs = clusters[k].tfs;
+            var card = this.analyzeCardGroup(cTfs, null, options);
+            if (card.nameFrame || card.detailsFrame) {
+                var cBounds = card.nameFrame ? card.nameFrame.geometricBounds : card.detailsFrame.geometricBounds;
+                card.bounds = cBounds;
+                card.artboardIndex = 0;
+                cards.push(card);
+            }
         }
+
         return cards;
     },
 
@@ -547,22 +581,33 @@ var CardAutoFiller = {
         }
     },
 
-    detectCards: function(arg1, arg2) {
+    detectCards: function(arg1, arg2, arg3) {
         var doc = app.activeDocument;
         if (!doc) return [];
 
         var scope = "artboard";
         var order = "zigzag";
+        var options = {};
 
-        if (arg1 === "selection" || arg1 === "artboard" || arg1 === "document" || arg1 === "all_artboards") {
-            scope = arg1;
-            if (arg2) order = arg2;
-        } else if (arg2 === "selection" || arg2 === "artboard" || arg2 === "document" || arg2 === "all_artboards") {
-            scope = arg2;
-            if (arg1) order = arg1;
+        if (typeof arg1 === "object" && arg1 !== null) {
+            options = arg1;
+            scope = options.scope || "artboard";
+            order = options.order || "zigzag";
+        } else if (typeof arg3 === "object" && arg3 !== null) {
+            options = arg3;
+            scope = arg1 || "artboard";
+            order = arg2 || "zigzag";
         } else {
-            if (arg1) order = arg1;
-            if (arg2) scope = arg2;
+            if (arg1 === "selection" || arg1 === "artboard" || arg1 === "document" || arg1 === "all_artboards") {
+                scope = arg1;
+                if (arg2) order = arg2;
+            } else if (arg2 === "selection" || arg2 === "artboard" || arg2 === "document" || arg2 === "all_artboards") {
+                scope = arg2;
+                if (arg1) order = arg1;
+            } else {
+                if (arg1) order = arg1;
+                if (arg2) scope = arg2;
+            }
         }
 
         var cardUnits = [];
@@ -622,7 +667,7 @@ var CardAutoFiller = {
         }
 
         for (var g = 0; g < candidateItems.length; g++) {
-            this.extractCardsFromItem(candidateItems[g], cardUnits);
+            this.extractCardsFromItem(candidateItems[g], cardUnits, options);
         }
 
         if (cardUnits.length === 0) {
@@ -651,7 +696,7 @@ var CardAutoFiller = {
                     artboardIndex: 0
                 });
             } else if (filteredTFs.length >= 2) {
-                cardUnits = this.clusterProximityCards(filteredTFs);
+                cardUnits = this.clusterProximityCards(filteredTFs, options);
             }
         }
 
@@ -672,9 +717,10 @@ var CardAutoFiller = {
             }
             for (var cu = 0; cu < cardUnits.length; cu++) {
                 var cCard = cardUnits[cu];
-                if (!cCard.nameFrame) continue;
+                if (!cCard.nameFrame && !cCard.detailsFrame) continue;
                 if (cCard.serialFrame && cCard.formFrame && cCard.qtyFrame) continue; // already attached!
-                var cgb = cCard.nameFrame.geometricBounds;
+                var anchorFrame = cCard.nameFrame || cCard.detailsFrame;
+                var cgb = anchorFrame.geometricBounds;
                 var cLeft = cgb[0];
                 var cTop = cgb[1];
 
@@ -687,7 +733,7 @@ var CardAutoFiller = {
 
                 for (var dt = 0; dt < allDocTFs.length; dt++) {
                     var dtf = allDocTFs[dt];
-                    if (dtf === cCard.nameFrame || this.isItemHidden(dtf)) continue;
+                    if (dtf === cCard.nameFrame || dtf === cCard.detailsFrame || this.isItemHidden(dtf)) continue;
                     var dtgb = dtf.geometricBounds;
                     var dx = dtgb[0] - cLeft;
                     var dy = cTop - dtgb[1]; // positive downwards
@@ -743,10 +789,10 @@ var CardAutoFiller = {
             }
         }
 
-        return this.sortCards(cardUnits, order || "zigzag");
+        return this.sortCards(cardUnits, order || "zigzag", options.layoutGrid);
     },
 
-    extractCardsFromItem: function(item, outCards) {
+    extractCardsFromItem: function(item, outCards, options) {
         if (!item || this.isItemHidden(item)) return;
 
         if (item.typename === "TextFrame") {
@@ -778,10 +824,8 @@ var CardAutoFiller = {
 
             var gb = item.geometricBounds;
             var w = Math.abs(gb[2] - gb[0]);
-            var h = Math.abs(gb[1] - gb[3]);
 
-            // If this group contains sub-groups that themselves have text frames, OR if width > 280pt, OR if tfs > 4:
-            // It is a multi-card container/row (e.g. 2 cards side-by-side in a row). Recurse down!
+            // Check if this group contains sub-groups that represent individual cards (e.g. 2 cards in a row)
             var subGroupTFCount = 0;
             for (var pi = 0; pi < item.pageItems.length; pi++) {
                 var pSub = item.pageItems[pi];
@@ -794,16 +838,17 @@ var CardAutoFiller = {
                 }
             }
 
-            if (subGroupTFCount >= 2 || w > 300 || tfs.length > 4) {
+            // Only recurse down if there are 2 or more distinct sub-groups with text frames, or group spans multiple cards (>450pt)
+            if (subGroupTFCount >= 2 || w > 450 || (tfs.length >= 7 && subGroupTFCount >= 1)) {
                 for (var c = 0; c < item.pageItems.length; c++) {
-                    this.extractCardsFromItem(item.pageItems[c], outCards);
+                    this.extractCardsFromItem(item.pageItems[c], outCards, options);
                 }
                 return;
             }
 
-            // Single card group (1 to 4 text frames, width <= 300)
-            var card = this.analyzeCardGroup(tfs, item);
-            if (card.nameFrame || card.namePlaceholderPath) {
+            // Single card group
+            var card = this.analyzeCardGroup(tfs, item, options);
+            if (card.nameFrame || card.namePlaceholderPath || card.detailsFrame) {
                 card.group = item;
                 card.bounds = item.geometricBounds;
                 outCards.push(card);
@@ -812,13 +857,16 @@ var CardAutoFiller = {
 
             for (var k = 0; k < item.pageItems.length; k++) {
                 if (item.pageItems[k].typename === "GroupItem") {
-                    this.extractCardsFromItem(item.pageItems[k], outCards);
+                    this.extractCardsFromItem(item.pageItems[k], outCards, options);
                 }
             }
         }
     },
 
-    analyzeCardGroup: function(tfs, group) {
+    analyzeCardGroup: function(tfs, group, options) {
+        var opts = options || {};
+        var frameMode = opts.frameMode || "auto"; // "auto", "dual_box", "single_box"
+
         var card = {
             nameFrame: null,
             detailsFrame: null,
@@ -844,7 +892,6 @@ var CardAutoFiller = {
             if (this.isItemHidden(tf)) continue; // STRICT: Ignore locked & hidden items
             var rawTxt = tf.contents;
             var cleanTxt = rawTxt.replace(/\s+/g, "");
-            var num = this.bengaliToInt(cleanTxt);
             var gb = tf.geometricBounds;
             var tfLeft = gb[0];
             var tfTop = gb[1];
@@ -875,12 +922,17 @@ var CardAutoFiller = {
                 continue;
             }
 
-            // 4. Quantity frame (sitting on right edge or small number frame)
-            if (/^[০-৯0-9]+$/.test(cleanTxt) && cleanTxt.length <= 4 && (relX > 0.65 || (groupWidth > 0 && tfLeft > groupRight - 55) || (tfW < 35 && tfH < 30))) {
-                if (!card.qtyFrame) {
-                    card.qtyFrame = tf;
-                    if (!card.serialFrame) card.serialFrame = tf;
-                    continue;
+            // 4. Serial badge / Quantity frame (sitting on top-right, right edge, or small number frame <= 4 digits)
+            if (/^[০-৯0-9]+$/.test(cleanTxt) && cleanTxt.length <= 4) {
+                if (relX > 0.60 || (groupWidth > 0 && tfLeft > groupRight - 60) || (tfW < 40 && tfH < 35)) {
+                    if (!card.serialFrame) {
+                        card.serialFrame = tf;
+                        if (!card.qtyFrame) card.qtyFrame = tf;
+                        continue;
+                    } else if (!card.qtyFrame) {
+                        card.qtyFrame = tf;
+                        continue;
+                    }
                 }
             }
 
@@ -912,65 +964,67 @@ var CardAutoFiller = {
             card.nameFrame = candidateFrames[0];
             card.detailsFrame = null;
         } else if (candidateFrames.length >= 2) {
-            var bioFrame = null;        // Multi-line student info (Name + Father + Address + Phone)
-            var nonBioFrame = null;     // Quote / Bani / advice text
-            var shortNameFrame = null;  // 1-line name frame
-            var separateDetFrame = null;// Starts with পিতা: or address
-
-            for (var cf = 0; cf < candidateFrames.length; cf++) {
-                var ctf = candidateFrames[cf];
-                var cText = ctf.contents.replace(/^\s+|\s+$/g, "");
-                var hasBio = this.hasStudentBiodata(cText) || /(?:পিতা|মাতা|গ্রাম|ডাক|উপজেলা|জেলা|মোবাইল|ফোন|রক্ত|01[3-9]\d{8}|০১[৩-৯][০-৯]{8})/i.test(cText);
-                var isBani = this.isBaniText(cText);
-
-                if (isBani) {
-                    if (!card.baniFrame) card.baniFrame = ctf;
-                } else if (hasBio) {
-                    var lines = cText.split(/[\r\n]+/);
-                    if (lines.length >= 2) {
-                        if (!bioFrame) bioFrame = ctf;
-                        else if (!nonBioFrame) nonBioFrame = ctf;
-                    } else {
-                        if (!separateDetFrame) separateDetFrame = ctf;
-                    }
-                } else {
-                    if (ctf.lines.length === 1 || ctf.paragraphs.length === 1) {
-                        if (!shortNameFrame) shortNameFrame = ctf;
-                    } else {
-                        if (!nonBioFrame) nonBioFrame = ctf;
-                    }
-                }
-            }
-
-            if (bioFrame) {
-                // Multi-line frame with student info is the Person Info frame!
-                card.nameFrame = bioFrame;
-                card.detailsFrame = null;
-                if (!card.baniFrame) {
-                    card.baniFrame = nonBioFrame || shortNameFrame || separateDetFrame;
-                }
-            } else if (shortNameFrame && separateDetFrame) {
-                card.nameFrame = shortNameFrame;
-                card.detailsFrame = separateDetFrame;
-                if (!card.baniFrame && nonBioFrame) card.baniFrame = nonBioFrame;
-            } else if (shortNameFrame && nonBioFrame) {
-                card.nameFrame = shortNameFrame;
-                card.baniFrame = nonBioFrame;
-            } else {
+            if (frameMode === "single_box") {
+                // Forced Single Box mode
                 card.nameFrame = candidateFrames[0];
-                card.detailsFrame = candidateFrames.length > 1 ? candidateFrames[1] : null;
+                card.detailsFrame = null;
+                if (candidateFrames.length > 1 && !card.baniFrame) card.baniFrame = candidateFrames[1];
+            } else if (frameMode === "dual_box") {
+                // Forced Dual Box mode: Top is Name, Bottom is Details
+                card.nameFrame = candidateFrames[0];
+                card.detailsFrame = candidateFrames[1];
+                if (candidateFrames.length > 2 && !card.baniFrame) card.baniFrame = candidateFrames[2];
+            } else {
+                // Smart Auto-Detect Mode:
+                var topCandidate = candidateFrames[0];
+                var bottomCandidate = candidateFrames[1];
+
+                var topText = topCandidate.contents.replace(/^\s+|\s+$/g, "");
+                var bottomText = bottomCandidate.contents.replace(/^\s+|\s+$/g, "");
+
+                var topHasBio = this.hasStudentBiodata(topText) || /(?:পিতা|মাতা|গ্রাম|ডাক|উপজেলা|জেলা|মোবাইল|ফোন|রক্ত|01[3-9]\d{8}|০১[৩-৯][০-৯]{8})/i.test(topText);
+                var bottomHasBio = this.hasStudentBiodata(bottomText) || /(?:পিতা|মাতা|গ্রাম|ডাক|উপজেলা|জেলা|মোবাইল|ফোন|রক্ত|01[3-9]\d{8}|০১[৩-৯][০-৯]{8})/i.test(bottomText);
+
+                var isTopBani = this.isBaniText(topText);
+                var isBottomBani = this.isBaniText(bottomText);
+
+                if (isBottomBani) {
+                    card.nameFrame = topCandidate;
+                    card.detailsFrame = null;
+                    card.baniFrame = bottomCandidate;
+                } else if (isTopBani) {
+                    card.baniFrame = topCandidate;
+                    card.nameFrame = bottomCandidate;
+                    card.detailsFrame = null;
+                } else if (!topHasBio && bottomHasBio) {
+                    // Classic Dual Box: Top is Name (1 line header), Bottom is Address/Details
+                    card.nameFrame = topCandidate;
+                    card.detailsFrame = bottomCandidate;
+                } else if (topHasBio && !bottomHasBio) {
+                    card.nameFrame = topCandidate;
+                    card.baniFrame = bottomCandidate;
+                    card.detailsFrame = null;
+                } else if (topCandidate.lines.length === 1 && bottomCandidate.lines.length >= 1) {
+                    // Top is single-line name header, bottom is details
+                    card.nameFrame = topCandidate;
+                    card.detailsFrame = bottomCandidate;
+                } else {
+                    // Default to Dual Box (Top = Name, Bottom = Details)
+                    card.nameFrame = topCandidate;
+                    card.detailsFrame = bottomCandidate;
+                }
             }
         }
 
         return card;
     },
 
-                        sortCards: function(cards, order) {
+    sortCards: function(cards, order, layoutGrid) {
         if (!cards || cards.length <= 1) return cards;
         var doc = app.activeDocument;
         var numABs = doc ? doc.artboards.length : 0;
 
-        // Filter out header banners (width > 280 or height > 90)
+        // Filter out header banners (width > 480 or height > 350)
         var filtered = [];
         for (var c = 0; c < cards.length; c++) {
             var card = cards[c];
@@ -978,7 +1032,7 @@ var CardAutoFiller = {
             card.bounds = gb;
             var w = Math.abs(gb[2] - gb[0]);
             var h = Math.abs(gb[1] - gb[3]);
-            if (w > 450 || h > 350) continue;
+            if (w > 480 || h > 350) continue;
             card.artboardIndex = 0;
             if (numABs > 1 && gb) {
                 var midX = (gb[0] + gb[2]) / 2;
@@ -994,25 +1048,14 @@ var CardAutoFiller = {
             filtered.push(card);
         }
 
-        // Cluster cards by Sheet / Page block (X-span threshold ~500pt)
-        for (var i = 0; i < filtered.length - 1; i++) {
-            for (var j = i + 1; j < filtered.length; j++) {
-                if (filtered[j].artboardIndex < filtered[i].artboardIndex || 
-                   (filtered[j].artboardIndex === filtered[i].artboardIndex && filtered[j].bounds[0] < filtered[i].bounds[0])) {
-                    var tmp = filtered[i];
-                    filtered[i] = filtered[j];
-                    filtered[j] = tmp;
-                }
-            }
-        }
-
+        // Cluster cards by Artboard / Sheet
         var sheets = [];
         for (var i = 0; i < filtered.length; i++) {
             var c = filtered[i];
             var placed = false;
             for (var s = 0; s < sheets.length; s++) {
                 var sFirst = sheets[s][0];
-                if (sFirst.artboardIndex === c.artboardIndex && Math.abs(c.bounds[0] - sFirst.bounds[0]) < 500) {
+                if (sFirst.artboardIndex === c.artboardIndex && Math.abs(c.bounds[0] - sFirst.bounds[0]) < 600) {
                     sheets[s].push(c);
                     placed = true;
                     break;
@@ -1022,83 +1065,100 @@ var CardAutoFiller = {
         }
 
         var finalResult = [];
+        var gridMode = layoutGrid || "auto";
 
         for (var s = 0; s < sheets.length; s++) {
             var sheetCards = sheets[s];
+            if (sheetCards.length === 0) continue;
 
-            if (order === "column") {
-                // Column-by-Column within sheet: Col 1 (top to bottom), Col 2 (top to bottom)...
-                for (var i = 0; i < sheetCards.length - 1; i++) {
-                    for (var j = i + 1; j < sheetCards.length; j++) {
-                        if (sheetCards[j].bounds[0] < sheetCards[i].bounds[0]) {
-                            var tmp = sheetCards[i];
-                            sheetCards[i] = sheetCards[j];
-                            sheetCards[j] = tmp;
-                        }
-                    }
+            // Sort all cards in this sheet from left to right by X-center
+            sheetCards.sort(function(a, b) {
+                var aMidX = (a.bounds[0] + a.bounds[2]) / 2;
+                var bMidX = (b.bounds[0] + b.bounds[2]) / 2;
+                return aMidX - bMidX;
+            });
+
+            var targetCols = 0;
+            if (gridMode === "2col") targetCols = 2;
+            else if (gridMode === "3col") targetCols = 3;
+            else if (gridMode === "4col") targetCols = 4;
+
+            var cols = [];
+
+            if (targetCols > 0 && sheetCards.length >= targetCols) {
+                // Explicit N-column partition: divide into targetCols clusters based on X
+                var minX = (sheetCards[0].bounds[0] + sheetCards[0].bounds[2]) / 2;
+                var maxX = (sheetCards[sheetCards.length - 1].bounds[0] + sheetCards[sheetCards.length - 1].bounds[2]) / 2;
+                var span = Math.max(1, maxX - minX);
+                var colWidth = span / targetCols;
+
+                for (var tc = 0; tc < targetCols; tc++) cols.push([]);
+
+                for (var ci = 0; ci < sheetCards.length; ci++) {
+                    var cardItem = sheetCards[ci];
+                    var cardMidX = (cardItem.bounds[0] + cardItem.bounds[2]) / 2;
+                    var colIdx = Math.floor((cardMidX - minX + (colWidth * 0.4)) / colWidth);
+                    if (colIdx < 0) colIdx = 0;
+                    if (colIdx >= targetCols) colIdx = targetCols - 1;
+                    cols[colIdx].push(cardItem);
                 }
-                var cols = [];
-                for (var i = 0; i < sheetCards.length; i++) {
-                    var c = sheetCards[i];
-                    var placed = false;
-                    for (var k = 0; k < cols.length; k++) {
-                        if (Math.abs(cols[k][0].bounds[0] - c.bounds[0]) < 30) {
-                            cols[k].push(c);
-                            placed = true;
-                            break;
-                        }
-                    }
-                    if (!placed) cols.push([c]);
+
+                // If any bucket ended up empty, fallback to proportional chunking
+                var hasEmpty = false;
+                for (var ck = 0; ck < cols.length; ck++) {
+                    if (cols[ck].length === 0) { hasEmpty = true; break; }
                 }
-                for (var k = 0; k < cols.length; k++) {
-                    var col = cols[k];
-                    for (var i = 0; i < col.length - 1; i++) {
-                        for (var j = i + 1; j < col.length; j++) {
-                            if (col[j].bounds[1] > col[i].bounds[1]) {
-                                var tmp = col[i];
-                                col[i] = col[j];
-                                col[j] = tmp;
-                            }
-                        }
+                if (hasEmpty && sheetCards.length % targetCols === 0) {
+                    cols = [];
+                    var perCol = sheetCards.length / targetCols;
+                    for (var tc = 0; tc < targetCols; tc++) {
+                        cols.push(sheetCards.slice(tc * perCol, (tc + 1) * perCol));
                     }
-                    for (var i = 0; i < col.length; i++) finalResult.push(col[i]);
                 }
             } else {
-                // Default: Row-by-Row ("zigzag") -> 1 - 2 - 3 - 4 | 5 - 6 - 7 - 8
-                for (var i = 0; i < sheetCards.length - 1; i++) {
-                    for (var j = i + 1; j < sheetCards.length; j++) {
-                        if (sheetCards[j].bounds[1] > sheetCards[i].bounds[1]) {
-                            var tmp = sheetCards[i];
-                            sheetCards[i] = sheetCards[j];
-                            sheetCards[j] = tmp;
-                        }
-                    }
-                }
-                var rows = [];
-                for (var i = 0; i < sheetCards.length; i++) {
-                    var c = sheetCards[i];
-                    var placed = false;
-                    for (var k = 0; k < rows.length; k++) {
-                        if (Math.abs(rows[k][0].bounds[1] - c.bounds[1]) < 20) {
-                            rows[k].push(c);
-                            placed = true;
+                // Adaptive Smart Grid Clustering: detect natural column gaps
+                for (var ci = 0; ci < sheetCards.length; ci++) {
+                    var cardItem = sheetCards[ci];
+                    var cardMidX = (cardItem.bounds[0] + cardItem.bounds[2]) / 2;
+                    var placedCol = false;
+                    for (var k = 0; k < cols.length; k++) {
+                        var colMidX = (cols[k][0].bounds[0] + cols[k][0].bounds[2]) / 2;
+                        if (Math.abs(colMidX - cardMidX) < 45) {
+                            cols[k].push(cardItem);
+                            placedCol = true;
                             break;
                         }
                     }
-                    if (!placed) rows.push([c]);
+                    if (!placedCol) cols.push([cardItem]);
                 }
-                for (var k = 0; k < rows.length; k++) {
-                    var row = rows[k];
-                    for (var i = 0; i < row.length - 1; i++) {
-                        for (var j = i + 1; j < row.length; j++) {
-                            if (row[j].bounds[0] < row[i].bounds[0]) {
-                                var tmp = row[i];
-                                row[i] = row[j];
-                                row[j] = tmp;
-                            }
+            }
+
+            // Sort each column internally from Top to Bottom (Y descending)
+            for (var k = 0; k < cols.length; k++) {
+                cols[k].sort(function(a, b) {
+                    return b.bounds[1] - a.bounds[1];
+                });
+            }
+
+            if (order === "column") {
+                // Column by Column: Col 1 top-to-bottom, then Col 2 top-to-bottom...
+                for (var k = 0; k < cols.length; k++) {
+                    for (var ci = 0; ci < cols[k].length; ci++) {
+                        finalResult.push(cols[k][ci]);
+                    }
+                }
+            } else {
+                // Row by Row (Zigzag): Row 1 (Col 1, Col 2, Col 3...), Row 2 (Col 1, Col 2, Col 3...)...
+                var maxRows = 0;
+                for (var k = 0; k < cols.length; k++) {
+                    if (cols[k].length > maxRows) maxRows = cols[k].length;
+                }
+                for (var r = 0; r < maxRows; r++) {
+                    for (var k = 0; k < cols.length; k++) {
+                        if (r < cols[k].length) {
+                            finalResult.push(cols[k][r]);
                         }
                     }
-                    for (var i = 0; i < row.length; i++) finalResult.push(row[i]);
                 }
             }
         }
@@ -1812,9 +1872,9 @@ var CardAutoFiller = {
         var hasCustomNameLeading = (!isNaN(userNameLeading) && userNameLeading > 0);
 
         var userDetailsLeading = parseFloat(payload.detailsLeading);
-        var hasCustomDetailsLeading = (!isNaN(userDetailsLeading) && userDetailsLeading > 0);
-
-        var cards = this.detectCards(scope);
+        var layoutGrid = payload.layoutGrid || "auto";
+        var frameMode = payload.frameMode || "auto";
+        var cards = this.detectCards(scope, order, { layoutGrid: layoutGrid, frameMode: frameMode });
         if (!cards.length) {
             return JSON.stringify({
                 status: "error",
@@ -1822,7 +1882,7 @@ var CardAutoFiller = {
             });
         }
 
-        cards = this.sortCards(cards, order);
+        cards = this.sortCards(cards, order, layoutGrid);
 
         var targetCards = [];
         if (!skipFilledCards || scope === "selection" || startIndex === 0) {
@@ -2179,7 +2239,9 @@ var CardAutoFiller = {
         var minHScale = parseFloat(payload.minHScale);
         if (isNaN(minHScale) || minHScale <= 0) minHScale = 55;
 
-        var cards = this.detectCards(scope);
+        var layoutGrid = payload.layoutGrid || "auto";
+        var frameMode = payload.frameMode || "auto";
+        var cards = this.detectCards(scope, order, { layoutGrid: layoutGrid, frameMode: frameMode });
         if (!cards.length) {
             return JSON.stringify({
                 status: "error",
@@ -2187,7 +2249,7 @@ var CardAutoFiller = {
             });
         }
 
-        cards = this.sortCards(cards, order);
+        cards = this.sortCards(cards, order, layoutGrid);
 
         var targetCards = [];
         // If starting from index 0 or in selection scope, populate all detected cards sequentially
@@ -2692,8 +2754,21 @@ var CardAutoFiller = {
                             nTr.paragraphAttributes.spaceBefore = 0;
                             nTr.paragraphAttributes.spaceAfter = 0;
                         } catch(nErr) {}
-                        if (autoFit && safeWidthPt > 0) {
-                            this.fitTextFrameToWidth(card.nameFrame, safeWidthPt, cardNameStyle.hScale, minHScale, cardNameStyle.size);
+                        if (autoFit) {
+                            var effectiveMaxPt = safeWidthPt;
+                            if (card.serialFrame) {
+                                var nGB = card.nameFrame.geometricBounds;
+                                var sGB = card.serialFrame.geometricBounds;
+                                if (sGB[0] > nGB[0] && Math.abs(sGB[1] - nGB[1]) < 35) {
+                                    var badgeAvailPt = (sGB[0] - nGB[0]) - 8;
+                                    if (badgeAvailPt > 20 && (effectiveMaxPt <= 0 || badgeAvailPt < effectiveMaxPt)) {
+                                        effectiveMaxPt = badgeAvailPt;
+                                    }
+                                }
+                            }
+                            if (effectiveMaxPt > 0) {
+                                this.fitTextFrameToWidth(card.nameFrame, effectiveMaxPt, cardNameStyle.hScale, minHScale, cardNameStyle.size);
+                            }
                         }
 
                         if (cleanDetails) {
@@ -2767,8 +2842,21 @@ var CardAutoFiller = {
                             }
                         } catch(pAddErr) {}
 
-                        if (autoFit && safeWidthPt > 0) {
-                            this.fitTextFrameToWidth(card.nameFrame, safeWidthPt, cardDetStyle.hScale, minHScale, cardDetStyle.size);
+                        if (autoFit && card.nameFrame.paragraphs.length > 0) {
+                            var effectiveMaxPt = safeWidthPt;
+                            if (card.serialFrame) {
+                                var nGB = card.nameFrame.geometricBounds;
+                                var sGB = card.serialFrame.geometricBounds;
+                                if (sGB[0] > nGB[0] && Math.abs(sGB[1] - nGB[1]) < 35) {
+                                    var badgeAvailPt = (sGB[0] - nGB[0]) - 8;
+                                    if (badgeAvailPt > 20 && (effectiveMaxPt <= 0 || badgeAvailPt < effectiveMaxPt)) {
+                                        effectiveMaxPt = badgeAvailPt;
+                                    }
+                                }
+                            }
+                            if (effectiveMaxPt > 0) {
+                                this.fitTextFrameToWidth(card.nameFrame.paragraphs[0], effectiveMaxPt, cardNameStyle.hScale, minHScale, cardNameStyle.size);
+                            }
                         }
                     }
                 }

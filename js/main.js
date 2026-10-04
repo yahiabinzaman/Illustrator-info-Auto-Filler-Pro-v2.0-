@@ -667,10 +667,17 @@
             var safeWidthK = inputSafeWidthK ? (parseFloat(inputSafeWidthK.value) || 45) : 45;
             var minHScaleK = inputMinHScaleK ? (parseFloat(inputMinHScaleK.value) || 60) : 60;
 
+            var selectLayoutGridK = document.getElementById('selectLayoutGridKeyring');
+            var selectFrameModeK = document.getElementById('selectFrameModeKeyring');
+            var layoutGridK = selectLayoutGridK ? selectLayoutGridK.value : "auto";
+            var frameModeK = selectFrameModeK ? selectFrameModeK.value : "auto";
+
             var payload = {
                 autoFit: autoFitK,
                 safeWidthMm: safeWidthK,
                 minHScale: minHScaleK,
+                layoutGrid: layoutGridK,
+                frameMode: frameModeK,
                 isKeyring: true,
                 fillSerial: false,
                 entries: parsedKeyringEntries,
@@ -880,13 +887,18 @@
             var skipFilled = chkSkipFilled ? chkSkipFilled.checked : false;
             var autoRemove = chkAutoRemove ? chkAutoRemove.checked : true;
 
+            var selectLayoutGridD = document.getElementById('selectLayoutGridDiary');
+            var selectFrameModeD = document.getElementById('selectFrameModeDiary');
+            var layoutGridD = selectLayoutGridD ? selectLayoutGridD.value : "auto";
+            var frameModeD = selectFrameModeD ? selectFrameModeD.value : "auto";
+
             var inputDetHScaleD = document.getElementById('inputDetailsHScaleDiary');
             var inputNmHScaleD = document.getElementById('inputNameHScaleDiary');
             var detHScaleD = inputDetHScaleD ? (parseFloat(inputDetHScaleD.value) || 85) : 85;
             var nmHScaleD = inputNmHScaleD ? (parseFloat(inputNmHScaleD.value) || 80) : 80;
 
             var inputNmSizeD = document.getElementById('inputNameSizeDiary');
-            var inputDetSizeD = document.getElementById('inputNameSizeDiary', 'inputDetailsSizeDiary');
+            var inputDetSizeD = document.getElementById('inputDetailsSizeDiary');
             var inputDetLeadD = document.getElementById('inputDetailsLeadingDiary');
             var nmSizeD = inputNmSizeD ? inputNmSizeD.value.trim() : "Auto";
             var detSizeD = inputDetSizeD ? inputDetSizeD.value.trim() : "Auto";
@@ -903,6 +915,8 @@
                 autoFit: autoFitD,
                 safeWidthMm: safeWidthD,
                 minHScale: minHScaleD,
+                layoutGrid: layoutGridD,
+                frameMode: frameModeD,
                 isKeyring: false,
                 fillSerial: true,
                 entries: parsedDiaryEntries,

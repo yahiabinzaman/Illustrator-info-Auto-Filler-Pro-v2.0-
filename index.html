@@ -107,6 +107,26 @@ Example:
                 </div>
             </div>
 
+            <div class="grid-2" style="margin-top: 4px;">
+                <div class="control-group">
+                    <label for="selectLayoutGridKeyring">Grid Layout (কলাম)</label>
+                    <select id="selectLayoutGridKeyring">
+                        <option value="auto" selected>Auto-Detect (স্মার্ট অটো)</option>
+                        <option value="2col">2 Columns (২ কলাম)</option>
+                        <option value="3col">3 Columns (৩ কলাম)</option>
+                        <option value="4col">4 Columns (৪ কলাম)</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label for="selectFrameModeKeyring">Box Engine (বক্স মোড)</label>
+                    <select id="selectFrameModeKeyring">
+                        <option value="auto" selected>Auto (স্মার্ট ডিটেক্ট)</option>
+                        <option value="dual_box">Dual Box (নাম আলাদা উপরে)</option>
+                        <option value="single_box">Single Box (এক বক্সে সব)</option>
+                    </select>
+                </div>
+            </div>
+
             <!-- Name Color Row -->
             <div class="control-group" style="margin-top: 2px;">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -317,6 +337,26 @@ Example:
                         <input type="number" id="inputStartIndexDiary" value="1" min="1" style="width: 50px; text-align: center;">
                         <button id="btnResetIndexDiary" class="btn btn-sm" title="Reset to #1">Reset</button>
                     </div>
+                </div>
+            </div>
+
+            <div class="grid-2" style="margin-top: 4px;">
+                <div class="control-group">
+                    <label for="selectLayoutGridDiary">Grid Layout (কলাম)</label>
+                    <select id="selectLayoutGridDiary">
+                        <option value="auto" selected>Auto-Detect (স্মার্ট অটো)</option>
+                        <option value="2col">2 Columns (২ কলাম / ৮-১০ কার্ড)</option>
+                        <option value="3col">3 Columns (৩ কলাম / ১২-১৫ কার্ড)</option>
+                        <option value="4col">4 Columns (৪ কলাম / ১৬-২৪ কার্ড)</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label for="selectFrameModeDiary">Box Engine (বক্স মোড)</label>
+                    <select id="selectFrameModeDiary">
+                        <option value="auto" selected>Auto (স্মার্ট ডিটেক্ট)</option>
+                        <option value="dual_box">Dual Box (নাম আলাদা উপরে + ঠিকানা নিচে)</option>
+                        <option value="single_box">Single Box (এক বক্সে নাম ও ঠিকানা)</option>
+                    </select>
                 </div>
             </div>
 

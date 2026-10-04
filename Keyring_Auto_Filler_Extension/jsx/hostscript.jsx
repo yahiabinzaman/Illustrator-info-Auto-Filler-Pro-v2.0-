@@ -94,6 +94,91 @@ var CardAutoFiller = {
         return res > 0 ? res : -1;
     },
 
+        getSelectedCanvasWidth: function() {
+        if (!app.documents.length) {
+            return JSON.stringify({ status: "error", message: "No document open." });
+        }
+        var doc = app.activeDocument;
+        var sel = doc.selection;
+        if (!sel || (sel instanceof Array && sel.length === 0)) {
+            return JSON.stringify({ status: "error", message: "Please select an object or text frame to measure." });
+        }
+        var item = (sel instanceof Array) ? sel[0] : sel;
+        var wPt = 0;
+        try {
+            if (item.typename === "TextRange") {
+                wPt = item.width || (item.characters.length * item.characterAttributes.size * 0.5);
+            } else if (item.width) {
+                wPt = item.width;
+            } else if (item.visibleBounds) {
+                wPt = Math.abs(item.visibleBounds[2] - item.visibleBounds[0]);
+            }
+        } catch(e) {}
+        if (!wPt || wPt <= 0) {
+            return JSON.stringify({ status: "error", message: "Could not measure selected item width." });
+        }
+        var widthPt = Math.round(wPt * 10) / 10;
+        var widthMm = Math.round((wPt * 25.4 / 72.0) * 10) / 10;
+        return JSON.stringify({
+            status: "success",
+            widthMm: widthMm,
+            widthPt: widthPt,
+            message: "Picked safe width: " + widthMm + " mm (" + widthPt + " pt)"
+        });
+    },
+
+    fitTextFrameToWidth: function(targetItem, maxPt, baseHScale, minScale, baseFontSize) {
+        if (!targetItem || !maxPt || maxPt <= 0) return;
+        try {
+            var minSc = minScale || 50;
+            var paras = [];
+            if (targetItem.typename === "TextFrame") {
+                paras = targetItem.paragraphs;
+            } else if (targetItem.paragraphs) {
+                paras = targetItem.paragraphs;
+            } else if (targetItem.characters) {
+                paras = [targetItem];
+            }
+            if (!paras || paras.length === 0) return;
+
+            for (var p = 0; p < paras.length; p++) {
+                try {
+                    var para = paras[p];
+                    var pText = para.contents ? para.contents.replace(/^[\s\r\n]+|[\s\r\n]+$/g, "") : "";
+                    if (!pText || !para.characters || para.characters.length === 0) continue;
+
+                    var firstCharAttr = para.characters[0].characterAttributes;
+                    var curHScale = firstCharAttr.horizontalScale || baseHScale || 100;
+                    var curSize = firstCharAttr.size || baseFontSize || 11.0;
+
+                    var charFactor = (p === 0) ? 0.53 : 0.50;
+                    var estParaWidthPt = pText.length * (curSize * charFactor) * (curHScale / 100.0);
+
+                    if (estParaWidthPt <= maxPt) {
+                        continue;
+                    }
+
+                    var targetScale = Math.floor(curHScale * (maxPt / estParaWidthPt) * 0.96 * 10) / 10;
+                    if (targetScale < minSc) {
+                        targetScale = minSc;
+                        // Reduce font size proportionally if minimum scale is reached
+                        var neededSize = Math.max(7.0, Math.floor(curSize * (maxPt / (estParaWidthPt * (targetScale / curHScale))) * 10) / 10);
+                        for (var c = 0; c < para.characters.length; c++) {
+                            try {
+                                para.characters[c].characterAttributes.horizontalScale = targetScale;
+                                para.characters[c].characterAttributes.size = neededSize;
+                            } catch(ce) {}
+                        }
+                    } else {
+                        for (var c = 0; c < para.characters.length; c++) {
+                            try { para.characters[c].characterAttributes.horizontalScale = targetScale; } catch(ce) {}
+                        }
+                    }
+                } catch(pe) {}
+            }
+        } catch(e) {}
+    },
+
     getSelectedCanvasColor: function() {
         if (!app.documents.length) {
             return JSON.stringify({ status: "error", message: "No document open." });
@@ -356,9 +441,10 @@ var CardAutoFiller = {
 
     isBaniText: function(text) {
         if (!text) return false;
+        if (/(?:[-–—]\s*(?:মাও|মাওলানা|হযরত|মুফতী|মুফতি|শায়খ|ড\.|আল্লামা|মুহাদ্দিস|ইমাম|রাসূল|হাকিমুল|রহ|হাফি))/i.test(text)) return true;
+        if (/(?:বাণী|বানী|Bani|উক্তি|হাদীস|উপদেশ|মহান|স্মারক|টাকা দিয়েই|টাকা দিয়ে|প্রয়োজন মেটাতে|লোভ থেকে|মোহ থেকে|মুক্ত রাখতে)/i.test(text)) return true;
         if (/^[\s\r\n]*[-–—]/.test(text)) return true;
-        if (/[-–—]\s*(?:মাওলানা|হযরত|মুফতী|শায়খ|ড\.|আল্লামা|মুহাদ্দিস|ইমাম|রাসূল)/i.test(text)) return true;
-        if (/(?:বাণী|উক্তি|হাদীস|বানী)/i.test(text) && !/(?:পিতা|গ্রাম|পোস্ট|থানা|জেলা|মোবাইল)/i.test(text)) return true;
+        if (text.indexOf("রহ:") !== -1 || text.indexOf("রহ.") !== -1 || text.indexOf("হাফি:") !== -1 || text.indexOf("হাফি.") !== -1) return true;
         return false;
     },
 
@@ -388,48 +474,65 @@ var CardAutoFiller = {
         return false;
     },
 
-    clusterProximityCards: function(textFrames) {
+    clusterProximityCards: function(textFrames, options) {
         if (!textFrames || textFrames.length === 0) return [];
         var cards = [];
-        var nameCandidates = [];
-        var otherFrames = [];
 
+        var validTFs = [];
         for (var i = 0; i < textFrames.length; i++) {
             var tf = textFrames[i];
             if (this.isItemHidden(tf)) continue;
             var cTxt = tf.contents || "";
             if (this.isBackSideText(cTxt)) continue;
+            validTFs.push(tf);
+        }
 
-            var clean = cTxt.replace(/\s+/g, "");
-            var num = this.bengaliToInt(clean);
-            if (clean.length <= 4 && num > 0) {
-                otherFrames.push({ tf: tf, type: "qty_or_serial", num: num });
-            } else if (/^(?:ফরম|দাখেলা|রোল|Form|Roll|‡¶´|‡dvi|diBk|‡ivj)/i.test(cTxt)) {
-                otherFrames.push({ tf: tf, type: "form" });
-            } else {
-                nameCandidates.push(tf);
+        if (validTFs.length === 0) return [];
+
+        // Sort all textframes top-to-bottom by Y, then left-to-right by X
+        validTFs.sort(function(a, b) {
+            var aGB = a.geometricBounds;
+            var bGB = b.geometricBounds;
+            if (Math.abs(bGB[1] - aGB[1]) > 30) return bGB[1] - aGB[1];
+            return aGB[0] - bGB[0];
+        });
+
+        // Group textframes that belong to the same spatial card bounding box
+        var clusters = [];
+        for (var v = 0; v < validTFs.length; v++) {
+            var vtf = validTFs[v];
+            var vgb = vtf.geometricBounds;
+            var vMidX = (vgb[0] + vgb[2]) / 2;
+            var vMidY = (vgb[1] + vgb[3]) / 2;
+
+            var placed = false;
+            for (var cl = 0; cl < clusters.length; cl++) {
+                var cCenter = clusters[cl].center;
+                if (Math.abs(cCenter[0] - vMidX) < 180 && Math.abs(cCenter[1] - vMidY) < 160) {
+                    clusters[cl].tfs.push(vtf);
+                    placed = true;
+                    break;
+                }
+            }
+            if (!placed) {
+                clusters.push({
+                    center: [vMidX, vMidY],
+                    tfs: [vtf]
+                });
             }
         }
 
-        if (nameCandidates.length === 0) nameCandidates = textFrames;
-
-        for (var n = 0; n < nameCandidates.length; n++) {
-            var ntf = nameCandidates[n];
-            var ngb = ntf.geometricBounds;
-            var card = {
-                nameFrame: ntf,
-                detailsFrame: null,
-                baniFrame: null,
-                qtyFrame: null,
-                badgeFrame: null,
-                serialFrame: null,
-                formFrame: null,
-                group: null,
-                bounds: ngb,
-                artboardIndex: 0
-            };
-            cards.push(card);
+        for (var k = 0; k < clusters.length; k++) {
+            var cTfs = clusters[k].tfs;
+            var card = this.analyzeCardGroup(cTfs, null, options);
+            if (card.nameFrame || card.detailsFrame) {
+                var cBounds = card.nameFrame ? card.nameFrame.geometricBounds : card.detailsFrame.geometricBounds;
+                card.bounds = cBounds;
+                card.artboardIndex = 0;
+                cards.push(card);
+            }
         }
+
         return cards;
     },
 
@@ -478,22 +581,33 @@ var CardAutoFiller = {
         }
     },
 
-    detectCards: function(arg1, arg2) {
+    detectCards: function(arg1, arg2, arg3) {
         var doc = app.activeDocument;
         if (!doc) return [];
 
         var scope = "artboard";
         var order = "zigzag";
+        var options = {};
 
-        if (arg1 === "selection" || arg1 === "artboard" || arg1 === "document" || arg1 === "all_artboards") {
-            scope = arg1;
-            if (arg2) order = arg2;
-        } else if (arg2 === "selection" || arg2 === "artboard" || arg2 === "document" || arg2 === "all_artboards") {
-            scope = arg2;
-            if (arg1) order = arg1;
+        if (typeof arg1 === "object" && arg1 !== null) {
+            options = arg1;
+            scope = options.scope || "artboard";
+            order = options.order || "zigzag";
+        } else if (typeof arg3 === "object" && arg3 !== null) {
+            options = arg3;
+            scope = arg1 || "artboard";
+            order = arg2 || "zigzag";
         } else {
-            if (arg1) order = arg1;
-            if (arg2) scope = arg2;
+            if (arg1 === "selection" || arg1 === "artboard" || arg1 === "document" || arg1 === "all_artboards") {
+                scope = arg1;
+                if (arg2) order = arg2;
+            } else if (arg2 === "selection" || arg2 === "artboard" || arg2 === "document" || arg2 === "all_artboards") {
+                scope = arg2;
+                if (arg1) order = arg1;
+            } else {
+                if (arg1) order = arg1;
+                if (arg2) scope = arg2;
+            }
         }
 
         var cardUnits = [];
@@ -553,7 +667,7 @@ var CardAutoFiller = {
         }
 
         for (var g = 0; g < candidateItems.length; g++) {
-            this.extractCardsFromItem(candidateItems[g], cardUnits);
+            this.extractCardsFromItem(candidateItems[g], cardUnits, options);
         }
 
         if (cardUnits.length === 0) {
@@ -582,7 +696,7 @@ var CardAutoFiller = {
                     artboardIndex: 0
                 });
             } else if (filteredTFs.length >= 2) {
-                cardUnits = this.clusterProximityCards(filteredTFs);
+                cardUnits = this.clusterProximityCards(filteredTFs, options);
             }
         }
 
@@ -603,9 +717,10 @@ var CardAutoFiller = {
             }
             for (var cu = 0; cu < cardUnits.length; cu++) {
                 var cCard = cardUnits[cu];
-                if (!cCard.nameFrame) continue;
+                if (!cCard.nameFrame && !cCard.detailsFrame) continue;
                 if (cCard.serialFrame && cCard.formFrame && cCard.qtyFrame) continue; // already attached!
-                var cgb = cCard.nameFrame.geometricBounds;
+                var anchorFrame = cCard.nameFrame || cCard.detailsFrame;
+                var cgb = anchorFrame.geometricBounds;
                 var cLeft = cgb[0];
                 var cTop = cgb[1];
 
@@ -618,7 +733,7 @@ var CardAutoFiller = {
 
                 for (var dt = 0; dt < allDocTFs.length; dt++) {
                     var dtf = allDocTFs[dt];
-                    if (dtf === cCard.nameFrame || this.isItemHidden(dtf)) continue;
+                    if (dtf === cCard.nameFrame || dtf === cCard.detailsFrame || this.isItemHidden(dtf)) continue;
                     var dtgb = dtf.geometricBounds;
                     var dx = dtgb[0] - cLeft;
                     var dy = cTop - dtgb[1]; // positive downwards
@@ -674,10 +789,10 @@ var CardAutoFiller = {
             }
         }
 
-        return this.sortCards(cardUnits, order || "zigzag");
+        return this.sortCards(cardUnits, order || "zigzag", options.layoutGrid);
     },
 
-    extractCardsFromItem: function(item, outCards) {
+    extractCardsFromItem: function(item, outCards, options) {
         if (!item || this.isItemHidden(item)) return;
 
         if (item.typename === "TextFrame") {
@@ -709,10 +824,8 @@ var CardAutoFiller = {
 
             var gb = item.geometricBounds;
             var w = Math.abs(gb[2] - gb[0]);
-            var h = Math.abs(gb[1] - gb[3]);
 
-            // If this group contains sub-groups that themselves have text frames, OR if width > 280pt, OR if tfs > 4:
-            // It is a multi-card container/row (e.g. 2 cards side-by-side in a row). Recurse down!
+            // Check if this group contains sub-groups that represent individual cards (e.g. 2 cards in a row)
             var subGroupTFCount = 0;
             for (var pi = 0; pi < item.pageItems.length; pi++) {
                 var pSub = item.pageItems[pi];
@@ -725,16 +838,17 @@ var CardAutoFiller = {
                 }
             }
 
-            if (subGroupTFCount >= 2 || w > 300 || tfs.length > 4) {
+            // Only recurse down if there are 2 or more distinct sub-groups with text frames, or group spans multiple cards (>450pt)
+            if (subGroupTFCount >= 2 || w > 450 || (tfs.length >= 7 && subGroupTFCount >= 1)) {
                 for (var c = 0; c < item.pageItems.length; c++) {
-                    this.extractCardsFromItem(item.pageItems[c], outCards);
+                    this.extractCardsFromItem(item.pageItems[c], outCards, options);
                 }
                 return;
             }
 
-            // Single card group (1 to 4 text frames, width <= 300)
-            var card = this.analyzeCardGroup(tfs, item);
-            if (card.nameFrame || card.namePlaceholderPath) {
+            // Single card group
+            var card = this.analyzeCardGroup(tfs, item, options);
+            if (card.nameFrame || card.namePlaceholderPath || card.detailsFrame) {
                 card.group = item;
                 card.bounds = item.geometricBounds;
                 outCards.push(card);
@@ -743,13 +857,16 @@ var CardAutoFiller = {
 
             for (var k = 0; k < item.pageItems.length; k++) {
                 if (item.pageItems[k].typename === "GroupItem") {
-                    this.extractCardsFromItem(item.pageItems[k], outCards);
+                    this.extractCardsFromItem(item.pageItems[k], outCards, options);
                 }
             }
         }
     },
 
-    analyzeCardGroup: function(tfs, group) {
+    analyzeCardGroup: function(tfs, group, options) {
+        var opts = options || {};
+        var frameMode = opts.frameMode || "auto"; // "auto", "dual_box", "single_box"
+
         var card = {
             nameFrame: null,
             detailsFrame: null,
@@ -775,7 +892,6 @@ var CardAutoFiller = {
             if (this.isItemHidden(tf)) continue; // STRICT: Ignore locked & hidden items
             var rawTxt = tf.contents;
             var cleanTxt = rawTxt.replace(/\s+/g, "");
-            var num = this.bengaliToInt(cleanTxt);
             var gb = tf.geometricBounds;
             var tfLeft = gb[0];
             var tfTop = gb[1];
@@ -806,12 +922,17 @@ var CardAutoFiller = {
                 continue;
             }
 
-            // 4. Quantity frame (sitting on right edge or small number frame)
-            if (/^[০-৯0-9]+$/.test(cleanTxt) && cleanTxt.length <= 4 && (relX > 0.65 || (groupWidth > 0 && tfLeft > groupRight - 55) || (tfW < 35 && tfH < 30))) {
-                if (!card.qtyFrame) {
-                    card.qtyFrame = tf;
-                    if (!card.serialFrame) card.serialFrame = tf;
-                    continue;
+            // 4. Serial badge / Quantity frame (sitting on top-right, right edge, or small number frame <= 4 digits)
+            if (/^[০-৯0-9]+$/.test(cleanTxt) && cleanTxt.length <= 4) {
+                if (relX > 0.60 || (groupWidth > 0 && tfLeft > groupRight - 60) || (tfW < 40 && tfH < 35)) {
+                    if (!card.serialFrame) {
+                        card.serialFrame = tf;
+                        if (!card.qtyFrame) card.qtyFrame = tf;
+                        continue;
+                    } else if (!card.qtyFrame) {
+                        card.qtyFrame = tf;
+                        continue;
+                    }
                 }
             }
 
@@ -843,45 +964,54 @@ var CardAutoFiller = {
             card.nameFrame = candidateFrames[0];
             card.detailsFrame = null;
         } else if (candidateFrames.length >= 2) {
-            var detFrame = null;
-            var nameFrame = null;
-            var otherCandidates = [];
+            if (frameMode === "single_box") {
+                // Forced Single Box mode
+                card.nameFrame = candidateFrames[0];
+                card.detailsFrame = null;
+                if (candidateFrames.length > 1 && !card.baniFrame) card.baniFrame = candidateFrames[1];
+            } else if (frameMode === "dual_box") {
+                // Forced Dual Box mode: Top is Name, Bottom is Details
+                card.nameFrame = candidateFrames[0];
+                card.detailsFrame = candidateFrames[1];
+                if (candidateFrames.length > 2 && !card.baniFrame) card.baniFrame = candidateFrames[2];
+            } else {
+                // Smart Auto-Detect Mode:
+                var topCandidate = candidateFrames[0];
+                var bottomCandidate = candidateFrames[1];
 
-            for (var cf = 0; cf < candidateFrames.length; cf++) {
-                var ctf = candidateFrames[cf];
-                var cLines = ctf.lines.length;
-                var cParas = ctf.paragraphs.length;
-                var cText = ctf.contents;
-                var isDet = (cLines >= 2 || cParas >= 2 || 
-                            /(?:পিতা|মাতা|গ্রাম|ডাক|উপজেলা|জেলা|রক্ত|মোবাইল|ফোন|ঠিকানা|wcZv|gvZv|MÖvg|i³|‡gvevBj|‡dvb)/i.test(cText) ||
-                            /(?:01[3-9]\d{8}|০১[৩-৯][০-৯]{8})/.test(cText));
-                
-                if (isDet && !detFrame) {
-                    detFrame = ctf;
-                } else if (!nameFrame && (cLines === 1 || cParas === 1 || !isDet)) {
-                    nameFrame = ctf;
+                var topText = topCandidate.contents.replace(/^\s+|\s+$/g, "");
+                var bottomText = bottomCandidate.contents.replace(/^\s+|\s+$/g, "");
+
+                var topHasBio = this.hasStudentBiodata(topText) || /(?:পিতা|মাতা|গ্রাম|ডাক|উপজেলা|জেলা|মোবাইল|ফোন|রক্ত|01[3-9]\d{8}|০১[৩-৯][০-৯]{8})/i.test(topText);
+                var bottomHasBio = this.hasStudentBiodata(bottomText) || /(?:পিতা|মাতা|গ্রাম|ডাক|উপজেলা|জেলা|মোবাইল|ফোন|রক্ত|01[3-9]\d{8}|০১[৩-৯][০-৯]{8})/i.test(bottomText);
+
+                var isTopBani = this.isBaniText(topText);
+                var isBottomBani = this.isBaniText(bottomText);
+
+                if (isBottomBani) {
+                    card.nameFrame = topCandidate;
+                    card.detailsFrame = null;
+                    card.baniFrame = bottomCandidate;
+                } else if (isTopBani) {
+                    card.baniFrame = topCandidate;
+                    card.nameFrame = bottomCandidate;
+                    card.detailsFrame = null;
+                } else if (!topHasBio && bottomHasBio) {
+                    // Classic Dual Box: Top is Name (1 line header), Bottom is Address/Details
+                    card.nameFrame = topCandidate;
+                    card.detailsFrame = bottomCandidate;
+                } else if (topHasBio && !bottomHasBio) {
+                    card.nameFrame = topCandidate;
+                    card.baniFrame = bottomCandidate;
+                    card.detailsFrame = null;
+                } else if (topCandidate.lines.length === 1 && bottomCandidate.lines.length >= 1) {
+                    // Top is single-line name header, bottom is details
+                    card.nameFrame = topCandidate;
+                    card.detailsFrame = bottomCandidate;
                 } else {
-                    otherCandidates.push(ctf);
-                }
-            }
-
-            if (!nameFrame && candidateFrames.length > 0) {
-                nameFrame = candidateFrames[0];
-                if (detFrame === nameFrame) detFrame = candidateFrames.length > 1 ? candidateFrames[1] : null;
-            }
-            if (!detFrame && candidateFrames.length > 1) {
-                detFrame = (candidateFrames[0] === nameFrame) ? candidateFrames[1] : candidateFrames[0];
-            }
-
-            card.nameFrame = nameFrame;
-            card.detailsFrame = detFrame;
-
-            if (otherCandidates.length > 0 && !card.baniFrame) {
-                for (var oc = 0; oc < otherCandidates.length; oc++) {
-                    if (otherCandidates[oc] !== card.nameFrame && otherCandidates[oc] !== card.detailsFrame) {
-                        card.baniFrame = otherCandidates[oc];
-                        break;
-                    }
+                    // Default to Dual Box (Top = Name, Bottom = Details)
+                    card.nameFrame = topCandidate;
+                    card.detailsFrame = bottomCandidate;
                 }
             }
         }
@@ -889,12 +1019,12 @@ var CardAutoFiller = {
         return card;
     },
 
-                        sortCards: function(cards, order) {
+    sortCards: function(cards, order, layoutGrid) {
         if (!cards || cards.length <= 1) return cards;
         var doc = app.activeDocument;
         var numABs = doc ? doc.artboards.length : 0;
 
-        // Filter out header banners (width > 280 or height > 90)
+        // Filter out header banners (width > 480 or height > 350)
         var filtered = [];
         for (var c = 0; c < cards.length; c++) {
             var card = cards[c];
@@ -902,7 +1032,7 @@ var CardAutoFiller = {
             card.bounds = gb;
             var w = Math.abs(gb[2] - gb[0]);
             var h = Math.abs(gb[1] - gb[3]);
-            if (w > 450 || h > 350) continue;
+            if (w > 480 || h > 350) continue;
             card.artboardIndex = 0;
             if (numABs > 1 && gb) {
                 var midX = (gb[0] + gb[2]) / 2;
@@ -918,25 +1048,14 @@ var CardAutoFiller = {
             filtered.push(card);
         }
 
-        // Cluster cards by Sheet / Page block (X-span threshold ~500pt)
-        for (var i = 0; i < filtered.length - 1; i++) {
-            for (var j = i + 1; j < filtered.length; j++) {
-                if (filtered[j].artboardIndex < filtered[i].artboardIndex || 
-                   (filtered[j].artboardIndex === filtered[i].artboardIndex && filtered[j].bounds[0] < filtered[i].bounds[0])) {
-                    var tmp = filtered[i];
-                    filtered[i] = filtered[j];
-                    filtered[j] = tmp;
-                }
-            }
-        }
-
+        // Cluster cards by Artboard / Sheet
         var sheets = [];
         for (var i = 0; i < filtered.length; i++) {
             var c = filtered[i];
             var placed = false;
             for (var s = 0; s < sheets.length; s++) {
                 var sFirst = sheets[s][0];
-                if (sFirst.artboardIndex === c.artboardIndex && Math.abs(c.bounds[0] - sFirst.bounds[0]) < 500) {
+                if (sFirst.artboardIndex === c.artboardIndex && Math.abs(c.bounds[0] - sFirst.bounds[0]) < 600) {
                     sheets[s].push(c);
                     placed = true;
                     break;
@@ -946,83 +1065,100 @@ var CardAutoFiller = {
         }
 
         var finalResult = [];
+        var gridMode = layoutGrid || "auto";
 
         for (var s = 0; s < sheets.length; s++) {
             var sheetCards = sheets[s];
+            if (sheetCards.length === 0) continue;
 
-            if (order === "column") {
-                // Column-by-Column within sheet: Col 1 (top to bottom), Col 2 (top to bottom)...
-                for (var i = 0; i < sheetCards.length - 1; i++) {
-                    for (var j = i + 1; j < sheetCards.length; j++) {
-                        if (sheetCards[j].bounds[0] < sheetCards[i].bounds[0]) {
-                            var tmp = sheetCards[i];
-                            sheetCards[i] = sheetCards[j];
-                            sheetCards[j] = tmp;
-                        }
-                    }
+            // Sort all cards in this sheet from left to right by X-center
+            sheetCards.sort(function(a, b) {
+                var aMidX = (a.bounds[0] + a.bounds[2]) / 2;
+                var bMidX = (b.bounds[0] + b.bounds[2]) / 2;
+                return aMidX - bMidX;
+            });
+
+            var targetCols = 0;
+            if (gridMode === "2col") targetCols = 2;
+            else if (gridMode === "3col") targetCols = 3;
+            else if (gridMode === "4col") targetCols = 4;
+
+            var cols = [];
+
+            if (targetCols > 0 && sheetCards.length >= targetCols) {
+                // Explicit N-column partition: divide into targetCols clusters based on X
+                var minX = (sheetCards[0].bounds[0] + sheetCards[0].bounds[2]) / 2;
+                var maxX = (sheetCards[sheetCards.length - 1].bounds[0] + sheetCards[sheetCards.length - 1].bounds[2]) / 2;
+                var span = Math.max(1, maxX - minX);
+                var colWidth = span / targetCols;
+
+                for (var tc = 0; tc < targetCols; tc++) cols.push([]);
+
+                for (var ci = 0; ci < sheetCards.length; ci++) {
+                    var cardItem = sheetCards[ci];
+                    var cardMidX = (cardItem.bounds[0] + cardItem.bounds[2]) / 2;
+                    var colIdx = Math.floor((cardMidX - minX + (colWidth * 0.4)) / colWidth);
+                    if (colIdx < 0) colIdx = 0;
+                    if (colIdx >= targetCols) colIdx = targetCols - 1;
+                    cols[colIdx].push(cardItem);
                 }
-                var cols = [];
-                for (var i = 0; i < sheetCards.length; i++) {
-                    var c = sheetCards[i];
-                    var placed = false;
-                    for (var k = 0; k < cols.length; k++) {
-                        if (Math.abs(cols[k][0].bounds[0] - c.bounds[0]) < 30) {
-                            cols[k].push(c);
-                            placed = true;
-                            break;
-                        }
-                    }
-                    if (!placed) cols.push([c]);
+
+                // If any bucket ended up empty, fallback to proportional chunking
+                var hasEmpty = false;
+                for (var ck = 0; ck < cols.length; ck++) {
+                    if (cols[ck].length === 0) { hasEmpty = true; break; }
                 }
-                for (var k = 0; k < cols.length; k++) {
-                    var col = cols[k];
-                    for (var i = 0; i < col.length - 1; i++) {
-                        for (var j = i + 1; j < col.length; j++) {
-                            if (col[j].bounds[1] > col[i].bounds[1]) {
-                                var tmp = col[i];
-                                col[i] = col[j];
-                                col[j] = tmp;
-                            }
-                        }
+                if (hasEmpty && sheetCards.length % targetCols === 0) {
+                    cols = [];
+                    var perCol = sheetCards.length / targetCols;
+                    for (var tc = 0; tc < targetCols; tc++) {
+                        cols.push(sheetCards.slice(tc * perCol, (tc + 1) * perCol));
                     }
-                    for (var i = 0; i < col.length; i++) finalResult.push(col[i]);
                 }
             } else {
-                // Default: Row-by-Row ("zigzag") -> 1 - 2 - 3 - 4 | 5 - 6 - 7 - 8
-                for (var i = 0; i < sheetCards.length - 1; i++) {
-                    for (var j = i + 1; j < sheetCards.length; j++) {
-                        if (sheetCards[j].bounds[1] > sheetCards[i].bounds[1]) {
-                            var tmp = sheetCards[i];
-                            sheetCards[i] = sheetCards[j];
-                            sheetCards[j] = tmp;
-                        }
-                    }
-                }
-                var rows = [];
-                for (var i = 0; i < sheetCards.length; i++) {
-                    var c = sheetCards[i];
-                    var placed = false;
-                    for (var k = 0; k < rows.length; k++) {
-                        if (Math.abs(rows[k][0].bounds[1] - c.bounds[1]) < 20) {
-                            rows[k].push(c);
-                            placed = true;
+                // Adaptive Smart Grid Clustering: detect natural column gaps
+                for (var ci = 0; ci < sheetCards.length; ci++) {
+                    var cardItem = sheetCards[ci];
+                    var cardMidX = (cardItem.bounds[0] + cardItem.bounds[2]) / 2;
+                    var placedCol = false;
+                    for (var k = 0; k < cols.length; k++) {
+                        var colMidX = (cols[k][0].bounds[0] + cols[k][0].bounds[2]) / 2;
+                        if (Math.abs(colMidX - cardMidX) < 45) {
+                            cols[k].push(cardItem);
+                            placedCol = true;
                             break;
                         }
                     }
-                    if (!placed) rows.push([c]);
+                    if (!placedCol) cols.push([cardItem]);
                 }
-                for (var k = 0; k < rows.length; k++) {
-                    var row = rows[k];
-                    for (var i = 0; i < row.length - 1; i++) {
-                        for (var j = i + 1; j < row.length; j++) {
-                            if (row[j].bounds[0] < row[i].bounds[0]) {
-                                var tmp = row[i];
-                                row[i] = row[j];
-                                row[j] = tmp;
-                            }
+            }
+
+            // Sort each column internally from Top to Bottom (Y descending)
+            for (var k = 0; k < cols.length; k++) {
+                cols[k].sort(function(a, b) {
+                    return b.bounds[1] - a.bounds[1];
+                });
+            }
+
+            if (order === "column") {
+                // Column by Column: Col 1 top-to-bottom, then Col 2 top-to-bottom...
+                for (var k = 0; k < cols.length; k++) {
+                    for (var ci = 0; ci < cols[k].length; ci++) {
+                        finalResult.push(cols[k][ci]);
+                    }
+                }
+            } else {
+                // Row by Row (Zigzag): Row 1 (Col 1, Col 2, Col 3...), Row 2 (Col 1, Col 2, Col 3...)...
+                var maxRows = 0;
+                for (var k = 0; k < cols.length; k++) {
+                    if (cols[k].length > maxRows) maxRows = cols[k].length;
+                }
+                for (var r = 0; r < maxRows; r++) {
+                    for (var k = 0; k < cols.length; k++) {
+                        if (r < cols[k].length) {
+                            finalResult.push(cols[k][r]);
                         }
                     }
-                    for (var i = 0; i < row.length; i++) finalResult.push(row[i]);
                 }
             }
         }
@@ -1032,33 +1168,123 @@ var CardAutoFiller = {
 
     _fontCache: {},
 
+    
+        ensureBornomalaDefault: function() {
+        try {
+            var bFonts = this.getBornomalaFonts();
+            var fontReg = bFonts.bold || bFonts.regular;
+            if (!fontReg || !app.documents.length) return JSON.stringify({ success: false });
+
+            var doc = app.activeDocument;
+            try {
+                var ncs = doc.characterStyles["[Normal Character Style]"];
+                if (ncs && ncs.characterAttributes) ncs.characterAttributes.textFont = fontReg;
+            } catch(e1) {}
+            try {
+                var nps = doc.paragraphStyles["[Normal Paragraph Style]"];
+                if (nps && nps.characterAttributes) nps.characterAttributes.textFont = fontReg;
+            } catch(e2) {}
+            return JSON.stringify({ success: true });
+        } catch(ex) {
+            return JSON.stringify({ success: false });
+        }
+    },
+
     getBornomalaFonts: function() {
+        if (!this._fontCache) this._fontCache = {};
         if (this._fontCache["bornomala_default"]) return this._fontCache["bornomala_default"];
         var res = { bold: null, regular: null };
-        var bNames = ["Bornomala01MJ-Bold", "Bornomala-Bold", "Bornomala02MJ-Bold", "SutonnyMJ-Bold", "SutonnyMJ-Bold-Bold"];
-        var rNames = ["Bornomala01MJ-Regular", "Bornomala-Regular", "Bornomala", "Bornomala02MJ", "SutonnyMJ", "SutonnyMJ-Regular"];
+
+        // 1. Direct PostScript Name lookups
+        var bNames = [
+            "Bornomala-Bold",
+            "BornomalaANSI-Bold",
+            "Bornomala01MJ-Bold",
+            "Bornomala02MJ-Bold",
+            "Bornomala",
+            "SutonnyMJ-Bold",
+            "SutonnyMJ-Bold-Bold"
+        ];
+        var rNames = [
+            "Bornomala-Regular",
+            "BornomalaANSI-Regular",
+            "Bornomala01MJ-Regular",
+            "Bornomala02MJ-Regular",
+            "Bornomala",
+            "Bornomala ANSI",
+            "SutonnyMJ",
+            "SutonnyMJ-Regular"
+        ];
         
         for (var b = 0; b < bNames.length; b++) {
-            try { res.bold = app.textFonts.getByName(bNames[b]); if (res.bold) break; } catch(e) {}
+            try { 
+                var bf = app.textFonts.getByName(bNames[b]); 
+                if (bf) { res.bold = bf; break; } 
+            } catch(e) {}
         }
         for (var r = 0; r < rNames.length; r++) {
-            try { res.regular = app.textFonts.getByName(rNames[r]); if (res.regular) break; } catch(e) {}
+            try { 
+                var rf = app.textFonts.getByName(rNames[r]); 
+                if (rf) { res.regular = rf; break; } 
+            } catch(e) {}
         }
 
+        // 2. Search installed system fonts specifically for Bornomala / Sutonny
         if (!res.bold || !res.regular) {
             try {
-                for (var i = 0; i < Math.min(app.textFonts.length, 300); i++) {
+                for (var i = 0; i < app.textFonts.length; i++) {
                     var f = app.textFonts[i];
-                    var fn = f.name;
+                    var fn = f.name || "";
+                    var fam = f.family || "";
                     var fs = f.style || "";
-                    if (/bornomala|sutonny/i.test(fn)) {
-                        if (!res.bold && /bold/i.test(fn + fs)) res.bold = f;
-                        if (!res.regular && /regular|normal/i.test(fn + fs)) res.regular = f;
+                    var fullDesc = (fn + " " + fam + " " + fs).toLowerCase();
+                    
+                    if (fullDesc.indexOf("bornomala") !== -1 || fullDesc.indexOf("sutonny") !== -1) {
+                        if (!res.bold && (fs.toLowerCase().indexOf("bold") !== -1 || fn.toLowerCase().indexOf("bold") !== -1)) {
+                            res.bold = f;
+                        }
+                        if (!res.regular && (fs.toLowerCase().indexOf("regular") !== -1 || fn.toLowerCase().indexOf("regular") !== -1 || fs === "" || fs === "Normal")) {
+                            res.regular = f;
+                        }
                     }
                     if (res.bold && res.regular) break;
                 }
             } catch(e) {}
         }
+
+        // 3. Fallback: Search active document text frames specifically for Bornomala / Sutonny
+        if (!res.bold || !res.regular) {
+            try {
+                if (app.documents.length > 0) {
+                    var doc = app.activeDocument;
+                    for (var i = 0; i < doc.textFrames.length; i++) {
+                        try {
+                            var tf = doc.textFrames[i];
+                            if (tf.paragraphs.length > 0 && tf.paragraphs[0].characters.length > 0) {
+                                var f = tf.paragraphs[0].characters[0].characterAttributes.textFont;
+                                if (f) {
+                                    var fn = (f.name || "").toLowerCase();
+                                    var fam = (f.family || "").toLowerCase();
+                                    var fs = (f.style || "").toLowerCase();
+                                    if (fn.indexOf("bornomala") !== -1 || fam.indexOf("bornomala") !== -1 || fn.indexOf("sutonny") !== -1 || fam.indexOf("sutonny") !== -1) {
+                                        if (/bold/i.test(fn) || /bold/i.test(fs)) {
+                                            if (!res.bold) res.bold = f;
+                                        } else if (/regular|normal/i.test(fn) || /regular|normal/i.test(fs) || fs === "") {
+                                            if (!res.regular) res.regular = f;
+                                        }
+                                    }
+                                }
+                            }
+                        } catch(tfe) {}
+                        if (res.bold && res.regular) break;
+                    }
+                }
+            } catch(de) {}
+        }
+
+        if (res.bold && !res.regular) res.regular = res.bold;
+        if (!res.bold && res.regular) res.bold = res.regular;
+
         this._fontCache["bornomala_default"] = res;
         return res;
     },
@@ -1070,7 +1296,7 @@ var CardAutoFiller = {
         if (!fam) {
             try { fam = baseFont.name.split("-")[0]; } catch(e) {}
         }
-        if (!fam) return this.getBornomalaFonts();
+        if (!fam || /akhand|myriad/i.test(fam) || /akhand|myriad/i.test(baseFont.name)) return this.getBornomalaFonts();
 
         var cacheKey = fam.toLowerCase();
         if (this._fontCache[cacheKey]) {
@@ -1646,9 +1872,9 @@ var CardAutoFiller = {
         var hasCustomNameLeading = (!isNaN(userNameLeading) && userNameLeading > 0);
 
         var userDetailsLeading = parseFloat(payload.detailsLeading);
-        var hasCustomDetailsLeading = (!isNaN(userDetailsLeading) && userDetailsLeading > 0);
-
-        var cards = this.detectCards(scope);
+        var layoutGrid = payload.layoutGrid || "auto";
+        var frameMode = payload.frameMode || "auto";
+        var cards = this.detectCards(scope, order, { layoutGrid: layoutGrid, frameMode: frameMode });
         if (!cards.length) {
             return JSON.stringify({
                 status: "error",
@@ -1656,7 +1882,7 @@ var CardAutoFiller = {
             });
         }
 
-        cards = this.sortCards(cards, order);
+        cards = this.sortCards(cards, order, layoutGrid);
 
         var targetCards = [];
         if (!skipFilledCards || scope === "selection" || startIndex === 0) {
@@ -1720,9 +1946,12 @@ var CardAutoFiller = {
             var card = targetCards[i];
             var entry = activeEntries[i];
 
-            // 1. POPULATE NAME FRAME
+            // 1. POPULATE PERSON INFO (Name on line 1, Father/Address/Mobile on lines 2..4 next to icons)
             if (card.nameFrame && entry.name) {
                 var cleanName = (entry.name || "").replace(/^\s+|\s+$/g, "");
+                var cleanDetails = (entry.details || "").replace(/^\s+|\s+$/g, "");
+                cleanDetails = cleanDetails.split("\r\n").join("\r").split("\n").join("\r");
+
                 var origNameFont = boldFont;
                 var origNameSize = 11.0;
                 var origNameLeading = 11.0;
@@ -1730,45 +1959,6 @@ var CardAutoFiller = {
                 var origNameHScale = nameHScale;
                 var origNameTracking = 0;
                 var origNameJust = null;
-
-                try {
-                    if (card.nameFrame.characters.length > 0) {
-                        var nca = card.nameFrame.characters[0].characterAttributes;
-                        if (nca.textFont) origNameFont = nca.textFont;
-                        if (nca.size > 0) origNameSize = nca.size;
-                        if (nca.leading > 0) origNameLeading = nca.leading;
-                        origNameTracking = nca.tracking;
-                        if (!userChosenColor && nca.fillColor && nca.fillColor.typename !== "NoColor") {
-                            origNameColor = nca.fillColor;
-                        }
-                    }
-                    if (card.nameFrame.paragraphs.length > 0) {
-                        origNameJust = card.nameFrame.paragraphs[0].paragraphAttributes.justification;
-                    }
-                } catch(ne) {}
-
-                if (userChosenColor) origNameColor = userChosenColor;
-                if (hasCustomNameLeading) origNameLeading = userNameLeading;
-
-                card.nameFrame.contents = cleanName;
-                try {
-                    var nTr = card.nameFrame.textRange;
-                    if (origNameFont) nTr.characterAttributes.textFont = origNameFont;
-                    nTr.characterAttributes.size = origNameSize;
-                    nTr.characterAttributes.leading = origNameLeading;
-                    nTr.characterAttributes.horizontalScale = origNameHScale;
-                    nTr.characterAttributes.tracking = origNameTracking;
-                    nTr.characterAttributes.fillColor = origNameColor;
-                    if (origNameJust !== null) nTr.paragraphAttributes.justification = origNameJust;
-                    nTr.paragraphAttributes.spaceBefore = 0;
-                    nTr.paragraphAttributes.spaceAfter = 0;
-                } catch(nStyErr) {}
-            }
-
-            // 2. POPULATE DETAILS FRAME (Separate multi-line text frame)
-            if (card.detailsFrame && entry.details) {
-                var cleanDetails = (entry.details || "").replace(/^\s+|\s+$/g, "");
-                cleanDetails = cleanDetails.split("\r\n").join("\r").split("\n").join("\r");
 
                 var origDetFont = regularFont;
                 var origDetSize = 6.0;
@@ -1778,51 +1968,125 @@ var CardAutoFiller = {
                 var origDetJust = null;
 
                 try {
-                    if (card.detailsFrame.characters.length > 0) {
-                        var dca = card.detailsFrame.characters[0].characterAttributes;
-                        if (dca.textFont) origDetFont = dca.textFont;
-                        if (dca.size > 0) origDetSize = dca.size;
-                        if (dca.leading > 0) origDetLeading = dca.leading;
-                        origDetTracking = dca.tracking;
-                        if (dca.fillColor && dca.fillColor.typename !== "NoColor") {
-                            origDetColor = dca.fillColor;
+                    if (card.nameFrame.paragraphs.length > 0) {
+                        var p0 = card.nameFrame.paragraphs[0];
+                        if (p0.characters.length > 0) {
+                            var nca = p0.characters[0].characterAttributes;
+                            if (nca.textFont) origNameFont = nca.textFont;
+                            if (nca.size > 0) origNameSize = nca.size;
+                            if (nca.leading > 0) origNameLeading = nca.leading;
+                            origNameTracking = nca.tracking;
+                            if (!userChosenColor && nca.fillColor && nca.fillColor.typename !== "NoColor") {
+                                origNameColor = nca.fillColor;
+                            }
+                        }
+                        origNameJust = p0.paragraphAttributes.justification;
+                    }
+
+                    if (card.nameFrame.paragraphs.length > 1) {
+                        var p1 = card.nameFrame.paragraphs[1];
+                        if (p1.characters.length > 0) {
+                            var dca = p1.characters[0].characterAttributes;
+                            if (dca.textFont) origDetFont = dca.textFont;
+                            if (dca.size > 0) origDetSize = dca.size;
+                            if (dca.leading > 0) origDetLeading = dca.leading;
+                            origDetTracking = dca.tracking;
+                            if (dca.fillColor && dca.fillColor.typename !== "NoColor") {
+                                origDetColor = dca.fillColor;
+                            }
+                        }
+                    } else if (card.detailsFrame && card.detailsFrame !== card.nameFrame && card.detailsFrame !== card.baniFrame) {
+                        if (card.detailsFrame.characters.length > 0) {
+                            var ddca = card.detailsFrame.characters[0].characterAttributes;
+                            if (ddca.textFont) origDetFont = ddca.textFont;
+                            if (ddca.size > 0) origDetSize = ddca.size;
+                            if (ddca.leading > 0) origDetLeading = ddca.leading;
+                            origDetTracking = ddca.tracking;
+                            if (ddca.fillColor && ddca.fillColor.typename !== "NoColor") {
+                                origDetColor = ddca.fillColor;
+                            }
                         }
                     }
-                    if (card.detailsFrame.paragraphs.length > 0) {
-                        origDetJust = card.detailsFrame.paragraphs[0].paragraphAttributes.justification;
-                    }
-                } catch(de) {}
+                } catch(ne) {}
 
+                if (userChosenColor) origNameColor = userChosenColor;
+                if (hasCustomNameLeading) origNameLeading = userNameLeading;
                 if (hasCustomDetailsLeading) origDetLeading = userDetailsLeading;
 
-                card.detailsFrame.contents = cleanDetails;
-                try {
-                    var dTr = card.detailsFrame.textRange;
-                    if (origDetFont) dTr.characterAttributes.textFont = origDetFont;
-                    dTr.characterAttributes.size = origDetSize;
-                    dTr.characterAttributes.leading = origDetLeading;
-                    dTr.characterAttributes.horizontalScale = detailsHScale;
-                    dTr.characterAttributes.tracking = origDetTracking;
-                    dTr.characterAttributes.fillColor = origDetColor;
-                    if (origDetJust !== null) dTr.paragraphAttributes.justification = origDetJust;
-                    dTr.paragraphAttributes.spaceBefore = 0;
-                    dTr.paragraphAttributes.spaceAfter = 0;
+                var isSeparateDetFrame = (card.detailsFrame && card.detailsFrame !== card.nameFrame && card.detailsFrame !== card.baniFrame);
 
-                    for (var dp = 0; dp < card.detailsFrame.paragraphs.length; dp++) {
-                        try {
-                            var dpPara = card.detailsFrame.paragraphs[dp];
-                            if (origDetFont) dpPara.characterAttributes.textFont = origDetFont;
-                            dpPara.characterAttributes.size = origDetSize;
-                            dpPara.characterAttributes.leading = origDetLeading;
-                            dpPara.characterAttributes.horizontalScale = detailsHScale;
-                            dpPara.characterAttributes.tracking = origDetTracking;
-                            dpPara.characterAttributes.fillColor = origDetColor;
-                            if (origDetJust !== null) dpPara.paragraphAttributes.justification = origDetJust;
-                            dpPara.paragraphAttributes.spaceBefore = 0;
-                            dpPara.paragraphAttributes.spaceAfter = 0;
-                        } catch(dpE) {}
-                    }
-                } catch(dStyErr) {}
+                if (!isSeparateDetFrame) {
+                    // Single combined frame: Name (line 1) + Father (line 2) + Village (line 3) + Phone (line 4)
+                    var fullInfo = cleanDetails ? (cleanName + "\r" + cleanDetails) : cleanName;
+                    card.nameFrame.contents = fullInfo;
+
+                    // 1. Apply base details styling to entire frame
+                    try {
+                        var nTr = card.nameFrame.textRange;
+                        if (origDetFont) nTr.characterAttributes.textFont = origDetFont;
+                        nTr.characterAttributes.size = origDetSize;
+                        nTr.characterAttributes.leading = origDetLeading;
+                        nTr.characterAttributes.horizontalScale = detailsHScale;
+                        nTr.characterAttributes.tracking = origDetTracking;
+                        nTr.characterAttributes.fillColor = origDetColor;
+                        if (origDetJust !== null) nTr.paragraphAttributes.justification = origDetJust;
+                        nTr.paragraphAttributes.spaceBefore = 0;
+                        nTr.paragraphAttributes.spaceAfter = 0;
+                    } catch(bStyErr) {}
+
+                    // 2. Apply Name styling to Paragraph 0
+                    try {
+                        if (card.nameFrame.paragraphs.length > 0) {
+                            var p0 = card.nameFrame.paragraphs[0];
+                            if (origNameFont) p0.characterAttributes.textFont = origNameFont;
+                            p0.characterAttributes.size = origNameSize;
+                            p0.characterAttributes.leading = origNameLeading;
+                            p0.characterAttributes.horizontalScale = nameHScale;
+                            p0.characterAttributes.tracking = origNameTracking;
+                            p0.characterAttributes.fillColor = origNameColor;
+                            if (origNameJust !== null) p0.paragraphAttributes.justification = origNameJust;
+                        }
+                    } catch(p0Err) {}
+
+                    // 3. Ensure subsequent paragraphs keep details styling
+                    try {
+                        for (var p = 1; p < card.nameFrame.paragraphs.length; p++) {
+                            var pIt = card.nameFrame.paragraphs[p];
+                            if (origDetFont) pIt.characterAttributes.textFont = origDetFont;
+                            pIt.characterAttributes.size = origDetSize;
+                            pIt.characterAttributes.leading = origDetLeading;
+                            pIt.characterAttributes.horizontalScale = detailsHScale;
+                            pIt.characterAttributes.tracking = origDetTracking;
+                            pIt.characterAttributes.fillColor = origDetColor;
+                            if (origDetJust !== null) pIt.paragraphAttributes.justification = origDetJust;
+                        }
+                    } catch(pDetErr) {}
+                } else {
+                    // Separate Name frame and Details frame
+                    card.nameFrame.contents = cleanName;
+                    try {
+                        var nTr = card.nameFrame.textRange;
+                        if (origNameFont) nTr.characterAttributes.textFont = origNameFont;
+                        nTr.characterAttributes.size = origNameSize;
+                        nTr.characterAttributes.leading = origNameLeading;
+                        nTr.characterAttributes.horizontalScale = nameHScale;
+                        nTr.characterAttributes.tracking = origNameTracking;
+                        nTr.characterAttributes.fillColor = origNameColor;
+                        if (origNameJust !== null) nTr.paragraphAttributes.justification = origNameJust;
+                    } catch(nStyErr) {}
+
+                    card.detailsFrame.contents = cleanDetails;
+                    try {
+                        var dTr = card.detailsFrame.textRange;
+                        if (origDetFont) dTr.characterAttributes.textFont = origDetFont;
+                        dTr.characterAttributes.size = origDetSize;
+                        dTr.characterAttributes.leading = origDetLeading;
+                        dTr.characterAttributes.horizontalScale = detailsHScale;
+                        dTr.characterAttributes.tracking = origDetTracking;
+                        dTr.characterAttributes.fillColor = origDetColor;
+                        if (origDetJust !== null) dTr.paragraphAttributes.justification = origDetJust;
+                    } catch(dStyErr) {}
+                }
             }
 
             // 3. POPULATE QTY FRAME (Right side quantity)
@@ -1966,7 +2230,18 @@ var CardAutoFiller = {
         var userNameLeading = parseFloat(payload.nameLeading);
         var hasCustomNameLeading = (!isNaN(userNameLeading) && userNameLeading > 0);
 
-        var cards = this.detectCards(scope);
+        var autoFit = (payload.autoFit !== false && payload.autoFit !== "false");
+        var safeWidthMm = parseFloat(payload.safeWidthMm || payload.safeWidth || payload.maxWidthMm || payload.maxWidth);
+        var safeWidthPt = 0;
+        if (!isNaN(safeWidthMm) && safeWidthMm > 0) {
+            safeWidthPt = safeWidthMm * 72.0 / 25.4;
+        }
+        var minHScale = parseFloat(payload.minHScale);
+        if (isNaN(minHScale) || minHScale <= 0) minHScale = 55;
+
+        var layoutGrid = payload.layoutGrid || "auto";
+        var frameMode = payload.frameMode || "auto";
+        var cards = this.detectCards(scope, order, { layoutGrid: layoutGrid, frameMode: frameMode });
         if (!cards.length) {
             return JSON.stringify({
                 status: "error",
@@ -1974,7 +2249,7 @@ var CardAutoFiller = {
             });
         }
 
-        cards = this.sortCards(cards, order);
+        cards = this.sortCards(cards, order, layoutGrid);
 
         var targetCards = [];
         // If starting from index 0 or in selection scope, populate all detected cards sequentially
@@ -2023,7 +2298,7 @@ var CardAutoFiller = {
                     var p0 = cTF.paragraphs[0];
                     if (p0 && p0.characterAttributes) {
                         var f0 = p0.characterAttributes.textFont;
-                        if (f0 && (!docBoldFont || f0.name.indexOf("Bold") !== -1)) docBoldFont = f0;
+                        if (f0 && !/akhand/i.test(f0.name) && (!docBoldFont || f0.name.indexOf("Bold") !== -1)) docBoldFont = f0;
                         var fc = p0.characterAttributes.fillColor;
                         if (!docNameColor && fc && fc.typename !== "NoColor") {
                             if (fc.typename === "SpotColor" || (fc.typename === "CMYKColor" && fc.magenta > 50)) {
@@ -2039,7 +2314,7 @@ var CardAutoFiller = {
                         var p1 = cTF.paragraphs[1];
                         if (p1 && p1.characterAttributes) {
                             var f1 = p1.characterAttributes.textFont;
-                            if (f1 && (!docRegularFont || f1.name.indexOf("Bold") === -1)) docRegularFont = f1;
+                            if (f1 && !/akhand/i.test(f1.name) && (!docRegularFont || f1.name.indexOf("Bold") === -1)) docRegularFont = f1;
                             if (!docDetailsLeading && p1.characterAttributes.leading > 0) {
                                 docDetailsLeading = p1.characterAttributes.leading;
                             }
@@ -2479,6 +2754,22 @@ var CardAutoFiller = {
                             nTr.paragraphAttributes.spaceBefore = 0;
                             nTr.paragraphAttributes.spaceAfter = 0;
                         } catch(nErr) {}
+                        if (autoFit) {
+                            var effectiveMaxPt = safeWidthPt;
+                            if (card.serialFrame) {
+                                var nGB = card.nameFrame.geometricBounds;
+                                var sGB = card.serialFrame.geometricBounds;
+                                if (sGB[0] > nGB[0] && Math.abs(sGB[1] - nGB[1]) < 35) {
+                                    var badgeAvailPt = (sGB[0] - nGB[0]) - 8;
+                                    if (badgeAvailPt > 20 && (effectiveMaxPt <= 0 || badgeAvailPt < effectiveMaxPt)) {
+                                        effectiveMaxPt = badgeAvailPt;
+                                    }
+                                }
+                            }
+                            if (effectiveMaxPt > 0) {
+                                this.fitTextFrameToWidth(card.nameFrame, effectiveMaxPt, cardNameStyle.hScale, minHScale, cardNameStyle.size);
+                            }
+                        }
 
                         if (cleanDetails) {
                             card.detailsFrame.contents = cleanDetails;
@@ -2524,9 +2815,10 @@ var CardAutoFiller = {
                         try {
                             if (card.nameFrame.paragraphs.length > 0) {
                                 var p0 = card.nameFrame.paragraphs[0];
-                                if (cardNameStyle.font) p0.characterAttributes.textFont = cardNameStyle.font;
-                                p0.characterAttributes.size = cardNameStyle.size;
-                                p0.characterAttributes.leading = cardNameStyle.leading;
+                                var nbFont = this.getFamilyFonts(cardNameStyle.font || globalBoldFont).bold || globalBoldFont;
+                                if (nbFont) p0.characterAttributes.textFont = nbFont;
+                                if (cardNameStyle.size > 0) p0.characterAttributes.size = cardNameStyle.size;
+                                if (cardNameStyle.leading > 0) p0.characterAttributes.leading = cardNameStyle.leading;
                                 p0.characterAttributes.horizontalScale = cardNameStyle.hScale;
                                 p0.characterAttributes.tracking = cardNameStyle.tracking;
                                 p0.characterAttributes.fillColor = cardNameStyle.color;
@@ -2539,15 +2831,33 @@ var CardAutoFiller = {
                             var numP = card.nameFrame.paragraphs.length;
                             for (var p = 1; p < numP; p++) {
                                 var pIt = card.nameFrame.paragraphs[p];
-                                if (cardDetStyle.font) pIt.characterAttributes.textFont = cardDetStyle.font;
-                                pIt.characterAttributes.size = cardDetStyle.size;
-                                pIt.characterAttributes.leading = cardDetStyle.leading;
+                                var ndFont = this.getFamilyFonts(cardDetStyle.font || globalRegularFont).regular || globalRegularFont;
+                                if (ndFont) pIt.characterAttributes.textFont = ndFont;
+                                if (cardDetStyle.size > 0) pIt.characterAttributes.size = cardDetStyle.size;
+                                if (cardDetStyle.leading > 0) pIt.characterAttributes.leading = cardDetStyle.leading;
                                 pIt.characterAttributes.horizontalScale = cardDetStyle.hScale;
                                 pIt.characterAttributes.tracking = cardDetStyle.tracking;
                                 pIt.characterAttributes.fillColor = cardDetStyle.color;
                                 if (cardDetStyle.just !== null) pIt.paragraphAttributes.justification = cardDetStyle.just;
                             }
                         } catch(pAddErr) {}
+
+                        if (autoFit && card.nameFrame.paragraphs.length > 0) {
+                            var effectiveMaxPt = safeWidthPt;
+                            if (card.serialFrame) {
+                                var nGB = card.nameFrame.geometricBounds;
+                                var sGB = card.serialFrame.geometricBounds;
+                                if (sGB[0] > nGB[0] && Math.abs(sGB[1] - nGB[1]) < 35) {
+                                    var badgeAvailPt = (sGB[0] - nGB[0]) - 8;
+                                    if (badgeAvailPt > 20 && (effectiveMaxPt <= 0 || badgeAvailPt < effectiveMaxPt)) {
+                                        effectiveMaxPt = badgeAvailPt;
+                                    }
+                                }
+                            }
+                            if (effectiveMaxPt > 0) {
+                                this.fitTextFrameToWidth(card.nameFrame.paragraphs[0], effectiveMaxPt, cardNameStyle.hScale, minHScale, cardNameStyle.size);
+                            }
+                        }
                     }
                 }
             } catch(nErr) {}
@@ -2759,4 +3069,8 @@ function detectCards(scope) {
         status: "success",
         count: cards.length
     });
+}
+
+function getSelectedCanvasWidth() {
+    return CardAutoFiller.getSelectedCanvasWidth();
 }
