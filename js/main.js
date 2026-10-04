@@ -36,20 +36,62 @@
             }
         }
 
-        // Method 1: Node.js child_process (100% reliable and instantaneous in CEP)
+        // Method 1: Node.js child_process with strict UTF-8 locale environment
         try {
             if (typeof require !== 'undefined') {
                 var cp = require('child_process');
+                var utf8Env = Object.assign({}, process.env, {
+                    LANG: 'en_US.UTF-8',
+                    LC_ALL: 'en_US.UTF-8'
+                });
+
                 if (process.platform === 'darwin') {
-                    var out = cp.execSync("pbpaste", { encoding: 'utf8', maxBuffer: 10 * 1024 * 1024 });
-                    if (out !== undefined && out !== null) {
-                        done(out);
-                        return;
-                    }
+                    // Try pbpaste with -Prefer utf8 first to preserve Bengali and Unicode characters
+                    try {
+                        var out = cp.execSync('/usr/bin/pbpaste -Prefer utf8', {
+                            env: utf8Env,
+                            encoding: 'utf8',
+                            maxBuffer: 20 * 1024 * 1024
+                        });
+                        if (out !== undefined && out !== null && out.length > 0) {
+                            done(out);
+                            return;
+                        }
+                    } catch(pbe1) {}
+
+                    // Fallback to pbpaste -Prefer txt
+                    try {
+                        var outTxt = cp.execSync('/usr/bin/pbpaste -Prefer txt', {
+                            env: utf8Env,
+                            encoding: 'utf8',
+                            maxBuffer: 20 * 1024 * 1024
+                        });
+                        if (outTxt !== undefined && outTxt !== null && outTxt.length > 0) {
+                            done(outTxt);
+                            return;
+                        }
+                    } catch(pbe2) {}
+
+                    // Fallback to plain pbpaste
+                    try {
+                        var outPlain = cp.execSync('/usr/bin/pbpaste', {
+                            env: utf8Env,
+                            encoding: 'utf8',
+                            maxBuffer: 20 * 1024 * 1024
+                        });
+                        if (outPlain !== undefined && outPlain !== null) {
+                            done(outPlain);
+                            return;
+                        }
+                    } catch(pbe3) {}
                 } else if (process.platform === 'win32') {
-                    var out = cp.execSync('powershell.exe -NoProfile -Command "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; Get-Clipboard -Raw"', { encoding: 'utf8', maxBuffer: 10 * 1024 * 1024 });
-                    if (out !== undefined && out !== null) {
-                        done(out);
+                    var outWin = cp.execSync('powershell.exe -NoProfile -Command "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; Get-Clipboard -Raw"', {
+                        env: utf8Env,
+                        encoding: 'utf8',
+                        maxBuffer: 20 * 1024 * 1024
+                    });
+                    if (outWin !== undefined && outWin !== null) {
+                        done(outWin);
                         return;
                     }
                 }
@@ -75,14 +117,18 @@
         try {
             if (typeof require !== 'undefined') {
                 var cp = require('child_process');
+                var utf8Env = Object.assign({}, process.env, {
+                    LANG: 'en_US.UTF-8',
+                    LC_ALL: 'en_US.UTF-8'
+                });
                 if (process.platform === 'darwin') {
-                    var proc = cp.spawn('pbcopy');
-                    proc.stdin.write(text);
+                    var proc = cp.spawn('/usr/bin/pbcopy', [], { env: utf8Env });
+                    proc.stdin.write(text, 'utf8');
                     proc.stdin.end();
                     return;
                 } else if (process.platform === 'win32') {
-                    var proc = cp.spawn('clip');
-                    proc.stdin.write(text);
+                    var proc = cp.spawn('clip', [], { env: utf8Env });
+                    proc.stdin.write(text, 'utf8');
                     proc.stdin.end();
                     return;
                 }
@@ -231,23 +277,33 @@
         if (!isCmdOrCtrl) return;
 
         var key = e.key ? e.key.toLowerCase() : '';
+        var keyCode = e.keyCode || e.which;
         var active = document.activeElement;
         var isInput = active && (active.tagName === 'TEXTAREA' || active.tagName === 'INPUT');
 
-        if (key === 'v') {
+        if (key === 'v' || keyCode === 86) {
             if (isInput) {
                 e.preventDefault();
                 getSystemClipboardText(function(clipText) {
                     if (clipText) {
                         insertTextIntoElement(active, clipText, false);
+                        if (active.id === 'rawTextInputDiary') {
+                            var rawK = document.getElementById('rawTextInputKeyring');
+                            if (rawK) rawK.value = active.value;
+                            parseDiaryInput();
+                        } else if (active.id === 'rawTextInputKeyring') {
+                            var rawD = document.getElementById('rawTextInputDiary');
+                            if (rawD) rawD.value = active.value;
+                            parseKeyringInput();
+                        }
                     }
                 });
             }
-        } else if (key === 'a') {
+        } else if (key === 'a' || keyCode === 65) {
             if (isInput) {
                 active.select();
             }
-        } else if (key === 'c') {
+        } else if (key === 'c' || keyCode === 67) {
             if (isInput) {
                 var start = active.selectionStart;
                 var end = active.selectionEnd;
@@ -256,7 +312,7 @@
                     if (selected) setSystemClipboardText(selected);
                 }
             }
-        } else if (key === 'x') {
+        } else if (key === 'x' || keyCode === 88) {
             if (isInput) {
                 var start = active.selectionStart;
                 var end = active.selectionEnd;
@@ -282,6 +338,15 @@
             if (text) {
                 e.preventDefault();
                 insertTextIntoElement(active, text, false);
+                if (active.id === 'rawTextInputDiary') {
+                    var rawK = document.getElementById('rawTextInputKeyring');
+                    if (rawK) rawK.value = active.value;
+                    parseDiaryInput();
+                } else if (active.id === 'rawTextInputKeyring') {
+                    var rawD = document.getElementById('rawTextInputDiary');
+                    if (rawD) rawD.value = active.value;
+                    parseKeyringInput();
+                }
             }
         }
     });
