@@ -26,17 +26,7 @@
         }
     } catch (e) {}
 
-    function getSystemClipboardText(callback) {
-        if (typeof callback !== 'function') return;
-        var called = false;
-        function done(text) {
-            if (!called) {
-                called = true;
-                callback(text || '');
-            }
-        }
-
-        // Method 1: Node.js child_process with strict UTF-8 locale environment
+    function getSystemClipboardTextSync() {
         try {
             if (typeof require !== 'undefined') {
                 var cp = require('child_process');
@@ -46,43 +36,31 @@
                 });
 
                 if (process.platform === 'darwin') {
-                    // Try pbpaste with -Prefer utf8 first to preserve Bengali and Unicode characters
                     try {
                         var out = cp.execSync('/usr/bin/pbpaste -Prefer utf8', {
                             env: utf8Env,
                             encoding: 'utf8',
                             maxBuffer: 20 * 1024 * 1024
                         });
-                        if (out !== undefined && out !== null && out.length > 0) {
-                            done(out);
-                            return;
-                        }
+                        if (out && out.length > 0) return out;
                     } catch(pbe1) {}
 
-                    // Fallback to pbpaste -Prefer txt
                     try {
                         var outTxt = cp.execSync('/usr/bin/pbpaste -Prefer txt', {
                             env: utf8Env,
                             encoding: 'utf8',
                             maxBuffer: 20 * 1024 * 1024
                         });
-                        if (outTxt !== undefined && outTxt !== null && outTxt.length > 0) {
-                            done(outTxt);
-                            return;
-                        }
+                        if (outTxt && outTxt.length > 0) return outTxt;
                     } catch(pbe2) {}
 
-                    // Fallback to plain pbpaste
                     try {
                         var outPlain = cp.execSync('/usr/bin/pbpaste', {
                             env: utf8Env,
                             encoding: 'utf8',
                             maxBuffer: 20 * 1024 * 1024
                         });
-                        if (outPlain !== undefined && outPlain !== null) {
-                            done(outPlain);
-                            return;
-                        }
+                        if (outPlain && outPlain.length > 0) return outPlain;
                     } catch(pbe3) {}
                 } else if (process.platform === 'win32') {
                     var outWin = cp.execSync('powershell.exe -NoProfile -Command "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; Get-Clipboard -Raw"', {
@@ -90,26 +68,31 @@
                         encoding: 'utf8',
                         maxBuffer: 20 * 1024 * 1024
                     });
-                    if (outWin !== undefined && outWin !== null) {
-                        done(outWin);
-                        return;
-                    }
+                    if (outWin !== undefined && outWin !== null) return outWin;
                 }
             }
         } catch (ne) {}
+        return '';
+    }
 
-        // Method 2: Modern Navigator Clipboard API
-        if (navigator.clipboard && navigator.clipboard.readText) {
-            navigator.clipboard.readText().then(function(text) {
-                done(text || '');
-            }).catch(function() {
-                done('');
-            });
-            setTimeout(function() { done(''); }, 300);
+    function getSystemClipboardText(callback) {
+        if (typeof callback !== 'function') return;
+        var syncText = getSystemClipboardTextSync();
+        if (syncText && syncText.length > 0) {
+            callback(syncText);
             return;
         }
 
-        done('');
+        if (navigator.clipboard && navigator.clipboard.readText) {
+            navigator.clipboard.readText().then(function(text) {
+                callback(text || '');
+            }).catch(function() {
+                callback('');
+            });
+            return;
+        }
+
+        callback('');
     }
 
     function setSystemClipboardText(text) {
@@ -272,8 +255,7 @@
 
     // Global keyboard listener to guarantee Cmd+V / Ctrl+V, Cmd+C, Cmd+X, Cmd+A work in all text inputs
     window.addEventListener('keydown', function(e) {
-        var isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
-        var isCmdOrCtrl = isMac ? e.metaKey : e.ctrlKey;
+        var isCmdOrCtrl = e.metaKey || e.ctrlKey;
         if (!isCmdOrCtrl) return;
 
         var key = e.key ? e.key.toLowerCase() : '';
@@ -284,20 +266,34 @@
         if (key === 'v' || keyCode === 86) {
             if (isInput) {
                 e.preventDefault();
-                getSystemClipboardText(function(clipText) {
-                    if (clipText) {
-                        insertTextIntoElement(active, clipText, false);
-                        if (active.id === 'rawTextInputDiary') {
-                            var rawK = document.getElementById('rawTextInputKeyring');
-                            if (rawK) rawK.value = active.value;
-                            parseDiaryInput();
-                        } else if (active.id === 'rawTextInputKeyring') {
-                            var rawD = document.getElementById('rawTextInputDiary');
-                            if (rawD) rawD.value = active.value;
-                            parseKeyringInput();
-                        }
+                var clipText = getSystemClipboardTextSync();
+                if (clipText) {
+                    insertTextIntoElement(active, clipText, false);
+                    if (active.id === 'rawTextInputDiary') {
+                        var rawK = document.getElementById('rawTextInputKeyring');
+                        if (rawK) rawK.value = active.value;
+                        parseDiaryInput();
+                    } else if (active.id === 'rawTextInputKeyring') {
+                        var rawD = document.getElementById('rawTextInputDiary');
+                        if (rawD) rawD.value = active.value;
+                        parseKeyringInput();
                     }
-                });
+                } else {
+                    getSystemClipboardText(function(text) {
+                        if (text) {
+                            insertTextIntoElement(active, text, false);
+                            if (active.id === 'rawTextInputDiary') {
+                                var rawK = document.getElementById('rawTextInputKeyring');
+                                if (rawK) rawK.value = active.value;
+                                parseDiaryInput();
+                            } else if (active.id === 'rawTextInputKeyring') {
+                                var rawD = document.getElementById('rawTextInputDiary');
+                                if (rawD) rawD.value = active.value;
+                                parseKeyringInput();
+                            }
+                        }
+                    });
+                }
             }
         } else if (key === 'a' || keyCode === 65) {
             if (isInput) {

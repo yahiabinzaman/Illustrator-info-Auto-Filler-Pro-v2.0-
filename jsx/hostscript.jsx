@@ -2777,7 +2777,7 @@ var CardAutoFiller = {
                 } catch(serErr) {}
             }
 
-            // --- STEP 3: POPULATE FORM NUMBER (Bottom-Right Box - Strictly 2 Lines) ---
+            // --- STEP 3: POPULATE FORM NUMBER ---
             var formHandled = false;
             var shouldFillForm = (payload.fillForm !== false && payload.fillFormNumber !== false);
             if (card.formFrame && shouldFillForm && (entry.formNumber || entry.form)) {
@@ -2792,67 +2792,32 @@ var CardAutoFiller = {
                         formDigits = this.toBengaliDigits(cleanDigits);
                     }
 
-                    // Detect original label from existing formFrame text if available
-                    var formLabel = "ফরম";
-                    var existingFormTxt = card.formFrame.contents.replace(/^\s+|\s+$/g, "");
-                    if (/(?:দাখেলা|ডাকো|‡`v‡Ljv)/i.test(existingFormTxt) || /^(দাখেলা|রোল|Roll|Form)/i.test(rawForm)) {
-                        formLabel = "দাখেলা";
-                    } else if (/^(দাখেলা|রোল|Roll|Form)/i.test(rawForm)) {
-                        var mLabel = rawForm.match(/^([^:\d]+)/);
-                        if (mLabel) formLabel = mLabel[1].replace(/[:\s]+$/, "");
-                    }
+                    if (formDigits) {
+                        var existingFormTxt = card.formFrame.contents.replace(/^\s+|\s+$/g, "");
 
-                    // Read existing form frame styling
-                    var formFont = globalRegularFont;
-                    var formSize = masterTplForm.size || 5.3181;
-                    var formLeading = masterTplForm.leading || 5.5884;
-                    var formHScale = masterTplForm.hScale || 98.6;
-                    var formTracking = masterTplForm.tracking || -50;
-                    var formJust = masterTplForm.just || null;
-
-                    try {
-                        if (card.formFrame.characters.length > 0) {
-                            var fca = card.formFrame.characters[0].characterAttributes;
-                            if (fca.textFont) formFont = fca.textFont;
-                            if (fca.size > 0) formSize = fca.size;
-                            if (fca.leading > 0) formLeading = fca.leading;
-                            if (fca.horizontalScale > 0) formHScale = fca.horizontalScale;
-                            formTracking = fca.tracking;
-                            try { formJust = card.formFrame.paragraphs[0].paragraphAttributes.justification; } catch(fj) {}
-                        }
-                    } catch(f0e) {}
-
-                    // Write 2 lines strictly: Label on Line 1, Number on Line 2
-                    card.formFrame.contents = formLabel + "\r" + formDigits;
-                    try {
-                        var fAttr = card.formFrame.textRange.characterAttributes;
-                        if (formFont) fAttr.textFont = formFont;
-                        fAttr.size = formSize;
-                        fAttr.leading = formLeading;
-                        fAttr.tracking = formTracking;
-                        fAttr.horizontalScale = formHScale;
-                        fAttr.fillColor = solidBlackCMYK;
-                        if (formJust !== null) card.formFrame.textRange.paragraphAttributes.justification = formJust;
-                        card.formFrame.textRange.paragraphAttributes.spaceBefore = 0;
-                        card.formFrame.textRange.paragraphAttributes.spaceAfter = 0;
-
-                        for (var fPi = 0; fPi < card.formFrame.paragraphs.length; fPi++) {
+                        // Preserve existing template formatting (vertical rotation, paragraph sizes, leading)
+                        if (card.formFrame.paragraphs && card.formFrame.paragraphs.length >= 2) {
                             try {
-                                var fp = card.formFrame.paragraphs[fPi];
-                                fp.characterAttributes.size = formSize;
-                                fp.characterAttributes.leading = formLeading;
-                                fp.characterAttributes.tracking = formTracking;
-                                fp.characterAttributes.horizontalScale = formHScale;
-                                fp.characterAttributes.fillColor = solidBlackCMYK;
-                                fp.paragraphAttributes.spaceBefore = 0;
-                                fp.paragraphAttributes.spaceAfter = 0;
-                            } catch(fpe) {}
+                                card.formFrame.paragraphs[1].contents = formDigits;
+                                formHandled = true;
+                            } catch(p1e) {
+                                var p0Txt = card.formFrame.paragraphs[0].contents.replace(/[\r\n]+/g, '');
+                                card.formFrame.contents = p0Txt + "\r" + formDigits;
+                                formHandled = true;
+                            }
+                        } else if (/([০-৯0-9]+)/.test(existingFormTxt)) {
+                            card.formFrame.contents = existingFormTxt.replace(/[০-৯0-9]+$/, formDigits);
+                            formHandled = true;
+                        } else {
+                            var formLabel = /(?:দাখেলা|ডাকো|‡`v‡Ljv)/i.test(existingFormTxt) ? "দাখেলা" : "ফরম";
+                            card.formFrame.contents = formLabel + "\r" + formDigits;
+                            formHandled = true;
                         }
+
                         try {
                             card.formFrame.zOrder(ZOrderMethod.BRINGTOFRONT);
                         } catch(zoe) {}
-                    } catch(fStyErr) {}
-                    formHandled = true;
+                    }
                 } catch(ffErr) {}
             }
 
