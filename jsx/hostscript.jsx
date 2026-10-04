@@ -679,7 +679,7 @@ var CardAutoFiller = {
             var isDup = false;
             for (var c = 0; c < cleanAllTFs.length; c++) {
                 var cgb = cleanAllTFs[c].geometricBounds;
-                if (Math.abs(agb[0] - cgb[0]) < 2 && Math.abs(agb[1] - cgb[1]) < 2) {
+                if (Math.abs(agb[0] - cgb[0]) < 20 && Math.abs(agb[1] - cgb[1]) < 20) {
                     try {
                         atf.contents = "";
                         atf.remove();
@@ -954,7 +954,7 @@ var CardAutoFiller = {
             var isDup = false;
             for (var u = 0; u < uniqueTFs.length; u++) {
                 var ugb = uniqueTFs[u].geometricBounds;
-                if (Math.abs(dgb[0] - ugb[0]) < 2 && Math.abs(dgb[1] - ugb[1]) < 2) {
+                if (Math.abs(dgb[0] - ugb[0]) < 25 && Math.abs(dgb[1] - ugb[1]) < 25) {
                     try {
                         dtf.contents = "";
                         dtf.remove();
@@ -1049,11 +1049,28 @@ var CardAutoFiller = {
                 card.nameFrame = candidateFrames[0];
                 card.detailsFrame = null;
                 if (candidateFrames.length > 1 && !card.baniFrame) card.baniFrame = candidateFrames[1];
+                for (var ex = 2; ex < candidateFrames.length; ex++) {
+                    try {
+                        candidateFrames[ex].contents = "";
+                        candidateFrames[ex].remove();
+                    } catch(e) {}
+                }
             } else if (frameMode === "dual_box") {
                 // Forced Dual Box mode: Top is Name, Bottom is Details
                 card.nameFrame = candidateFrames[0];
                 card.detailsFrame = candidateFrames[1];
-                if (candidateFrames.length > 2 && !card.baniFrame) card.baniFrame = candidateFrames[2];
+                if (candidateFrames.length > 2 && !card.baniFrame && this.isBaniText(candidateFrames[2].contents)) {
+                    card.baniFrame = candidateFrames[2];
+                }
+                // Purge any ghost candidate frames
+                for (var ex = 2; ex < candidateFrames.length; ex++) {
+                    if (candidateFrames[ex] !== card.baniFrame) {
+                        try {
+                            candidateFrames[ex].contents = "";
+                            candidateFrames[ex].remove();
+                        } catch(e) {}
+                    }
+                }
             } else {
                 // Smart Auto-Detect Mode:
                 var topCandidate = candidateFrames[0];
@@ -1092,6 +1109,21 @@ var CardAutoFiller = {
                     // Default to Dual Box (Top = Name, Bottom = Details)
                     card.nameFrame = topCandidate;
                     card.detailsFrame = bottomCandidate;
+                }
+
+                if (candidateFrames.length > 2 && !card.baniFrame && this.isBaniText(candidateFrames[2].contents)) {
+                    card.baniFrame = candidateFrames[2];
+                }
+
+                // Purge any remaining ghost candidate text frames
+                for (var ex = 2; ex < candidateFrames.length; ex++) {
+                    var exCandidate = candidateFrames[ex];
+                    if (exCandidate !== card.nameFrame && exCandidate !== card.detailsFrame && exCandidate !== card.baniFrame) {
+                        try {
+                            exCandidate.contents = "";
+                            exCandidate.remove();
+                        } catch(e) {}
+                    }
                 }
             }
         }
@@ -2026,6 +2058,30 @@ var CardAutoFiller = {
             var card = targetCards[i];
             var entry = activeEntries[i];
 
+            // Clean/Purge any ghost text frames inside the card group
+            if (card.group && card.group.pageItems) {
+                try {
+                    for (var kgpi = card.group.pageItems.length - 1; kgpi >= 0; kgpi--) {
+                        var kgItem = card.group.pageItems[kgpi];
+                        if (kgItem && kgItem.typename === "TextFrame" && !this.isItemHidden(kgItem)) {
+                            if (kgItem !== card.nameFrame && kgItem !== card.detailsFrame && 
+                                kgItem !== card.serialFrame && kgItem !== card.formFrame && 
+                                kgItem !== card.baniFrame && kgItem !== card.badgeFrame && kgItem !== card.qtyFrame) {
+                                var kgTxt = kgItem.contents;
+                                if (this.hasStudentBiodata(kgTxt) || /(?:পিতা|মাতা|গ্রাম|ডাক|উপজেলা|জেলা|মোবাইল|ফোন|রক্ত|01[3-9]\d{8}|০১[৩-৯][০-৯]{8})/i.test(kgTxt)) {
+                                    try {
+                                        kgItem.contents = "";
+                                        kgItem.remove();
+                                    } catch(kgre) {
+                                        try { kgItem.contents = ""; } catch(kge2) {}
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } catch(kgrpErr) {}
+            }
+
             // 1. POPULATE PERSON INFO (Name on line 1, Father/Address/Mobile on lines 2..4 next to icons)
             if (card.nameFrame && entry.name) {
                 var cleanName = (entry.name || "").replace(/^\s+|\s+$/g, "");
@@ -2818,6 +2874,30 @@ var CardAutoFiller = {
                         nonFormLines.push(rlText);
                     }
                     cleanDetails = nonFormLines.join("\r");
+
+                    // Clean/Purge any ghost text frames inside the card group that overlap or remain underneath
+                    if (card.group && card.group.pageItems) {
+                        try {
+                            for (var dgpi = card.group.pageItems.length - 1; dgpi >= 0; dgpi--) {
+                                var dgItem = card.group.pageItems[dgpi];
+                                if (dgItem && dgItem.typename === "TextFrame" && !this.isItemHidden(dgItem)) {
+                                    if (dgItem !== card.nameFrame && dgItem !== card.detailsFrame && 
+                                        dgItem !== card.serialFrame && dgItem !== card.formFrame && 
+                                        dgItem !== card.baniFrame && dgItem !== card.badgeFrame && dgItem !== card.qtyFrame) {
+                                        var dgTxt = dgItem.contents;
+                                        if (this.hasStudentBiodata(dgTxt) || /(?:পিতা|মাতা|গ্রাম|ডাক|উপজেলা|জেলা|মোবাইল|ফোন|রক্ত|01[3-9]\d{8}|০১[৩-৯][০-৯]{8})/i.test(dgTxt)) {
+                                            try {
+                                                dgItem.contents = "";
+                                                dgItem.remove();
+                                            } catch(dgre) {
+                                                try { dgItem.contents = ""; } catch(dge2) {}
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        } catch(dgrpErr) {}
+                    }
 
                     if (card.detailsFrame) {
                         // Separate Name and Details frames
