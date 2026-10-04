@@ -38,10 +38,12 @@
             var extPath = cs.getSystemPath(SystemPath.EXTENSION).replace(/\\/g, '/');
             var loadScript = "try { $.evalFile(new File('" + extPath + "/jsx/hostscript.jsx')); } catch(e) {}";
             cs.evalScript(loadScript, function() {
-                window.location.reload(true);
+                var url = window.location.href.split('?')[0] + '?t=' + new Date().getTime();
+                window.location.href = url;
             });
         } catch(e) {
-            window.location.reload(true);
+            var url = window.location.href.split('?')[0] + '?t=' + new Date().getTime();
+            window.location.href = url;
         }
     }
     </script>
@@ -622,7 +624,7 @@ Example:
         <a href="https://github.com/yahiabinzaman" id="btn-author-link" onclick="openAuthorProfile(event); return false;" style="color: #888888; text-decoration: none; cursor: pointer;">
             Developed by <strong style="color: #1473e6; font-weight: 600;">Yahia Bin Zaman</strong>
         </a>
-        <span style="font-size: 10px; color: #555555; font-family: monospace;">v2.8.1</span>
+        <span style="font-size: 10px; color: #555555; font-family: monospace;">v2.8.2</span>
     </footer>
 
     <!-- Custom Context Menu for Right-Click Cut/Copy/Paste/Select All -->
@@ -637,7 +639,7 @@ Example:
 
     <!-- Scripts -->
     <script src="js/CSInterface.js"></script>
-    <script src="js/main.js?v=2.8.1"></script>
+    <script src="js/main.js?v=2.8.2"></script>
 <script>
 function openAuthorProfile(e) {
     if (e) { e.preventDefault(); e.stopPropagation(); }
