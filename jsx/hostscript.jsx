@@ -493,11 +493,12 @@ var CardAutoFiller = {
         validTFs.sort(function(a, b) {
             var aGB = a.geometricBounds;
             var bGB = b.geometricBounds;
-            if (Math.abs(bGB[1] - aGB[1]) > 30) return bGB[1] - aGB[1];
+            if (Math.abs(bGB[1] - aGB[1]) > 25) return bGB[1] - aGB[1];
             return aGB[0] - bGB[0];
         });
 
         // Group textframes that belong to the same spatial card bounding box
+        // Within a single card: Name and Details are aligned vertically (dX < 75, dY < 65)
         var clusters = [];
         for (var v = 0; v < validTFs.length; v++) {
             var vtf = validTFs[v];
@@ -508,7 +509,7 @@ var CardAutoFiller = {
             var placed = false;
             for (var cl = 0; cl < clusters.length; cl++) {
                 var cCenter = clusters[cl].center;
-                if (Math.abs(cCenter[0] - vMidX) < 180 && Math.abs(cCenter[1] - vMidY) < 160) {
+                if (Math.abs(cCenter[0] - vMidX) < 75 && Math.abs(cCenter[1] - vMidY) < 65) {
                     clusters[cl].tfs.push(vtf);
                     placed = true;
                     break;
@@ -666,37 +667,94 @@ var CardAutoFiller = {
             }
         }
 
+        var allTFs = [];
+        this.collectTextFrames(candidateItems, allTFs);
+
+        // 1. Group-based card extraction
         for (var g = 0; g < candidateItems.length; g++) {
-            this.extractCardsFromItem(candidateItems[g], cardUnits, options);
+            var itm = candidateItems[g];
+            if (itm.typename === "GroupItem") {
+                this.extractCardsFromItem(itm, cardUnits, options);
+            }
         }
 
-        if (cardUnits.length === 0) {
-            var allTFs = [];
-            this.collectTextFrames(candidateItems, allTFs);
-            var filteredTFs = [];
-            for (var t = 0; t < allTFs.length; t++) {
-                var tf = allTFs[t];
-                if (this.isItemHidden(tf)) continue;
-                if (this.isBackSideText(tf.contents)) continue;
-                if (tf.contents.length > 500 || tf.lines.length > 25) continue;
-                filteredTFs.push(tf);
-            }
-            if (filteredTFs.length === 1) {
-                cardUnits.push({
-                    nameFrame: filteredTFs[0],
-                    detailsFrame: null,
-                    baniFrame: null,
-                    qtyFrame: null,
-                    badgeFrame: null,
-                    serialFrame: null,
-                    formFrame: null,
-                    namePlaceholderPath: null,
-                    group: filteredTFs[0],
-                    bounds: filteredTFs[0].geometricBounds,
-                    artboardIndex: 0
-                });
-            } else if (filteredTFs.length >= 2) {
-                cardUnits = this.clusterProximityCards(filteredTFs, options);
+        // 2. Loose / ungrouped / selection text frames clustering
+        if (cardUnits.length === 0 && allTFs.length > 0) {
+            cardUnits = this.clusterProximityCards(allTFs, options);
+        }
+
+        // 3. Post-processing DUAL-BOX AUDIT & PAIRING
+        var frameMode = options.frameMode || "auto";
+        if (frameMode !== "single_box") {
+            for (var cu = 0; cu < cardUnits.length; cu++) {
+                var cCard = cardUnits[cu];
+
+                // Case A: Card has nameFrame but missing detailsFrame
+                if (cCard.nameFrame && !cCard.detailsFrame) {
+                    var nGB = cCard.nameFrame.geometricBounds;
+                    var nTop = nGB[1];
+                    var nMidX = (nGB[0] + nGB[2]) / 2;
+                    var bestDet = null;
+                    var minDetDist = 9999;
+
+                    for (var at = 0; at < allTFs.length; at++) {
+                        var atf = allTFs[at];
+                        if (atf === cCard.nameFrame || atf === cCard.serialFrame || atf === cCard.baniFrame || this.isItemHidden(atf)) continue;
+                        if (this.isBackSideText(atf.contents)) continue;
+                        var atgb = atf.geometricBounds;
+                        var atMidX = (atgb[0] + atgb[2]) / 2;
+                        var dy = nTop - atgb[1]; // positive downwards
+                        var dx = Math.abs(nMidX - atMidX);
+
+                        if (dy > 3 && dy < 65 && dx < 60) {
+                            if (dy < minDetDist) {
+                                minDetDist = dy;
+                                bestDet = atf;
+                            }
+                        }
+                    }
+                    if (bestDet) {
+                        cCard.detailsFrame = bestDet;
+                    }
+                }
+
+                // Case B: Card has detailsFrame but missing nameFrame
+                if (cCard.detailsFrame && !cCard.nameFrame) {
+                    var dGB = cCard.detailsFrame.geometricBounds;
+                    var dTop = dGB[1];
+                    var dMidX = (dGB[0] + dGB[2]) / 2;
+                    var bestNm = null;
+                    var minNmDist = 9999;
+
+                    for (var at = 0; at < allTFs.length; at++) {
+                        var atf = allTFs[at];
+                        if (atf === cCard.detailsFrame || atf === cCard.serialFrame || atf === cCard.baniFrame || this.isItemHidden(atf)) continue;
+                        if (this.isBackSideText(atf.contents)) continue;
+                        var atgb = atf.geometricBounds;
+                        var atMidX = (atgb[0] + atgb[2]) / 2;
+                        var dy = atgb[1] - dTop; // positive upwards
+                        var dx = Math.abs(dMidX - atMidX);
+
+                        if (dy > 3 && dy < 65 && dx < 60) {
+                            if (dy < minNmDist) {
+                                minNmDist = dy;
+                                bestNm = atf;
+                            }
+                        }
+                    }
+                    if (bestNm) {
+                        cCard.nameFrame = bestNm;
+                    }
+                }
+
+                // Case C: Guarantee nameFrame is strictly ABOVE detailsFrame
+                if (cCard.nameFrame && cCard.detailsFrame && cCard.nameFrame !== cCard.detailsFrame) {
+                    if (cCard.nameFrame.geometricBounds[1] < cCard.detailsFrame.geometricBounds[1]) {
+                        var swap = cCard.nameFrame;
+                        cCard.nameFrame = cCard.detailsFrame;
+                        cCard.detailsFrame = swap;
+                    }
+                }
             }
         }
 
@@ -794,28 +852,6 @@ var CardAutoFiller = {
 
     extractCardsFromItem: function(item, outCards, options) {
         if (!item || this.isItemHidden(item)) return;
-
-        if (item.typename === "TextFrame") {
-            if (this.isBackSideText(item.contents)) return;
-            var cTxt = item.contents;
-            if (this.hasStudentBiodata(cTxt) || item.lines.length >= 2) {
-                var card = {
-                    nameFrame: item,
-                    detailsFrame: null,
-                    baniFrame: null,
-                    qtyFrame: null,
-                    badgeFrame: null,
-                    serialFrame: null,
-                    formFrame: null,
-                    namePlaceholderPath: null,
-                    group: item,
-                    bounds: item.geometricBounds,
-                    artboardIndex: 0
-                };
-                outCards.push(card);
-            }
-            return;
-        }
 
         if (item.typename === "GroupItem") {
             var tfs = [];
