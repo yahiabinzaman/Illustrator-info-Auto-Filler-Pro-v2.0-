@@ -4,7 +4,7 @@
  * Version: 2.2.1 Pro - Enhanced with Unicode-Safe JSON & Keyring Support
  */
 
-#target illustrator
+// Safe for direct eval in ExtendScript and CEP engine
 
 // Safe JSON parser for ExtendScript supporting Unicode Bengali text
 if (typeof JSON !== "object") {

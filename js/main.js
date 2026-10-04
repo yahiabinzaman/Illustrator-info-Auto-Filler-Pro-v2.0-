@@ -282,7 +282,7 @@
         
         var fullCode = '';
         if (extPath) {
-            fullCode = 'try { var _f = new File("' + extPath + '/jsx/hostscript.jsx"); if (_f.exists) { _f.encoding = "UTF-8"; _f.open("r"); var _c = _f.read(); _f.close(); eval(_c); } } catch(e) {}; ' + code;
+            fullCode = 'try { $.evalFile(new File("' + extPath + '/jsx/hostscript.jsx")); } catch(_e) { try { var _f = new File("' + extPath + '/jsx/hostscript.jsx"); if (_f.exists) { _f.encoding = "UTF-8"; _f.open("r"); var _c = _f.read().replace(/^\\s*#[^\\r\\n]*/gm, ""); _f.close(); eval(_c); } } catch(_e2) {} }; ' + code;
         } else {
             fullCode = code;
         }
