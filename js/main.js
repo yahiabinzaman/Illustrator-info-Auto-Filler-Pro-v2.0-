@@ -14,12 +14,15 @@
     // CEP Keyboard & Clipboard Engine
     // ==========================================
     try {
+        var keyEventsInterest = [];
+        for (var k = 0; k <= 255; k++) {
+            keyEventsInterest.push({ keyCode: k, ctrlKey: false, altKey: false, shiftKey: false, metaKey: true }); // Mac Cmd
+            keyEventsInterest.push({ keyCode: k, ctrlKey: true, altKey: false, shiftKey: false, metaKey: false });  // Win Ctrl
+            keyEventsInterest.push({ keyCode: k, ctrlKey: true, altKey: false, shiftKey: true, metaKey: false });   // Win Ctrl+Shift
+            keyEventsInterest.push({ keyCode: k, ctrlKey: false, altKey: false, shiftKey: true, metaKey: true });  // Mac Cmd+Shift
+        }
         if (window.__adobe_cep__ && window.__adobe_cep__.registerKeyEventsInterest) {
-            var keyEventsInterest = JSON.stringify([
-                { keyCode: 0, ctrlKey: false, altKey: false, shiftKey: false, metaKey: true },
-                { keyCode: 0, ctrlKey: true, altKey: false, shiftKey: false, metaKey: false }
-            ]);
-            window.__adobe_cep__.registerKeyEventsInterest(keyEventsInterest);
+            window.__adobe_cep__.registerKeyEventsInterest(JSON.stringify(keyEventsInterest));
         }
     } catch (e) {}
 
@@ -33,73 +36,42 @@
             }
         }
 
-        // Method 1: Modern Navigator Clipboard API (fastest & native)
-        if (navigator.clipboard && navigator.clipboard.readText) {
-            navigator.clipboard.readText().then(function(text) {
-                if (text) {
-                    done(text);
-                } else {
-                    tryAsyncChildProcess();
-                }
-            }).catch(function() {
-                tryAsyncChildProcess();
-            });
-            // 500ms safety timeout
-            setTimeout(function() { tryAsyncChildProcess(); }, 500);
-            return;
-        }
-
-        tryAsyncChildProcess();
-
-        function tryAsyncChildProcess() {
-            if (called) return;
-            try {
-                if (typeof require !== 'undefined') {
-                    var cp = require('child_process');
-                    if (process.platform === 'darwin') {
-                        cp.exec("pbpaste -Prefer txt", {
-                            env: Object.assign({}, process.env, { LANG: "en_US.UTF-8", LC_ALL: "en_US.UTF-8", LC_CTYPE: "UTF-8" }),
-                            encoding: 'utf8',
-                            timeout: 800,
-                            maxBuffer: 10 * 1024 * 1024
-                        }, function(err, stdout) {
-                            if (!err && stdout && stdout.length > 0) {
-                                done(stdout);
-                            } else {
-                                done('');
-                            }
-                        });
+        // Method 1: Node.js child_process (100% reliable and instantaneous in CEP)
+        try {
+            if (typeof require !== 'undefined') {
+                var cp = require('child_process');
+                if (process.platform === 'darwin') {
+                    var out = cp.execSync("pbpaste", { encoding: 'utf8', maxBuffer: 10 * 1024 * 1024 });
+                    if (out !== undefined && out !== null) {
+                        done(out);
                         return;
-                    } else if (process.platform === 'win32') {
-                        cp.exec('powershell.exe -NoProfile -Command "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; Get-Clipboard -Raw"', {
-                            encoding: 'utf8',
-                            timeout: 800,
-                            maxBuffer: 10 * 1024 * 1024
-                        }, function(err, stdout) {
-                            if (!err && stdout && stdout.length > 0) {
-                                done(stdout);
-                            } else {
-                                done('');
-                            }
-                        });
+                    }
+                } else if (process.platform === 'win32') {
+                    var out = cp.execSync('powershell.exe -NoProfile -Command "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; Get-Clipboard -Raw"', { encoding: 'utf8', maxBuffer: 10 * 1024 * 1024 });
+                    if (out !== undefined && out !== null) {
+                        done(out);
                         return;
                     }
                 }
-            } catch (e) {}
+            }
+        } catch (ne) {}
 
-            done('');
+        // Method 2: Modern Navigator Clipboard API
+        if (navigator.clipboard && navigator.clipboard.readText) {
+            navigator.clipboard.readText().then(function(text) {
+                done(text || '');
+            }).catch(function() {
+                done('');
+            });
+            setTimeout(function() { done(''); }, 300);
+            return;
         }
+
+        done('');
     }
 
     function setSystemClipboardText(text) {
         if (!text) return;
-        try {
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-                navigator.clipboard.writeText(text);
-                return;
-            }
-        } catch (e) {}
-
         try {
             if (typeof require !== 'undefined') {
                 var cp = require('child_process');
@@ -114,6 +86,13 @@
                     proc.stdin.end();
                     return;
                 }
+            }
+        } catch (e) {}
+
+        try {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text);
+                return;
             }
         } catch (e) {}
 
@@ -245,7 +224,7 @@
         }
     }
 
-    // Global keyboard listener to guarantee Cmd+V / Ctrl+V and Cmd+A / Ctrl+A work in all text inputs
+    // Global keyboard listener to guarantee Cmd+V / Ctrl+V, Cmd+C, Cmd+X, Cmd+A work in all text inputs
     window.addEventListener('keydown', function(e) {
         var isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
         var isCmdOrCtrl = isMac ? e.metaKey : e.ctrlKey;
@@ -257,6 +236,7 @@
 
         if (key === 'v') {
             if (isInput) {
+                e.preventDefault();
                 getSystemClipboardText(function(clipText) {
                     if (clipText) {
                         insertTextIntoElement(active, clipText, false);
@@ -266,6 +246,42 @@
         } else if (key === 'a') {
             if (isInput) {
                 active.select();
+            }
+        } else if (key === 'c') {
+            if (isInput) {
+                var start = active.selectionStart;
+                var end = active.selectionEnd;
+                if (start !== undefined && end !== undefined && start !== end) {
+                    var selected = active.value.substring(start, end);
+                    if (selected) setSystemClipboardText(selected);
+                }
+            }
+        } else if (key === 'x') {
+            if (isInput) {
+                var start = active.selectionStart;
+                var end = active.selectionEnd;
+                if (start !== undefined && end !== undefined && start !== end) {
+                    var selected = active.value.substring(start, end);
+                    if (selected) {
+                        setSystemClipboardText(selected);
+                        insertTextIntoElement(active, '', false);
+                    }
+                }
+            }
+        }
+    });
+
+    // Native paste event listener for textareas
+    window.addEventListener('paste', function(e) {
+        var active = document.activeElement;
+        if (active && (active.tagName === 'TEXTAREA' || active.tagName === 'INPUT')) {
+            var text = '';
+            if (e.clipboardData && e.clipboardData.getData) {
+                text = e.clipboardData.getData('text/plain');
+            }
+            if (text) {
+                e.preventDefault();
+                insertTextIntoElement(active, text, false);
             }
         }
     });
