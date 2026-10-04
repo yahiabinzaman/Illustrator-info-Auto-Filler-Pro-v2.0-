@@ -33,7 +33,7 @@ for /d %%D in ("C:\Program Files\Adobe\Adobe Illustrator*") do (
     if exist "%%D\Presets" (
         for /d %%P in ("%%D\Presets\*") do (
             if exist "%%P\Scripts" (
-                copy /Y "%~dp0Card_Data_AutoFiller.jsx" "%%P\Scripts\" >nul 2>&1
+                copy /Y "%~dp0jsx\hostscript.jsx" "%%P\Scripts\Card_Data_AutoFiller.jsx" >nul 2>&1
             )
         )
     )

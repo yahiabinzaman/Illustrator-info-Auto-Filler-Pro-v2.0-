@@ -20,7 +20,7 @@ mkdir -p "$CEP_USER_DIR"
 cp -R "$DIR/"* "$CEP_USER_DIR/" 2>/dev/null || true
 
 # 3. Copy Standalone Script to /tmp and into Illustrator presets
-cp -f "$DIR/Card_Data_AutoFiller.jsx" /tmp/Card_Data_AutoFiller.jsx
+cp -f "$DIR/jsx/hostscript.jsx" /tmp/Card_Data_AutoFiller.jsx
 
 osascript <<EOF
 tell application "System Events"

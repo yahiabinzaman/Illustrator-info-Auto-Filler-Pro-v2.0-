@@ -50,7 +50,7 @@
     copyFolderRecursive(scriptFolder, targetExtFolder);
 
     // 2. Also copy standalone script to Illustrator Scripts folder
-    var standaloneScript = new File(scriptFolder.fsName + "/Card_Data_AutoFiller.jsx");
+    var standaloneScript = new File(scriptFolder.fsName + "/jsx/hostscript.jsx");
     var scriptsFolder = null;
     var appFolder = Folder.appPackage;
 
