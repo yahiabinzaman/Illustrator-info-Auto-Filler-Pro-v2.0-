@@ -2,6 +2,16 @@
 
 All notable changes to **Auto Filler Pro (ColorLab Edition)** will be documented in this file.
 
+## [3.1.0 Pro] - 2026-11-26
+
+### Added
+- **📝 Note Bani Batch Filler Tab (`নোটের বাণী`)**:
+  - Added dedicated **Note Bani** tab for 16–32 page notebook spreads and artboards.
+  - Added `detectNoteBaniFrames`, `scanNoteBanis`, `pickNoteBaniSample`, and `populateNoteBanis` in `jsx/hostscript.jsx` with automatic exclusion of weekday headers (`শনি–শুক্র`), `বিষয়`, `তারিখ`, and page numbers.
+  - Preserves exact template font, font size, leading, horizontal/vertical scale, color, and paragraph alignment (`Left`/`Right` per page) on every placed Bani.
+  - Added smart multi-format Bani parser (`parseNoteBaniBlocks` & `formatNoteBaniEntry`) supporting blank-line blocks, numbered lists, 1-per-line Banis, and optional `— Author` newline formatting without breaking hyphenated Bangla words.
+  - Supports automatic 2-Forma continuation (e.g., placing 1–16 on Forma 1 and resuming from #17–32 on Forma 2).
+
 ## [3.0.0 Pro] - 2026-11-26
 
 ### Rebranded & Unified

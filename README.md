@@ -7,7 +7,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Adobe Illustrator](https://img.shields.io/badge/Adobe%20Illustrator-CC%202018%20--%202026%2B-orange.svg)](https://www.adobe.com/products/illustrator.html)
 [![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Windows-blue.svg)](https://github.com/yahiabinzaman/Illustrator-info-Auto-Filler-Pro-v2.0-)
-[![Version](https://img.shields.io/badge/Version-3.0.0%20Pro-007acc.svg)](https://github.com/yahiabinzaman/Illustrator-info-Auto-Filler-Pro-v2.0-)
+[![Version](https://img.shields.io/badge/Version-3.1.0%20Pro-007acc.svg)](https://github.com/yahiabinzaman/Illustrator-info-Auto-Filler-Pro-v2.0-)
 [![Author](https://img.shields.io/badge/Developed%20by-Yahia%20Bin%20Zaman-007acc.svg)](https://github.com/yahiabinzaman)
 
 **Auto Filler Pro** (ColorLab Edition) হলো Adobe Illustrator-এর জন্য একটি আধুনিক, দ্রুত এবং সম্পূর্ণ স্বয়ংক্রিয় CEP এক্সটেনশন। কিরিং (Keyring), ডায়েরি (Diary), আইডি কার্ড, নেম-ট্যাগ এবং প্রিন্ট টেমপ্লেটে শত শত বাংলা/ইংরেজি নাম, বায়োডাটা, পিস সংখ্যা (Quantity), বাণী ও ফরম নম্বর কয়েক সেকেন্ডের মধ্যে নির্ভুলভাবে বসিয়ে দেয়।
@@ -56,14 +56,19 @@ irm https://raw.githubusercontent.com/yahiabinzaman/Illustrator-info-Auto-Filler
 - **সেফ মার্জিন অটো-ফিট (Auto-Fit):** লম্বা নাম বা ঠিকানা কার্ডের বক্সের বাইরে চলে গেলে `Max Width (mm)` অনুযায়ী স্বয়ংক্রিয়ভাবে Horizontal Scale ও Font Size অ্যাডজাস্ট করে।
 - **সম্পূর্ণ CMYK ও Hex কালার কন্ট্রোল:** প্রিন্ট-রেডি সলিড ব্ল্যাক, ডিপ টিল, মেরুন সহ কাস্টম CMYK বা ক্যানভাস আইড্রপার (`Pick from Canvas`)।
 
-### 🗂️ ৩. Template Duplicator & Artboard Generator
+### 📝 ৩. Note Bani Batch Filler (১৬–৩২ পেজ নোটের বাণী)
+- **১-ক্লিকে সব পেজে বাণী সেট:** ১৬ বা ৩২ পেজের রেডি করা নোট ফাইলে একসাথে সব বাণী পেস্ট করে **Auto Fill Note Banis** ক্লিক করলেই প্রতিটি পেজের নিচের বাণী বক্সে সিরিয়াল অনুযায়ী বসে যায়।
+- **অরিজিনাল ফন্ট ও সাইজ প্রোটেকশন:** টেমপ্লেটে সেট করা exact ফন্ট, ফন্ট সাইজ, লিডিং, কালার এবং অ্যালাইনমেন্ট (বাম/ডান) ১০০% অক্ষত রাখে; হেডার (`শনি-শুক্র`, `বিষয়`, `তারিখ`) স্পর্শ করে না।
+- **স্মার্ট স্যাম্পল লক ও ৩২-পেজ অটো-রিজিউম:** চাইলে ১টি বাণী বক্সে `Pick Sample Bani` দিয়ে লক করা যায়, এবং ৩২টি বাণী দিয়ে ১৬-পেজ ফর্মা-১ ফিলাপ করলে পরের ফর্মা-২ তে অটোমেটিক #১৭ থেকে শুরু হয়।
+
+### 🗂️ ৪. Template Duplicator & Artboard Generator
 - সিঙ্গেল মাস্টার কার্ড সিলেক্ট করে মোট কপি সংখ্যা, কলাম ও গ্যাপ দিয়ে স্বয়ংক্রিয়ভাবে একাধিক আর্টবোর্ড ও গ্রিড তৈরি।
 - ক্লিপড আর্টওয়ার্ক বাউন্ডস ডিটেকশনের মাধ্যমে `0 pt` গ্যাপেও নিখুঁত ফ্লাশ অ্যালাইনমেন্ট।
 
-### ↔️ ৪. Canvas Move (Direct Placement)
+### ↔️ ৫. Canvas Move (Direct Placement)
 - ক্যানভাসে থাকা ফ্লোটিং টেক্সট ফ্রেমগুলোকে সিলেক্ট করা খালি কার্ডের ভেতর Column-wise বা Row-by-Row অনুযায়ী সরাসরি বসিয়ে দেয়।
 
-### 🔤 ৫. বাংলা ইউনিকোড, বিজয় ও বোর্নমালা (Bornomala) সাপোর্ট
+### 🔤 ৬. বাংলা ইউনিকোড, বিজয় ও বোর্নমালা (Bornomala) সাপোর্ট
 - ইউনিকোড ও বিজয় (SutonnyMJ / Bornomala) ফন্টের সাথে স্মার্ট কম্প্যাটিবিলিটি।
 - নেটিভ macOS/Windows সিঙ্ক্রোনাস ক্লিপবোর্ড পেস্ট (`Cmd+V` / `Ctrl+V` ও রাইট-ক্লিক মেনু) যাতে বাংলা যুক্তাক্ষর ভেঙে না যায়।
 
@@ -115,4 +120,4 @@ Auto Filler Pro/
 
 - **Developed by:** [Yahia Bin Zaman](https://github.com/yahiabinzaman) / **ColorLab**
 - **Repository:** [Illustrator-info-Auto-Filler-Pro-v2.0-](https://github.com/yahiabinzaman/Illustrator-info-Auto-Filler-Pro-v2.0-)
-- **Version:** `3.0.0 Pro`
+- **Version:** `3.1.0 Pro`

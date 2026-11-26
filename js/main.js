@@ -277,6 +277,8 @@
                         var rawD = document.getElementById('rawTextInputDiary');
                         if (rawD) rawD.value = active.value;
                         parseKeyringInput();
+                    } else if (active.id === 'rawTextInputNoteBani') {
+                        parseNoteBaniInput();
                     }
                 } else {
                     getSystemClipboardText(function(text) {
@@ -290,6 +292,8 @@
                                 var rawD = document.getElementById('rawTextInputDiary');
                                 if (rawD) rawD.value = active.value;
                                 parseKeyringInput();
+                            } else if (active.id === 'rawTextInputNoteBani') {
+                                parseNoteBaniInput();
                             }
                         }
                     });
@@ -342,6 +346,8 @@
                     var rawD = document.getElementById('rawTextInputDiary');
                     if (rawD) rawD.value = active.value;
                     parseKeyringInput();
+                } else if (active.id === 'rawTextInputNoteBani') {
+                    parseNoteBaniInput();
                 }
             }
         }
@@ -499,6 +505,11 @@
     var currentDiaryStartIndex = 0;
     var currentDiaryColor = "#1E5AA8";
     var currentDiaryCmyk = [100, 0, 0, 45];
+
+    var parsedNoteBanis = [];
+    var currentNoteBaniStartIndex = 0;
+    var noteBaniSampleProfile = null;
+    var sampleNoteBaniData = "১. অলসতাকে কখনো প্রশ্রয় দেবে না; কেননা, তা সাফল্যের পথে প্রধান অন্তরায়।\n— শায়খুল হাদীস আল্লামা আজিজুল হক রহ.\n\n২. ইসলামকে যুগোপযোগী করা যাবে না; বরং যুগকে ইসলাম-উপযোগী করতে হবে।\n— আল্লামা জুনায়েদ বাবুনগরী রহ.\n\n৩. কোন সুন্নতকে ছোট মনে করে ছাড়বে না, আর কোন গুনাহকে ছোট মনে করে করবে না।\n— আল্লামা আশরাফ আলী থানভী রহ.";
 
     // ==========================================
     // Regex Patterns for Parsing
@@ -1102,6 +1113,392 @@
     }
 
     // ==========================================
+    // Note Bani Batch Parser & Controller
+    // ==========================================
+    var noteBaniSerialPrefixRegex = /^(?:[০-৯0-9]{1,3}\s*[\.\)\:\-।]\s*|(?:বাণী|বানী|Bani|Quote)\s*[০-৯0-9]*\s*[:\-–—]\s*)/i;
+    var noteBaniSerialOnlyRegex = /^(?:[০-৯0-9]{1,3}[\.\)\:\-।]?|(?:বাণী|বানী|Bani)\s*[০-৯0-9]*\s*[:\-–—]?)$/i;
+    var noteBaniAuthorLineRegex = /^[\-–—~]/;
+
+    function formatNoteBaniEntry(text, stripSerial, newlineAuthor) {
+        if (!text) return "";
+        var lines = text.split(/\r\n|\r|\n/);
+        var cleanedLines = [];
+        for (var i = 0; i < lines.length; i++) {
+            var ln = lines[i].trim();
+            if (!ln) continue;
+            if (i === 0 && stripSerial) {
+                if (noteBaniSerialOnlyRegex.test(ln) && lines.length > 1) continue;
+                ln = ln.replace(noteBaniSerialPrefixRegex, '').trim();
+            }
+            if (ln) cleanedLines.push(ln);
+        }
+
+        var out = cleanedLines.join('\n').trim();
+        if (!out) return "";
+
+        // Optional: put inline " — Author" or " – Author" onto its own second line
+        // Note: requires whitespace before dash OR em-dash/en-dash so hyphenated words like "ইসলাম-উপযোগী" are untouched
+        if (newlineAuthor && out.indexOf('\n') === -1) {
+            var emMatch = out.match(/^(.*?[।!\?\.…]?)\s+([—–]\s*\S.*)$/);
+            if (emMatch && emMatch[1].trim().length >= 10) {
+                out = emMatch[1].trim() + '\n' + emMatch[2].trim();
+            } else {
+                var dashMatch = out.match(/^(.*?[।!\?\.…])\s+(-\s*\S.*)$/);
+                if (dashMatch && dashMatch[1].trim().length >= 10) {
+                    out = dashMatch[1].trim() + '\n' + dashMatch[2].trim();
+                }
+            }
+        }
+        return out;
+    }
+
+    function parseNoteBaniBlocks(rawText, splitMode) {
+        if (!rawText) return [];
+        var raw = rawText.replace(/\r\n|\r/g, '\n').trim();
+        if (!raw) return [];
+
+        var blocks = [];
+        var mode = splitMode || 'auto';
+
+        if (mode === 'line') {
+            var allLines = raw.split('\n');
+            for (var i = 0; i < allLines.length; i++) {
+                var ln = allLines[i].trim();
+                if (ln) blocks.push(ln);
+            }
+            return blocks;
+        }
+
+        if (mode === 'blank') {
+            var rawParas = raw.split(/\n\s*\n+/);
+            for (var p = 0; p < rawParas.length; p++) {
+                var blk = rawParas[p].trim();
+                if (blk) blocks.push(blk);
+            }
+            return blocks;
+        }
+
+        // Auto mode
+        var hasBlankLines = /\n\s*\n/.test(raw);
+        if (hasBlankLines) {
+            var paras = raw.split(/\n\s*\n+/);
+            for (var pi = 0; pi < paras.length; pi++) {
+                var pText = paras[pi].trim();
+                if (!pText) continue;
+                var pLines = pText.split('\n').map(function(s) { return s.trim(); }).filter(Boolean);
+                var serialStartCount = 0;
+                for (var k = 0; k < pLines.length; k++) {
+                    if (noteBaniSerialPrefixRegex.test(pLines[k]) || noteBaniSerialOnlyRegex.test(pLines[k])) {
+                        serialStartCount++;
+                    }
+                }
+                if (serialStartCount >= 2) {
+                    var subCur = [];
+                    for (var sIdx = 0; sIdx < pLines.length; sIdx++) {
+                        var isSer = noteBaniSerialPrefixRegex.test(pLines[sIdx]) || noteBaniSerialOnlyRegex.test(pLines[sIdx]);
+                        if (isSer && subCur.length > 0 && !noteBaniSerialOnlyRegex.test(subCur[subCur.length - 1])) {
+                            blocks.push(subCur.join('\n'));
+                            subCur = [pLines[sIdx]];
+                        } else {
+                            subCur.push(pLines[sIdx]);
+                        }
+                    }
+                    if (subCur.length > 0) blocks.push(subCur.join('\n'));
+                } else {
+                    blocks.push(pLines.join('\n'));
+                }
+            }
+            return blocks;
+        }
+
+        // No blank lines: check for numbered prefixes or author lines starting with dash
+        var lines = raw.split('\n').map(function(s) { return s.trim(); }).filter(Boolean);
+        var serialCount = 0;
+        var authorDashCount = 0;
+        for (var li = 0; li < lines.length; li++) {
+            if (noteBaniSerialPrefixRegex.test(lines[li]) || noteBaniSerialOnlyRegex.test(lines[li])) serialCount++;
+            if (li > 0 && noteBaniAuthorLineRegex.test(lines[li])) authorDashCount++;
+        }
+
+        if (serialCount >= 2) {
+            var cur = [];
+            for (var j = 0; j < lines.length; j++) {
+                var isStart = noteBaniSerialPrefixRegex.test(lines[j]) || noteBaniSerialOnlyRegex.test(lines[j]);
+                if (isStart && cur.length > 0 && !noteBaniSerialOnlyRegex.test(cur[cur.length - 1])) {
+                    blocks.push(cur.join('\n'));
+                    cur = [lines[j]];
+                } else {
+                    cur.push(lines[j]);
+                }
+            }
+            if (cur.length > 0) blocks.push(cur.join('\n'));
+            return blocks;
+        }
+
+        if (authorDashCount >= 1) {
+            var curA = [];
+            for (var a = 0; a < lines.length; a++) {
+                if (noteBaniAuthorLineRegex.test(lines[a]) && curA.length > 0) {
+                    curA.push(lines[a]);
+                    blocks.push(curA.join('\n'));
+                    curA = [];
+                } else {
+                    if (curA.length > 0) {
+                        blocks.push(curA.join('\n'));
+                        curA = [];
+                    }
+                    curA.push(lines[a]);
+                }
+            }
+            if (curA.length > 0) blocks.push(curA.join('\n'));
+            return blocks;
+        }
+
+        return lines;
+    }
+
+    function parseNoteBaniInput() {
+        var rawInput = document.getElementById('rawTextInputNoteBani');
+        var selectSplit = document.getElementById('selectSplitModeNoteBani');
+        var chkStrip = document.getElementById('chkStripSerialNoteBani');
+        var chkNewlineAuthor = document.getElementById('chkNewlineAuthorNoteBani');
+
+        var raw = rawInput ? rawInput.value.trim() : '';
+        var splitMode = selectSplit ? selectSplit.value : 'auto';
+        var stripSerial = chkStrip ? chkStrip.checked : true;
+        var newlineAuthor = chkNewlineAuthor ? chkNewlineAuthor.checked : true;
+
+        parsedNoteBanis = [];
+        if (!raw) {
+            renderNoteBaniPreview();
+            return;
+        }
+
+        var blocks = parseNoteBaniBlocks(raw, splitMode);
+        for (var i = 0; i < blocks.length; i++) {
+            var formatted = formatNoteBaniEntry(blocks[i], stripSerial, newlineAuthor);
+            if (!formatted) continue;
+            parsedNoteBanis.push({
+                rawText: blocks[i],
+                text: formatted
+            });
+        }
+
+        renderNoteBaniPreview();
+    }
+
+    function renderNoteBaniPreview() {
+        var previewList = document.getElementById('previewListNoteBani');
+        var countBadge = document.getElementById('entriesCountBadgeNoteBani');
+        if (!previewList) return;
+        previewList.innerHTML = '';
+
+        if (countBadge) {
+            var rem = Math.max(0, parsedNoteBanis.length - currentNoteBaniStartIndex);
+            if (currentNoteBaniStartIndex > 0) {
+                countBadge.textContent = 'Remaining: ' + rem + ' / ' + parsedNoteBanis.length + ' Banis';
+            } else {
+                countBadge.textContent = parsedNoteBanis.length + ' Banis';
+            }
+        }
+
+        if (!parsedNoteBanis.length) {
+            previewList.innerHTML = '<div class="empty-text">No quotes parsed. Paste 16–32 Banis above or click "Sample".</div>';
+            return;
+        }
+
+        var fragment = document.createDocumentFragment();
+        parsedNoteBanis.forEach(function(item, idx) {
+            var itemEl = document.createElement('div');
+            itemEl.className = 'preview-item';
+            if (idx < currentNoteBaniStartIndex) {
+                itemEl.classList.add('filled');
+            }
+
+            var lines = item.text.split('\n');
+            var topRow = document.createElement('div');
+            topRow.className = 'preview-header-row';
+
+            var nameEl = document.createElement('div');
+            nameEl.className = 'preview-name';
+            nameEl.textContent = lines[0];
+
+            var badgeEl = document.createElement('div');
+            badgeEl.className = 'preview-badge';
+            if (idx < currentNoteBaniStartIndex) {
+                badgeEl.textContent = 'Placed #' + (idx + 1);
+                badgeEl.classList.add('badge-filled');
+            } else {
+                badgeEl.textContent = 'Page #' + (idx + 1);
+                badgeEl.classList.add('badge-next');
+            }
+
+            topRow.appendChild(nameEl);
+            topRow.appendChild(badgeEl);
+            itemEl.appendChild(topRow);
+
+            if (lines.length > 1) {
+                var detEl = document.createElement('div');
+                detEl.className = 'preview-details';
+                detEl.textContent = lines.slice(1).join(' • ');
+                itemEl.appendChild(detEl);
+            }
+
+            fragment.appendChild(itemEl);
+        });
+
+        previewList.appendChild(fragment);
+    }
+
+    function updateNoteBaniSlotUI(count, fontName, fontSize, isLocked) {
+        var statusText = document.getElementById('noteSlotStatusText');
+        var countBadge = document.getElementById('noteSlotCountBadge');
+        var btnResetSample = document.getElementById('btnResetSampleNoteBani');
+
+        if (countBadge) {
+            countBadge.textContent = (count || 0) + ' Slots';
+            if (isLocked) countBadge.classList.add('locked');
+            else countBadge.classList.remove('locked');
+        }
+        if (btnResetSample) {
+            btnResetSample.style.display = noteBaniSampleProfile ? 'inline-flex' : 'none';
+        }
+        if (statusText) {
+            if (noteBaniSampleProfile) {
+                statusText.textContent = 'Sample Locked: ' + (noteBaniSampleProfile.fontName || 'Font') + ' (' + noteBaniSampleProfile.size + 'pt)';
+            } else if (count > 0 && fontName) {
+                statusText.textContent = 'Detected: ' + fontName + ' (' + fontSize + 'pt)';
+            } else {
+                statusText.textContent = 'Auto-detect ready (সব পেজের নিচের বাণী ধরবে)';
+            }
+        }
+    }
+
+    function executeScanNoteBanis(silent) {
+        var selectScope = document.getElementById('selectScopeNoteBani');
+        var selectOrder = document.getElementById('selectOrderNoteBani');
+        var payload = {
+            scope: selectScope ? selectScope.value : 'all_artboards',
+            order: selectOrder ? selectOrder.value : 'artboard_order',
+            sampleProfile: noteBaniSampleProfile
+        };
+        var payloadStr = encodeURIComponent(JSON.stringify(payload));
+        evalHostScript('scanNoteBanis(decodeURIComponent("' + payloadStr + '"))', function(resStr) {
+            try {
+                var res = JSON.parse(resStr);
+                if (res.status === 'success') {
+                    updateNoteBaniSlotUI(res.count || 0, res.fontName || '', res.fontSize || 0, !!noteBaniSampleProfile);
+                    if (!silent) {
+                        showToast(res.message, res.count > 0 ? 'success' : 'info');
+                    }
+                } else if (!silent) {
+                    showToast(res.message || 'Could not scan document', 'error');
+                }
+            } catch(e) {
+                if (!silent) showToast('Failed to scan Note Bani slots', 'error');
+            }
+        });
+    }
+
+    function executePickNoteBaniSample() {
+        evalHostScript('pickNoteBaniSample()', function(resStr) {
+            try {
+                var res = JSON.parse(resStr);
+                if (res.status === 'success' && res.sample) {
+                    noteBaniSampleProfile = res.sample;
+                    updateNoteBaniSlotUI(0, res.sample.fontName, res.sample.size, true);
+                    showToast(res.message, 'success');
+                    executeScanNoteBanis(true);
+                } else {
+                    showToast(res.message || 'Select 1 Bani TextFrame on canvas first', 'error');
+                }
+            } catch(e) {
+                showToast('Failed to pick sample Bani frame', 'error');
+            }
+        });
+    }
+
+    function executeAutoFillNoteBanis() {
+        var btnRun = document.getElementById('btnAutoFillNoteBani');
+        var rawInput = document.getElementById('rawTextInputNoteBani');
+        var selectScope = document.getElementById('selectScopeNoteBani');
+        var selectOrder = document.getElementById('selectOrderNoteBani');
+        var chkPreserve = document.getElementById('chkPreserveNoteStyle');
+        var chkAutoRemove = document.getElementById('chkAutoRemoveNoteBani');
+        var inputStartIdx = document.getElementById('inputStartIndexNoteBani');
+
+        try {
+            if (!parsedNoteBanis.length && rawInput && rawInput.value.trim()) {
+                parseNoteBaniInput();
+            }
+            if (!parsedNoteBanis.length) {
+                showToast('আগে বাণীর লিস্ট পেস্ট করুন', 'error');
+                return;
+            }
+
+            var entryTexts = parsedNoteBanis.map(function(e) { return e.text; });
+            var payload = {
+                entries: entryTexts,
+                startIndex: currentNoteBaniStartIndex,
+                scope: selectScope ? selectScope.value : 'all_artboards',
+                order: selectOrder ? selectOrder.value : 'artboard_order',
+                preserveStyle: chkPreserve ? chkPreserve.checked : true,
+                sampleProfile: noteBaniSampleProfile
+            };
+
+            if (btnRun) {
+                btnRun.disabled = true;
+                setBtnLabel(btnRun, 'Placing Note Banis...');
+            }
+
+            var payloadStr = encodeURIComponent(JSON.stringify(payload));
+            evalHostScript('populateNoteBanis(decodeURIComponent("' + payloadStr + '"))', function(resStr) {
+                if (btnRun) {
+                    btnRun.disabled = false;
+                    setBtnLabel(btnRun, 'Auto Fill Note Banis');
+                }
+                try {
+                    var res = JSON.parse(resStr);
+                    if (res.status === 'success') {
+                        updateNoteBaniSlotUI(res.totalSlots || 0, res.fontName || '', res.fontSize || 0, !!noteBaniSampleProfile);
+                        var placed = res.filledCount || 0;
+                        var autoRemove = chkAutoRemove ? chkAutoRemove.checked : false;
+                        if (autoRemove) {
+                            var remaining = parsedNoteBanis.slice(currentNoteBaniStartIndex + placed);
+                            if (rawInput) {
+                                rawInput.value = remaining.map(function(e) { return e.rawText || e.text; }).join('\n\n');
+                            }
+                            currentNoteBaniStartIndex = 0;
+                            if (inputStartIdx) inputStartIdx.value = 1;
+                            parseNoteBaniInput();
+                        } else {
+                            if (res.nextStartIndex < parsedNoteBanis.length) {
+                                currentNoteBaniStartIndex = res.nextStartIndex;
+                                if (inputStartIdx) inputStartIdx.value = currentNoteBaniStartIndex + 1;
+                            } else {
+                                currentNoteBaniStartIndex = 0;
+                                if (inputStartIdx) inputStartIdx.value = 1;
+                            }
+                            renderNoteBaniPreview();
+                        }
+                        showToast(res.message || ('Placed ' + placed + ' Note Bani(s)!'), 'success');
+                    } else {
+                        showToast(res.message || 'Failed to populate Note Banis', 'error');
+                    }
+                } catch(e) {
+                    showToast('Note Banis placed!', 'info');
+                }
+            });
+        } catch(err) {
+            if (btnRun) {
+                btnRun.disabled = false;
+                setBtnLabel(btnRun, 'Auto Fill Note Banis');
+            }
+            showToast('Error: ' + err.message, 'error');
+        }
+    }
+
+    // ==========================================
     // Duplicator & Grid Calculator
     // ==========================================
     function updateDuplicatorSummary() {
@@ -1613,6 +2010,100 @@
         var btnAutoFillD = document.getElementById('btnAutoFillDiary');
         if (btnAutoFillD) {
             btnAutoFillD.addEventListener('click', executeAutoFillDiary);
+        }
+
+        // Note Bani Listeners
+        var rawTextInputNB = document.getElementById('rawTextInputNoteBani');
+        if (rawTextInputNB) {
+            rawTextInputNB.addEventListener('input', debounce(parseNoteBaniInput, 180));
+        }
+
+        var selectSplitNB = document.getElementById('selectSplitModeNoteBani');
+        if (selectSplitNB) selectSplitNB.addEventListener('change', parseNoteBaniInput);
+
+        var chkStripNB = document.getElementById('chkStripSerialNoteBani');
+        if (chkStripNB) chkStripNB.addEventListener('change', parseNoteBaniInput);
+
+        var chkNewlineAuthorNB = document.getElementById('chkNewlineAuthorNoteBani');
+        if (chkNewlineAuthorNB) chkNewlineAuthorNB.addEventListener('change', parseNoteBaniInput);
+
+        var btnPasteNB = document.getElementById('btnPasteNoteBani');
+        if (btnPasteNB) {
+            btnPasteNB.addEventListener('click', function() {
+                getSystemClipboardText(function(clipText) {
+                    if (clipText && clipText.trim()) {
+                        if (rawTextInputNB) rawTextInputNB.value = clipText;
+                        parseNoteBaniInput();
+                        showToast('Pasted Note Banis from clipboard!', 'success');
+                    } else {
+                        showToast('Clipboard is empty (ক্লিপবোর্ড খালি)', 'error');
+                    }
+                });
+            });
+        }
+
+        var btnSampleNB = document.getElementById('btnLoadSampleNoteBani');
+        if (btnSampleNB) {
+            btnSampleNB.addEventListener('click', function() {
+                if (rawTextInputNB) rawTextInputNB.value = sampleNoteBaniData;
+                parseNoteBaniInput();
+                showToast('Sample Note Banis loaded!', 'info');
+            });
+        }
+
+        var btnClearNB = document.getElementById('btnClearNoteBani');
+        if (btnClearNB) {
+            btnClearNB.addEventListener('click', function() {
+                if (rawTextInputNB) rawTextInputNB.value = '';
+                parsedNoteBanis = [];
+                currentNoteBaniStartIndex = 0;
+                var inIdx = document.getElementById('inputStartIndexNoteBani');
+                if (inIdx) inIdx.value = 1;
+                renderNoteBaniPreview();
+                showToast('Cleared Note Bani input', 'info');
+            });
+        }
+
+        var btnScanNB = document.getElementById('btnScanNoteBanis');
+        if (btnScanNB) {
+            btnScanNB.addEventListener('click', function() { executeScanNoteBanis(false); });
+        }
+
+        var btnPickSampleNB = document.getElementById('btnPickSampleNoteBani');
+        if (btnPickSampleNB) {
+            btnPickSampleNB.addEventListener('click', executePickNoteBaniSample);
+        }
+
+        var btnResetSampleNB = document.getElementById('btnResetSampleNoteBani');
+        if (btnResetSampleNB) {
+            btnResetSampleNB.addEventListener('click', function() {
+                noteBaniSampleProfile = null;
+                updateNoteBaniSlotUI(0, '', 0, false);
+                showToast('Sample lock cleared — Auto-detect enabled', 'info');
+            });
+        }
+
+        var inputStartIdxNB = document.getElementById('inputStartIndexNoteBani');
+        if (inputStartIdxNB) {
+            inputStartIdxNB.addEventListener('input', function() {
+                currentNoteBaniStartIndex = Math.max(0, (parseInt(this.value, 10) || 1) - 1);
+                renderNoteBaniPreview();
+            });
+        }
+
+        var btnResetIdxNB = document.getElementById('btnResetIndexNoteBani');
+        if (btnResetIdxNB) {
+            btnResetIdxNB.addEventListener('click', function() {
+                currentNoteBaniStartIndex = 0;
+                if (inputStartIdxNB) inputStartIdxNB.value = 1;
+                renderNoteBaniPreview();
+                showToast('Reset to Bani #1', 'info');
+            });
+        }
+
+        var btnAutoFillNB = document.getElementById('btnAutoFillNoteBani');
+        if (btnAutoFillNB) {
+            btnAutoFillNB.addEventListener('click', executeAutoFillNoteBanis);
         }
 
         // Duplicator Listeners

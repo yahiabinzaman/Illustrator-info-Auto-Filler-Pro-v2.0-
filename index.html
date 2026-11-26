@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Auto Filler Pro — ColorLab</title>
-    <link rel="stylesheet" href="css/style.css?v=3.0.0">
+    <link rel="stylesheet" href="css/style.css?v=3.1.0">
     <script>
     function switchTab(tabId) {
         if (!tabId) return;
@@ -54,7 +54,7 @@
             <div class="brand-title">
                 <span>Auto Filler Pro</span>
                 <span class="brand-sub">ColorLab</span>
-                <span class="version-badge">v3.0</span>
+                <span class="version-badge">v3.1</span>
             </div>
         </div>
         <div class="header-actions">
@@ -72,6 +72,7 @@
     <nav class="mode-tabs" role="tablist">
         <button type="button" class="tab-btn active" data-tab="tab-keyring" onclick="switchTab('tab-keyring')">Keyring</button>
         <button type="button" class="tab-btn" data-tab="tab-diary" onclick="switchTab('tab-diary')">Diary / ID</button>
+        <button type="button" class="tab-btn" data-tab="tab-note-bani" onclick="switchTab('tab-note-bani')">Note Bani</button>
         <button type="button" class="tab-btn" data-tab="tab-duplicate" onclick="switchTab('tab-duplicate')">Duplicator</button>
         <button type="button" class="tab-btn" data-tab="tab-canvas-move" onclick="switchTab('tab-canvas-move')">Canvas Move</button>
     </nav>
@@ -495,7 +496,125 @@ Example:
             </div>
         </div>
 
-        <!-- TAB 3: Template Duplicator -->
+        <!-- TAB 3: Note Bani Batch Filler -->
+        <div id="tab-note-bani" class="tab-pane">
+            <div class="section-box">
+                <div class="section-header">
+                    <span class="section-title">Note Bani List (১৬–৩২ টি বাণী)</span>
+                    <div style="display: flex; gap: 4px;">
+                        <button type="button" id="btnPasteNoteBani" class="btn btn-sm btn-accent" title="Paste quotes from clipboard">📋 Paste</button>
+                        <button type="button" id="btnLoadSampleNoteBani" class="btn btn-sm">Sample</button>
+                        <button type="button" id="btnClearNoteBani" class="btn btn-sm">Clear</button>
+                    </div>
+                </div>
+
+                <textarea id="rawTextInputNoteBani" placeholder="এখানে ১৬–৩২ টি বাণী পেস্ট করুন...
+উদাহরণ:
+১. অলসতাকে কখনো প্রশ্রয় দেবে না; কেননা, তা সাফল্যের পথে প্রধান অন্তরায়।
+— শায়খুল হাদীস আল্লামা আজিজুল হক রহ.
+
+২. ইসলামকে যুগোপযোগী করা যাবে না; বরং যুগকে ইসলাম-উপযোগী করতে হবে।
+— আল্লামা জুনায়েদ বাবুনগরী রহ."></textarea>
+
+                <div style="display: flex; gap: 5px;">
+                    <button type="button" id="btnScanNoteBanis" class="btn btn-sm" style="flex: 1;" title="Scan how many Note Bani slots are in the document">
+                        🔍 Scan Note Slots
+                    </button>
+                    <button type="button" id="btnPickSampleNoteBani" class="btn btn-sm btn-accent" style="flex: 1;" title="Select 1 Bani frame on canvas to lock exact font, size &amp; position">
+                        🎯 Pick Sample Bani
+                    </button>
+                    <button type="button" id="btnResetSampleNoteBani" class="btn btn-sm" style="display: none;" title="Clear picked sample lock">
+                        ✕
+                    </button>
+                </div>
+
+                <div class="slot-status-bar">
+                    <span id="noteSlotStatusText">Auto-detect ready (সব পেজের নিচের বাণী ধরবে)</span>
+                    <span id="noteSlotCountBadge" class="slot-pill">0 Slots</span>
+                </div>
+            </div>
+
+            <div class="section-box">
+                <div class="section-header">
+                    <span class="section-title">Note Bani Settings</span>
+                </div>
+
+                <div class="grid-2">
+                    <div class="control-group">
+                        <label for="selectScopeNoteBani">Target Scope</label>
+                        <select id="selectScopeNoteBani">
+                            <option value="all_artboards" selected>All Artboards (সব আর্টবোর্ড)</option>
+                            <option value="artboard">Active Artboard (বর্তমান আর্টবোর্ড)</option>
+                            <option value="selection">Selected Frames (সিলেক্টেড ফ্রেম)</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label for="selectSplitModeNoteBani">List Split Mode</label>
+                        <select id="selectSplitModeNoteBani">
+                            <option value="auto" selected>Auto Detect (স্মার্ট অটো)</option>
+                            <option value="blank">Blank Line Blocks (ফাঁকা লাইন)</option>
+                            <option value="line">Every Line (প্রতি লাইন ১ বাণী)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid-2">
+                    <div class="control-group">
+                        <label for="selectOrderNoteBani">Page Fill Order</label>
+                        <select id="selectOrderNoteBani">
+                            <option value="artboard_order" selected>Artboard &amp; Spread (বাম → ডান)</option>
+                            <option value="zigzag">Row by Row (সারি অনুযায়ী)</option>
+                            <option value="column">Column-wise (কলাম অনুযায়ী)</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label for="inputStartIndexNoteBani">Start Bani #</label>
+                        <div style="display: flex; gap: 4px; align-items: center;">
+                            <input type="number" id="inputStartIndexNoteBani" value="1" min="1" style="width: 52px; text-align: center;">
+                            <button type="button" id="btnResetIndexNoteBani" class="btn btn-sm" style="flex: 1;" title="Reset to #1">Reset</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="checkbox-list" style="margin-top: 2px;">
+                    <label class="checkbox-label checkbox-highlight">
+                        <input type="checkbox" id="chkPreserveNoteStyle" checked>
+                        <span>টেমপ্লেটের ফন্ট, সাইজ, কালার ও অ্যালাইনমেন্ট অক্ষত রাখো</span>
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="chkStripSerialNoteBani" checked>
+                        <span>আগের ক্রমিক নম্বর (১., ২., বাণী:) বাদ দাও</span>
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="chkNewlineAuthorNoteBani" checked>
+                        <span>লেখকের নাম (—) থাকলে নতুন লাইনে নামাও</span>
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="chkAutoRemoveNoteBani">
+                        <span>বসে যাওয়া বাণী টেক্সটবক্স থেকে রিমুভ করো</span>
+                    </label>
+                </div>
+            </div>
+
+            <button type="button" id="btnAutoFillNoteBani" class="btn btn-primary" style="width: 100%;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                </svg>
+                <span class="btn-label">Auto Fill Note Banis</span>
+            </button>
+
+            <div class="section-box">
+                <div class="section-header">
+                    <span class="section-title">Parsed Note Banis</span>
+                    <span id="entriesCountBadgeNoteBani" class="badge">0 Banis</span>
+                </div>
+                <div id="previewListNoteBani" class="preview-container">
+                    <div class="empty-text">No quotes parsed. Paste 16–32 Banis above or click "Sample".</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 4: Template Duplicator -->
         <div id="tab-duplicate" class="tab-pane">
             <div class="section-box">
                 <div class="section-header">
@@ -631,7 +750,7 @@ Example:
 
     <!-- Scripts -->
     <script src="js/CSInterface.js"></script>
-    <script src="js/main.js?v=3.0.0"></script>
+    <script src="js/main.js?v=3.1.0"></script>
     <script>
     function openAuthorProfile(e) {
         if (e) { e.preventDefault(); e.stopPropagation(); }

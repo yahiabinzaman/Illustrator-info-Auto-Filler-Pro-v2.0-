@@ -3102,6 +3102,567 @@ var CardAutoFiller = {
             totalEntries: entries.length,
             nextStartIndex: startIndex + filledCount
         });
+    },
+
+    // ==========================================
+    // Note Bani Batch Filler Engine
+    // ==========================================
+    isNoteHeaderOrLabel: function(text) {
+        if (!text) return false;
+        var clean = text.replace(/^\s+|\s+$/g, "");
+        if (!clean) return false;
+
+        // Pure numbers / page numbers (e.g., "1", "01", "১২", "- ৫ -")
+        if (clean.length <= 12 && /^[০-৯0-9\s\.\-\/\#\(\)\[\]—–]+$/.test(clean)) {
+            return true;
+        }
+
+        // Weekday row ("শনি রবি সোম মঙ্গল বুধ বৃহঃ শুক্র")
+        var weekdays = ["শনি", "রবি", "সোম", "মঙ্গল", "বুধ", "বৃহ", "শুক্র"];
+        var dayHits = 0;
+        for (var w = 0; w < weekdays.length; w++) {
+            if (clean.indexOf(weekdays[w]) !== -1) dayHits++;
+        }
+        if (dayHits >= 2) return true;
+        if (dayHits === 1 && clean.length <= 12) return true;
+
+        // Short header / form labels
+        if (clean.length <= 32) {
+            var exactLabels = [
+                "বিষয়", "বিষয়", "তারিখ", "পৃষ্ঠা", "পৃষ্ঠা নং", "নোট", "নোট নং",
+                "নোটবুক", "ডায়েরি", "ডায়েরি", "দিন", "মাস", "সাল", "শিক্ষাবর্ষ",
+                "সেশন", "শ্রেণি", "শ্রেণী", "বিভাগ", "রোল", "নাম", "পিতা",
+                "subject", "date", "topic", "note", "page", "day", "month", "year",
+                "class", "section", "roll", "name"
+            ];
+            var lowerClean = clean.toLowerCase().replace(/[\:\-\.\s]+$/g, "");
+            for (var lb = 0; lb < exactLabels.length; lb++) {
+                if (lowerClean === exactLabels[lb]) return true;
+            }
+            if (/^(?:বিষয়|বিষয়|তারিখ|পৃষ্ঠা|subject|date|topic|page)\b/i.test(clean) && clean.length <= 22) {
+                return true;
+            }
+        }
+        return false;
+    },
+
+    findArtboardForPoint: function(doc, cx, cy) {
+        if (!doc || !doc.artboards || !doc.artboards.length) return -1;
+        var bestIdx = -1;
+        var bestDist = 999999;
+        for (var i = 0; i < doc.artboards.length; i++) {
+            var r = doc.artboards[i].artboardRect; // [left, top, right, bottom]
+            var abL = Math.min(r[0], r[2]);
+            var abR = Math.max(r[0], r[2]);
+            var abT = Math.max(r[1], r[3]);
+            var abB = Math.min(r[1], r[3]);
+
+            if (cx >= abL - 8 && cx <= abR + 8 && cy >= abB - 8 && cy <= abT + 8) {
+                return i;
+            }
+            var dx = (cx < abL) ? (abL - cx) : (cx > abR ? cx - abR : 0);
+            var dy = (cy < abB) ? (abB - cy) : (cy > abT ? cy - abT : 0);
+            var d = Math.sqrt(dx * dx + dy * dy);
+            if (d <= 25 && d < bestDist) {
+                bestDist = d;
+                bestIdx = i;
+            }
+        }
+        return bestIdx;
+    },
+
+    getNoteFrameStyle: function(tf) {
+        var style = {
+            font: null,
+            fontName: "",
+            fontFamily: "",
+            size: 10.0,
+            autoLeading: true,
+            leading: 12.0,
+            horizontalScale: 100.0,
+            verticalScale: 100.0,
+            tracking: 0,
+            fillColor: null,
+            justification: null,
+            spaceBefore: 0,
+            spaceAfter: 0
+        };
+        if (!tf) return style;
+
+        try {
+            var targetCa = null;
+            if (tf.characters && tf.characters.length > 0) {
+                var limit = Math.min(tf.characters.length, 12);
+                for (var c = 0; c < limit; c++) {
+                    var ch = tf.characters[c];
+                    var chStr = "";
+                    try { chStr = ch.contents || ""; } catch(ce) {}
+                    if (chStr && !/^\s+$/.test(chStr)) {
+                        targetCa = ch.characterAttributes;
+                        break;
+                    }
+                }
+                if (!targetCa) targetCa = tf.characters[0].characterAttributes;
+            } else if (tf.textRange && tf.textRange.characterAttributes) {
+                targetCa = tf.textRange.characterAttributes;
+            }
+
+            if (targetCa) {
+                try {
+                    if (targetCa.textFont) {
+                        style.font = targetCa.textFont;
+                        style.fontName = targetCa.textFont.name || "";
+                        style.fontFamily = targetCa.textFont.family || style.fontName.split("-")[0];
+                    }
+                } catch(fe) {}
+                try { if (targetCa.size > 0) style.size = targetCa.size; } catch(se) {}
+                try { style.autoLeading = !!targetCa.autoLeading; } catch(ae) {}
+                try { if (targetCa.leading > 0) style.leading = targetCa.leading; } catch(le) {}
+                try { if (targetCa.horizontalScale > 0) style.horizontalScale = targetCa.horizontalScale; } catch(he) {}
+                try { if (targetCa.verticalScale > 0) style.verticalScale = targetCa.verticalScale; } catch(ve) {}
+                try { style.tracking = targetCa.tracking; } catch(te) {}
+                try {
+                    if (targetCa.fillColor && targetCa.fillColor.typename !== "NoColor") {
+                        style.fillColor = targetCa.fillColor;
+                    }
+                } catch(ce2) {}
+            }
+
+            if (tf.paragraphs && tf.paragraphs.length > 0) {
+                try {
+                    var pa = tf.paragraphs[0].paragraphAttributes;
+                    if (pa) {
+                        style.justification = pa.justification;
+                        style.spaceBefore = pa.spaceBefore;
+                        style.spaceAfter = pa.spaceAfter;
+                    }
+                } catch(pe) {}
+            }
+        } catch(e) {}
+        return style;
+    },
+
+    collectAllVisibleTextFrames: function(doc, scope) {
+        var rawFrames = [];
+        if (scope === "selection") {
+            if (doc.selection && doc.selection.length > 0) {
+                this.collectTextFrames(doc.selection, rawFrames);
+            }
+        } else {
+            var visLayers = [];
+            this.collectVisibleLayers(doc, visLayers);
+            for (var li = 0; li < visLayers.length; li++) {
+                try {
+                    this.collectTextFrames(visLayers[li].pageItems, rawFrames);
+                } catch(e) {}
+            }
+        }
+
+        // Deduplicate & exclude hidden/locked/backside frames
+        var seen = [];
+        var unique = [];
+        for (var i = 0; i < rawFrames.length; i++) {
+            var tf = rawFrames[i];
+            if (!tf || tf.typename !== "TextFrame") continue;
+            if (this.isItemHidden(tf)) continue;
+            var dup = false;
+            for (var s = 0; s < seen.length; s++) {
+                if (seen[s] === tf) { dup = true; break; }
+            }
+            if (dup) continue;
+            seen.push(tf);
+
+            var txt = "";
+            try { txt = tf.contents || ""; } catch(e2) {}
+            if (this.isBackSideText(txt)) continue;
+
+            unique.push(tf);
+        }
+        return unique;
+    },
+
+    sortNoteFrames: function(items, order) {
+        if (!items || items.length <= 1) return items;
+        var ord = order || "artboard_order";
+
+        if (ord === "column") {
+            // Cluster by X column (~80pt) then Y descending
+            items.sort(function(a, b) {
+                if (Math.abs(a.cx - b.cx) > 80) return a.cx - b.cx;
+                return b.cy - a.cy;
+            });
+            return items;
+        }
+
+        if (ord === "zigzag") {
+            // Global top-to-bottom, left-to-right
+            items.sort(function(a, b) {
+                if (Math.abs(a.cy - b.cy) > 40) return b.cy - a.cy;
+                return a.cx - b.cx;
+            });
+            return items;
+        }
+
+        // Default "artboard_order": Artboard 1..N first, left-to-right (and top-to-bottom) within each artboard
+        items.sort(function(a, b) {
+            var abA = (a.abIdx >= 0) ? a.abIdx : 99999;
+            var abB = (b.abIdx >= 0) ? b.abIdx : 99999;
+            if (abA !== abB) return abA - abB;
+            if (Math.abs(a.cy - b.cy) > 40) return b.cy - a.cy;
+            return a.cx - b.cx;
+        });
+        return items;
+    },
+
+    detectNoteBaniFrames: function(doc, scope, order, sampleProfile) {
+        var frames = this.collectAllVisibleTextFrames(doc, scope);
+        if (!frames.length) return [];
+
+        var activeAB = -1;
+        try { activeAB = doc.artboards.getActiveArtboardIndex(); } catch(e) {}
+
+        var candidates = [];
+        var directTextSelection = (scope === "selection" && doc.selection && doc.selection.length > 0);
+        if (directTextSelection) {
+            for (var si = 0; si < doc.selection.length; si++) {
+                if (!doc.selection[si] || doc.selection[si].typename !== "TextFrame") {
+                    directTextSelection = false;
+                    break;
+                }
+            }
+        }
+
+        for (var i = 0; i < frames.length; i++) {
+            var tf = frames[i];
+            var txt = "";
+            try { txt = tf.contents || ""; } catch(e) {}
+            var clean = txt.replace(/^\s+|\s+$/g, "");
+
+            if (!sampleProfile && !directTextSelection && !clean) continue;
+            if (!directTextSelection && this.isNoteHeaderOrLabel(clean)) continue;
+
+            var b = null;
+            try { b = tf.geometricBounds; } catch(be) {
+                try { b = tf.visibleBounds; } catch(be2) {}
+            }
+            if (!b) continue;
+
+            var cx = (b[0] + b[2]) / 2;
+            var cy = (b[1] + b[3]) / 2;
+            var abIdx = this.findArtboardForPoint(doc, cx, cy);
+
+            if (scope === "artboard" && activeAB >= 0 && abIdx !== activeAB) {
+                continue;
+            }
+
+            var relY = -1;
+            if (abIdx >= 0) {
+                var r = doc.artboards[abIdx].artboardRect;
+                var abT = Math.max(r[1], r[3]);
+                var abB = Math.min(r[1], r[3]);
+                relY = (abT - cy) / Math.max(1, (abT - abB));
+            }
+
+            var style = this.getNoteFrameStyle(tf);
+            candidates.push({
+                tf: tf,
+                text: clean,
+                cx: cx,
+                cy: cy,
+                abIdx: abIdx,
+                relY: relY,
+                style: style
+            });
+        }
+
+        if (!candidates.length) return [];
+
+        var matched = [];
+
+        // 1. If user locked onto a Sample Bani frame, match by font + size + vertical position
+        if (sampleProfile && sampleProfile.fontName) {
+            for (var k = 0; k < candidates.length; k++) {
+                var c = candidates[k];
+                var sameFont = (c.style.fontName === sampleProfile.fontName) ||
+                               (sampleProfile.fontFamily && c.style.fontFamily === sampleProfile.fontFamily);
+                var sameSize = Math.abs(c.style.size - sampleProfile.size) <= 1.5;
+                var sameZone = (sampleProfile.relY < 0 || c.relY < 0 || Math.abs(c.relY - sampleProfile.relY) <= 0.18);
+                if (sameFont && sameSize && sameZone) {
+                    matched.push(c);
+                }
+            }
+            return this.sortNoteFrames(matched, order);
+        }
+
+        // 2. If user directly selected TextFrames, trust the selection directly
+        if (directTextSelection) {
+            return this.sortNoteFrames(candidates, order);
+        }
+
+        // 3. Auto-detect via Bani content + bottom-region + consensus style clustering
+        var scored = [];
+        for (var j = 0; j < candidates.length; j++) {
+            var cand = candidates[j];
+            var t = cand.text;
+            var sc = 0;
+
+            if (this.isBaniText(t)) sc += 6;
+            if (/^(?:বাণী|বানী|Bani|Quote)\s*[:\-]?/i.test(t)) sc += 6;
+            if (/[—–~]/.test(t) || /\s-\s/.test(t)) sc += 3;
+            if (t.length >= 25) sc += 3;
+            else if (t.length >= 14) sc += 1;
+
+            if (cand.relY >= 0.65) sc += 5;
+            else if (cand.relY >= 0.50) sc += 2;
+            else if (cand.relY >= 0 && cand.relY < 0.28) sc -= 5;
+
+            if (cand.style.size >= 5 && cand.style.size <= 16) sc += 2;
+            else if (cand.style.size > 24) sc -= 5;
+
+            if (sc >= 4) {
+                cand.score = sc;
+                scored.push(cand);
+            }
+        }
+
+        if (!scored.length) {
+            for (var f = 0; f < candidates.length; f++) {
+                if (candidates[f].text.length >= 16 && (candidates[f].relY < 0 || candidates[f].relY >= 0.50)) {
+                    candidates[f].score = 2;
+                    scored.push(candidates[f]);
+                }
+            }
+        }
+
+        if (scored.length >= 3) {
+            var groups = {};
+            for (var g = 0; g < scored.length; g++) {
+                var item = scored[g];
+                var gk = (item.style.fontName || "default") + "__" + Math.round(item.style.size * 2);
+                if (!groups[gk]) {
+                    groups[gk] = {
+                        fontName: item.style.fontName,
+                        fontFamily: item.style.fontFamily,
+                        sizeSum: 0,
+                        relYSum: 0,
+                        relYCount: 0,
+                        scoreSum: 0,
+                        count: 0
+                    };
+                }
+                groups[gk].count++;
+                groups[gk].sizeSum += item.style.size;
+                groups[gk].scoreSum += item.score;
+                if (item.relY >= 0) {
+                    groups[gk].relYSum += item.relY;
+                    groups[gk].relYCount++;
+                }
+            }
+
+            var bestGroup = null;
+            var bestWeight = -1;
+            for (var key in groups) {
+                if (groups.hasOwnProperty(key)) {
+                    var grp = groups[key];
+                    var weight = grp.count * 12 + grp.scoreSum;
+                    if (weight > bestWeight) {
+                        bestWeight = weight;
+                        bestGroup = grp;
+                    }
+                }
+            }
+
+            if (bestGroup) {
+                var refSize = bestGroup.sizeSum / bestGroup.count;
+                var refRelY = bestGroup.relYCount > 0 ? (bestGroup.relYSum / bestGroup.relYCount) : -1;
+                for (var m = 0; m < scored.length; m++) {
+                    var scItem = scored[m];
+                    var fOk = (!bestGroup.fontName || scItem.style.fontName === bestGroup.fontName ||
+                               (bestGroup.fontFamily && scItem.style.fontFamily === bestGroup.fontFamily));
+                    var sOk = Math.abs(scItem.style.size - refSize) <= 1.2;
+                    var yOk = (refRelY < 0 || scItem.relY < 0 || Math.abs(scItem.relY - refRelY) <= 0.25);
+                    if (fOk && sOk && yOk) {
+                        matched.push(scItem);
+                    }
+                }
+            }
+        } else {
+            matched = scored;
+        }
+
+        return this.sortNoteFrames(matched, order);
+    },
+
+    pickNoteBaniSample: function() {
+        var doc = this.getActiveDoc();
+        if (!doc) {
+            return JSON.stringify({ status: "error", message: "No active Illustrator document found." });
+        }
+        var sel = doc.selection;
+        if (!sel || sel.length === 0) {
+            return JSON.stringify({ status: "error", message: "Please select 1 Bani TextFrame on canvas first." });
+        }
+
+        var tfs = [];
+        this.collectTextFrames(sel, tfs);
+        if (!tfs.length) {
+            return JSON.stringify({ status: "error", message: "No TextFrame found in selection." });
+        }
+
+        var tf = tfs[0];
+        var style = this.getNoteFrameStyle(tf);
+        var relY = -1;
+        try {
+            var b = tf.geometricBounds;
+            var cx = (b[0] + b[2]) / 2;
+            var cy = (b[1] + b[3]) / 2;
+            var abIdx = this.findArtboardForPoint(doc, cx, cy);
+            if (abIdx >= 0) {
+                var r = doc.artboards[abIdx].artboardRect;
+                var abT = Math.max(r[1], r[3]);
+                var abB = Math.min(r[1], r[3]);
+                relY = (abT - cy) / Math.max(1, (abT - abB));
+            }
+        } catch(e) {}
+
+        var sampleProfile = {
+            fontName: style.fontName,
+            fontFamily: style.fontFamily,
+            size: Math.round(style.size * 100) / 100,
+            relY: Math.round(relY * 1000) / 1000
+        };
+
+        return JSON.stringify({
+            status: "success",
+            sample: sampleProfile,
+            message: "Locked: " + (style.fontName || "Template Font") + " (" + sampleProfile.size + " pt)"
+        });
+    },
+
+    scanNoteBanis: function(payloadJson) {
+        var doc = this.getActiveDoc();
+        if (!doc) {
+            return JSON.stringify({ status: "error", message: "No active Illustrator document found." });
+        }
+
+        var payload = {};
+        try { if (payloadJson) payload = JSON.parse(payloadJson); } catch(e) {}
+
+        var slots = this.detectNoteBaniFrames(
+            doc,
+            payload.scope || "all_artboards",
+            payload.order || "artboard_order",
+            payload.sampleProfile || null
+        );
+
+        var fontLabel = slots.length > 0 ? (slots[0].style.fontName || "Template") : "";
+        var sizeLabel = slots.length > 0 ? (Math.round(slots[0].style.size * 10) / 10) : 0;
+
+        return JSON.stringify({
+            status: "success",
+            count: slots.length,
+            fontName: fontLabel,
+            fontSize: sizeLabel,
+            message: slots.length > 0
+                ? ("Found " + slots.length + " Note Bani slot(s) (" + fontLabel + " " + sizeLabel + "pt)")
+                : "No Note Bani frames detected. Select 1 sample Bani and click Pick Sample."
+        });
+    },
+
+    populateNoteBanis: function(payloadJson) {
+        var doc = this.getActiveDoc();
+        if (!doc) {
+            return JSON.stringify({ status: "error", message: "No active Illustrator document found." });
+        }
+
+        var payload = {};
+        try { payload = JSON.parse(payloadJson); } catch(e) {
+            return JSON.stringify({ status: "error", message: "Invalid Note Bani payload." });
+        }
+
+        var entries = payload.entries || [];
+        var startIndex = payload.startIndex || 0;
+        var preserveStyle = (payload.preserveStyle !== false);
+        var scope = payload.scope || "all_artboards";
+        var order = payload.order || "artboard_order";
+        var sampleProfile = payload.sampleProfile || null;
+
+        if (!entries.length || startIndex >= entries.length) {
+            return JSON.stringify({ status: "error", message: "No Note Banis left to place." });
+        }
+
+        var slots = this.detectNoteBaniFrames(doc, scope, order, sampleProfile);
+        if (!slots.length) {
+            return JSON.stringify({
+                status: "error",
+                message: "No Note Bani frames found! Check scope or click 'Pick Sample Bani' on 1 frame."
+            });
+        }
+
+        var filledCount = 0;
+        var lastFontName = "";
+        var lastFontSize = 0;
+
+        for (var i = 0; i < slots.length; i++) {
+            var entryIdx = startIndex + filledCount;
+            if (entryIdx >= entries.length) break;
+
+            var slot = slots[i];
+            var tf = slot.tf;
+            var style = preserveStyle ? slot.style : this.getNoteFrameStyle(tf);
+            var rawBani = String(entries[entryIdx] || "");
+            var cleanBani = rawBani.split("\r\n").join("\r").split("\n").join("\r");
+            cleanBani = cleanBani.replace(/^\r+|\r+$/g, "");
+            if (!cleanBani) continue;
+
+            try {
+                tf.contents = cleanBani;
+
+                if (preserveStyle && style) {
+                    var tr = tf.textRange;
+                    try { if (style.font) tr.characterAttributes.textFont = style.font; } catch(fe) {}
+                    try { if (style.size > 0) tr.characterAttributes.size = style.size; } catch(se) {}
+                    try {
+                        if (style.autoLeading) {
+                            tr.characterAttributes.autoLeading = true;
+                        } else if (style.leading > 0) {
+                            tr.characterAttributes.autoLeading = false;
+                            tr.characterAttributes.leading = style.leading;
+                        }
+                    } catch(le) {}
+                    try { if (style.horizontalScale > 0) tr.characterAttributes.horizontalScale = style.horizontalScale; } catch(he) {}
+                    try { if (style.verticalScale > 0) tr.characterAttributes.verticalScale = style.verticalScale; } catch(ve) {}
+                    try { tr.characterAttributes.tracking = style.tracking; } catch(te) {}
+                    try { if (style.fillColor) tr.characterAttributes.fillColor = style.fillColor; } catch(ce) {}
+
+                    try {
+                        for (var p = 0; p < tf.paragraphs.length; p++) {
+                            var pAttr = tf.paragraphs[p].paragraphAttributes;
+                            if (style.justification !== null) pAttr.justification = style.justification;
+                            pAttr.spaceBefore = style.spaceBefore;
+                            pAttr.spaceAfter = style.spaceAfter;
+                        }
+                    } catch(pe) {}
+                }
+
+                if (style && style.fontName) lastFontName = style.fontName;
+                if (style && style.size > 0) lastFontSize = Math.round(style.size * 10) / 10;
+                filledCount++;
+            } catch(tfErr) {}
+        }
+
+        try { app.redraw(); } catch(e) {}
+
+        return JSON.stringify({
+            status: "success",
+            filledCount: filledCount,
+            totalSlots: slots.length,
+            totalEntries: entries.length,
+            nextStartIndex: startIndex + filledCount,
+            fontName: lastFontName,
+            fontSize: lastFontSize,
+            message: "Placed " + filledCount + " of " + slots.length + " Note Bani(s) in " + (lastFontName || "template font") + " (" + lastFontSize + "pt)!"
+        });
     }
 };
 
@@ -3186,4 +3747,16 @@ function detectCards(scope) {
 
 function getSelectedCanvasWidth() {
     return CardAutoFiller.getSelectedCanvasWidth();
+}
+
+function pickNoteBaniSample() {
+    return CardAutoFiller.pickNoteBaniSample();
+}
+
+function scanNoteBanis(payloadJson) {
+    return CardAutoFiller.scanNoteBanis(payloadJson);
+}
+
+function populateNoteBanis(payloadJson) {
+    return CardAutoFiller.populateNoteBanis(payloadJson);
 }
