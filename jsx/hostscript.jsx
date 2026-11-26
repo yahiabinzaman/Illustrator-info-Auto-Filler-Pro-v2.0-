@@ -1,7 +1,7 @@
 /**
- * Illustrator Name & Bio Card Auto-Filler Pro Engine
- * Author: Yahia Bin Zaman
- * Version: 2.2.1 Pro - Enhanced with Unicode-Safe JSON & Keyring Support
+ * Auto Filler Pro — ExtendScript Host Engine (ColorLab Edition)
+ * Author: Yahia Bin Zaman (https://github.com/yahiabinzaman)
+ * Version: 3.0.0 Pro — Keyring, Diary / ID, Duplicator & Canvas Placement
  */
 
 // Safe for direct eval in ExtendScript and CEP engine
@@ -439,38 +439,36 @@ var CardAutoFiller = {
         return false;
     },
 
-    isBaniText: function(text) {
-        if (!text) return false;
-        if (/(?:[-–—]\s*(?:মাও|মাওলানা|হযরত|মুফতী|মুফতি|শায়খ|ড\.|আল্লামা|মুহাদ্দিস|ইমাম|রাসূল|হাকিমুল|রহ|হাফি))/i.test(text)) return true;
-        if (/(?:বাণী|বানী|Bani|উক্তি|হাদীস|উপদেশ|মহান|স্মারক|টাকা দিয়েই|টাকা দিয়ে|প্রয়োজন মেটাতে|লোভ থেকে|মোহ থেকে|মুক্ত রাখতে)/i.test(text)) return true;
-        if (/^[\s\r\n]*[-–—]/.test(text)) return true;
-        if (text.indexOf("রহ:") !== -1 || text.indexOf("রহ.") !== -1 || text.indexOf("হাফি:") !== -1 || text.indexOf("হাফি.") !== -1) return true;
-        return false;
-    },
-
     hasStudentBiodata: function(text) {
         if (!text) return false;
-        if (this.isBaniText(text)) return false;
         if (text.indexOf("পিতা:") !== -1 || text.indexOf("পিতা :") !== -1 || text.indexOf("পিতা") !== -1 ||
-            text.indexOf("الوالদ:") !== -1 || text.indexOf("الوالد :") !== -1 || text.indexOf("বাবার নাম") !== -1) {
+            text.indexOf("বাবার নাম") !== -1 || text.indexOf("الوالد") !== -1) {
             return true;
         }
         if (/01[3-9]\d{8}/.test(text) || /০১[৩-৯][০-৯]{8}/.test(text) || /٠١[٠-৯]{9}/.test(text)) {
             return true;
         }
         var clean = text.replace(/^\s+|\s+$/g, "");
-        var lines = clean.split(/[\r\n]+/);
-        if (lines.length >= 2) {
+        var lns = clean.split(/[\r\n]+/);
+        if (lns.length >= 3) return true;
+        if (lns.length >= 2) {
             var studentTitles = ["মুহাম্মাদ", "মোহাম্মদ", "মোঃ", "শিক্ষার্থী", "ছাত্র", "الحافظ"];
             for (var s = 0; s < studentTitles.length; s++) {
-                if (clean.indexOf(studentTitles[s]) !== -1) {
-                    return true;
-                }
+                if (clean.indexOf(studentTitles[s]) !== -1) return true;
             }
-            if (/^(?:হাফেজ|মাওলানা|মুফতী|ক্বারী|মুহাদ্দিস)\b/m.test(clean)) {
-                return true;
-            }
+            if (/^(?:হাফেজ|মাওলানা|মুফতী|ক্বারী|মুহাদ্দিস)\b/m.test(clean)) return true;
         }
+        return false;
+    },
+
+    isBaniText: function(text) {
+        if (!text) return false;
+        if (this.hasStudentBiodata(text)) return false; // STRICT: Student biodata can NEVER be a quote
+        if (/^(?:বাণী|বানী|Bani)\s*[:\-]/i.test(text)) return true;
+        if (/(?:[-–—~]|\([^\)]*)\s*(?:মাও|মাওলানা|হযরত|মুফতী|মুফতি|শায়খ|শায়খ|ড\.|আল্লামা|মুহাদ্দিস|ইমাম|রাসূল|হাকিমুল|আদীব|বান্দা|ইবনে|আল\s*কোরআন|আল\s*কুরআন|আল\s*হাদিস|আল\s*হাদীস)/i.test(text)) return true;
+        if (/^[\s\r\n]*[-–—~]/.test(text)) return true;
+        if (/(?:তাকওয়া|তাকওয়া|সুন্নাত|সুন্নত|আমল|আল্লাহ|কুরআন|কোরআন|জান্নাত|জাহান্নাম|সাফল্য|সফলতা|আত্মশুদ্ধি|গুনাহ|পাপ|নেকী|মৃত্যু|কবর|ধৈর্য|অহংকার|চরিত্র|ইলম|সৎ মানুষ)/i.test(text)) return true;
+        if (/(?:রহঃ|রহ:|রহ\.|হাফিঃ|হাফি:|হাফি\.|দাঃবাঃ|দা\.বা\.)/.test(text)) return true;
         return false;
     },
 
@@ -615,6 +613,7 @@ var CardAutoFiller = {
         var candidateItems = [];
 
         var sel = doc.selection;
+        if (scope === "selection" && (!sel || sel.length === 0)) { scope = "artboard"; }
         var hasExplicitSelection = (scope === "selection" && sel && sel.length > 0);
 
         if (hasExplicitSelection) {
@@ -707,7 +706,7 @@ var CardAutoFiller = {
 
         // 3. Post-processing DUAL-BOX AUDIT & PAIRING
         var frameMode = options.frameMode || "auto";
-        if (frameMode !== "single_box") {
+        if (frameMode !== "single_box" && !options.isKeyring) {
             for (var cu = 0; cu < cardUnits.length; cu++) {
                 var cCard = cardUnits[cu];
 
@@ -716,13 +715,19 @@ var CardAutoFiller = {
                     var nGB = cCard.nameFrame.geometricBounds;
                     var nTop = nGB[1];
                     var nMidX = (nGB[0] + nGB[2]) / 2;
+                    var nTxt = cCard.nameFrame.contents || "";
+                    var isCombinedBox = this.hasStudentBiodata(nTxt) || cCard.nameFrame.lines.length >= 2;
+                    if (isCombinedBox) {
+                        // Already a combined Name + Details box, never pair a details frame below it
+                        continue;
+                    }
                     var bestDet = null;
                     var minDetDist = 9999;
 
                     for (var at = 0; at < allTFs.length; at++) {
                         var atf = allTFs[at];
                         if (atf === cCard.nameFrame || atf === cCard.serialFrame || atf === cCard.baniFrame || this.isItemHidden(atf)) continue;
-                        if (this.isBackSideText(atf.contents)) continue;
+                        if (this.isBackSideText(atf.contents) || this.isBaniText(atf.contents)) continue;
                         var atgb = atf.geometricBounds;
                         var atMidX = (atgb[0] + atgb[2]) / 2;
                         var dy = nTop - atgb[1]; // positive downwards
@@ -836,11 +841,21 @@ var CardAutoFiller = {
 
                     if (!cCard.qtyFrame && !isYearNum) {
                         if (/^[০-৯0-9]+$/.test(dRaw.replace(/\s+/g, "")) && dRaw.length <= 4) {
-                            // Qty frames sit to the right edge or outside right of the card
-                            if (dtgb[0] > cgb[0] + 40) {
-                                var qDistY = Math.abs(dtgb[1] - cgb[1]);
-                                if (qDistY < minQtyDist && qDistY < 100) {
-                                    minQtyDist = qDistY;
+                            var cardBox = cCard.bounds || cgb;
+                            var cRight = cardBox[2];
+                            var cTopY = cardBox[1];
+                            var cBotY = cardBox[3];
+                            var dtCenterY = (dtgb[1] + dtgb[3]) / 2;
+
+                            // Number frame sits to the right of the card, or near right edge
+                            var isRightSide = (dtgb[0] > cardBox[0] + 40) && (dtgb[0] < cRight + 160);
+                            // Vertically aligned within or near card span
+                            var isVertAligned = (dtCenterY <= cTopY + 40) && (dtCenterY >= cBotY - 40);
+
+                            if (isRightSide && isVertAligned) {
+                                var distToRightEdge = Math.abs(dtgb[0] - cRight);
+                                if (distToRightEdge < minQtyDist) {
+                                    minQtyDist = distToRightEdge;
                                     bestQty = dtf;
                                 }
                             }
@@ -1035,7 +1050,19 @@ var CardAutoFiller = {
             candidateFrames.push(tf);
         }
 
-        // Sort candidate frames by Y coordinate descending (top-to-bottom):
+        // First pass: extract explicit Bani frames from candidates
+        var nonBaniCandidates = [];
+        for (var c = 0; c < candidateFrames.length; c++) {
+            var cTf = candidateFrames[c];
+            if (!card.baniFrame && this.isBaniText(cTf.contents)) {
+                card.baniFrame = cTf;
+            } else {
+                nonBaniCandidates.push(cTf);
+            }
+        }
+        candidateFrames = nonBaniCandidates;
+
+        // Sort remaining candidate frames by Y coordinate descending (top-to-bottom):
         candidateFrames.sort(function(a, b) {
             return b.geometricBounds[1] - a.geometricBounds[1];
         });
@@ -1044,86 +1071,24 @@ var CardAutoFiller = {
             card.nameFrame = candidateFrames[0];
             card.detailsFrame = null;
         } else if (candidateFrames.length >= 2) {
-            if (frameMode === "single_box") {
-                // Forced Single Box mode
+            var topHasBio = this.hasStudentBiodata(candidateFrames[0].contents);
+            var topHasMultiLines = candidateFrames[0].lines.length >= 2;
+            var isKeyringMode = (opts.isKeyring === true);
+
+            if (isKeyringMode || frameMode === "single_box" || topHasBio || topHasMultiLines) {
+                // Combined Box / Keyring mode: Top candidate holds Name + Details combined
                 card.nameFrame = candidateFrames[0];
                 card.detailsFrame = null;
-                if (candidateFrames.length > 1 && !card.baniFrame) card.baniFrame = candidateFrames[1];
-                for (var ex = 2; ex < candidateFrames.length; ex++) {
-                    try {
-                        candidateFrames[ex].contents = "";
-                        candidateFrames[ex].remove();
-                    } catch(e) {}
-                }
-            } else if (frameMode === "dual_box") {
-                // Forced Dual Box mode: Top is Name, Bottom is Details
-                card.nameFrame = candidateFrames[0];
-                card.detailsFrame = candidateFrames[1];
-                if (candidateFrames.length > 2 && !card.baniFrame && this.isBaniText(candidateFrames[2].contents)) {
-                    card.baniFrame = candidateFrames[2];
-                }
-                // Purge any ghost candidate frames
-                for (var ex = 2; ex < candidateFrames.length; ex++) {
-                    if (candidateFrames[ex] !== card.baniFrame) {
-                        try {
-                            candidateFrames[ex].contents = "";
-                            candidateFrames[ex].remove();
-                        } catch(e) {}
-                    }
+                if (!card.baniFrame) {
+                    // Bottom candidate is the dedicated quote/bani frame!
+                    card.baniFrame = candidateFrames[1];
                 }
             } else {
-                // Smart Auto-Detect Mode:
-                var topCandidate = candidateFrames[0];
-                var bottomCandidate = candidateFrames[1];
-
-                var topText = topCandidate.contents.replace(/^\s+|\s+$/g, "");
-                var bottomText = bottomCandidate.contents.replace(/^\s+|\s+$/g, "");
-
-                var topHasBio = this.hasStudentBiodata(topText) || /(?:পিতা|মাতা|গ্রাম|ডাক|উপজেলা|জেলা|মোবাইল|ফোন|রক্ত|01[3-9]\d{8}|০১[৩-৯][০-৯]{8})/i.test(topText);
-                var bottomHasBio = this.hasStudentBiodata(bottomText) || /(?:পিতা|মাতা|গ্রাম|ডাক|উপজেলা|জেলা|মোবাইল|ফোন|রক্ত|01[3-9]\d{8}|০১[৩-৯][০-৯]{8})/i.test(bottomText);
-
-                var isTopBani = this.isBaniText(topText);
-                var isBottomBani = this.isBaniText(bottomText);
-
-                if (isBottomBani) {
-                    card.nameFrame = topCandidate;
-                    card.detailsFrame = null;
-                    card.baniFrame = bottomCandidate;
-                } else if (isTopBani) {
-                    card.baniFrame = topCandidate;
-                    card.nameFrame = bottomCandidate;
-                    card.detailsFrame = null;
-                } else if (!topHasBio && bottomHasBio) {
-                    // Classic Dual Box: Top is Name (1 line header), Bottom is Address/Details
-                    card.nameFrame = topCandidate;
-                    card.detailsFrame = bottomCandidate;
-                } else if (topHasBio && !bottomHasBio) {
-                    card.nameFrame = topCandidate;
-                    card.baniFrame = bottomCandidate;
-                    card.detailsFrame = null;
-                } else if (topCandidate.lines.length === 1 && bottomCandidate.lines.length >= 1) {
-                    // Top is single-line name header, bottom is details
-                    card.nameFrame = topCandidate;
-                    card.detailsFrame = bottomCandidate;
-                } else {
-                    // Default to Dual Box (Top = Name, Bottom = Details)
-                    card.nameFrame = topCandidate;
-                    card.detailsFrame = bottomCandidate;
-                }
-
-                if (candidateFrames.length > 2 && !card.baniFrame && this.isBaniText(candidateFrames[2].contents)) {
+                // True Dual Box mode (only when top box is strictly 1 single name line and 2nd box has details):
+                card.nameFrame = candidateFrames[0];
+                card.detailsFrame = candidateFrames[1];
+                if (candidateFrames.length > 2 && !card.baniFrame) {
                     card.baniFrame = candidateFrames[2];
-                }
-
-                // Purge any remaining ghost candidate text frames
-                for (var ex = 2; ex < candidateFrames.length; ex++) {
-                    var exCandidate = candidateFrames[ex];
-                    if (exCandidate !== card.nameFrame && exCandidate !== card.detailsFrame && exCandidate !== card.baniFrame) {
-                        try {
-                            exCandidate.contents = "";
-                            exCandidate.remove();
-                        } catch(e) {}
-                    }
                 }
             }
         }
@@ -1986,7 +1951,7 @@ var CardAutoFiller = {
         var userDetailsLeading = parseFloat(payload.detailsLeading);
         var layoutGrid = payload.layoutGrid || "auto";
         var frameMode = payload.frameMode || "auto";
-        var cards = this.detectCards(scope, order, { layoutGrid: layoutGrid, frameMode: frameMode });
+        var cards = this.detectCards(scope, order, { isKeyring: true, layoutGrid: layoutGrid, frameMode: frameMode });
         if (!cards.length) {
             return JSON.stringify({
                 status: "error",
@@ -2028,22 +1993,25 @@ var CardAutoFiller = {
         var solidBlackCMYK = new CMYKColor();
         solidBlackCMYK.cyan = 0; solidBlackCMYK.magenta = 0; solidBlackCMYK.yellow = 0; solidBlackCMYK.black = 100;
 
+        var keepTemplateStyle = (payload.keepTemplateStyle !== false);
         var userChosenColor = null;
-        if (isCMYK && payload.nameCmyk && payload.nameCmyk.length >= 4) {
-            var cVal = Math.max(0, Math.min(100, Math.round(Number(payload.nameCmyk[0]))));
-            var mVal = Math.max(0, Math.min(100, Math.round(Number(payload.nameCmyk[1]))));
-            var yVal = Math.max(0, Math.min(100, Math.round(Number(payload.nameCmyk[2]))));
-            var kVal = Math.max(0, Math.min(100, Math.round(Number(payload.nameCmyk[3]))));
-            var userCmyk = new CMYKColor();
-            userCmyk.cyan = cVal;
-            userCmyk.magenta = mVal;
-            userCmyk.yellow = yVal;
-            userCmyk.black = kVal;
-            userChosenColor = userCmyk;
-        } else if (payload.nameColor) {
-            var rawHex = String(payload.nameColor).replace(/[^0-9A-Fa-f]/g, "").toUpperCase();
-            if (rawHex.length === 3 || rawHex.length === 6) {
-                userChosenColor = this.hexToColor(rawHex, isCMYK);
+        if (!keepTemplateStyle) {
+            if (isCMYK && payload.nameCmyk && payload.nameCmyk.length >= 4) {
+                var cVal = Math.max(0, Math.min(100, Math.round(Number(payload.nameCmyk[0]))));
+                var mVal = Math.max(0, Math.min(100, Math.round(Number(payload.nameCmyk[1]))));
+                var yVal = Math.max(0, Math.min(100, Math.round(Number(payload.nameCmyk[2]))));
+                var kVal = Math.max(0, Math.min(100, Math.round(Number(payload.nameCmyk[3]))));
+                var userCmyk = new CMYKColor();
+                userCmyk.cyan = cVal;
+                userCmyk.magenta = mVal;
+                userCmyk.yellow = yVal;
+                userCmyk.black = kVal;
+                userChosenColor = userCmyk;
+            } else if (payload.nameColor) {
+                var rawHex = String(payload.nameColor).replace(/[^0-9A-Fa-f]/g, "").toUpperCase();
+                if (rawHex.length === 3 || rawHex.length === 6) {
+                    userChosenColor = this.hexToColor(rawHex, isCMYK);
+                }
             }
         }
 
@@ -2111,8 +2079,9 @@ var CardAutoFiller = {
                             if (nca.textFont) origNameFont = nca.textFont;
                             if (nca.size > 0) origNameSize = nca.size;
                             if (nca.leading > 0) origNameLeading = nca.leading;
+                            if (nca.horizontalScale > 0) origNameHScale = nca.horizontalScale;
                             origNameTracking = nca.tracking;
-                            if (!userChosenColor && nca.fillColor && nca.fillColor.typename !== "NoColor") {
+                            if (nca.fillColor && nca.fillColor.typename !== "NoColor") {
                                 origNameColor = nca.fillColor;
                             }
                         }
@@ -2137,6 +2106,7 @@ var CardAutoFiller = {
                             if (ddca.textFont) origDetFont = ddca.textFont;
                             if (ddca.size > 0) origDetSize = ddca.size;
                             if (ddca.leading > 0) origDetLeading = ddca.leading;
+                            if (ddca.horizontalScale > 0 && keepTemplateStyle) detailsHScale = ddca.horizontalScale;
                             origDetTracking = ddca.tracking;
                             if (ddca.fillColor && ddca.fillColor.typename !== "NoColor") {
                                 origDetColor = ddca.fillColor;
@@ -2145,11 +2115,12 @@ var CardAutoFiller = {
                     }
                 } catch(ne) {}
 
-                if (userChosenColor) origNameColor = userChosenColor;
-                if (hasCustomNameLeading) origNameLeading = userNameLeading;
-                if (hasCustomDetailsLeading) origDetLeading = userDetailsLeading;
+                if (!keepTemplateStyle && userChosenColor) origNameColor = userChosenColor;
+                if (!keepTemplateStyle && hasCustomNameLeading) origNameLeading = userNameLeading;
+                if (!keepTemplateStyle && hasCustomDetailsLeading) origDetLeading = userDetailsLeading;
 
-                var isSeparateDetFrame = (card.detailsFrame && card.detailsFrame !== card.nameFrame && card.detailsFrame !== card.baniFrame);
+                // In Keyrings, Name and Details (Father, Address, Mobile) are ALWAYS combined into the single biodata text frame
+                var isSeparateDetFrame = false;
 
                 if (!isSeparateDetFrame) {
                     // Single combined frame: Name (line 1) + Father (line 2) + Village (line 3) + Phone (line 4)
@@ -2281,31 +2252,48 @@ var CardAutoFiller = {
             }
 
             // 4. POPULATE BANI FRAME (if present)
-            if (fillBani && card.baniFrame && entry.bani && entry.bani.replace(/\s+/g, '').length > 0) {
-                var origBaniFont = null;
-                var origBaniSize = null;
-                var origBaniLeading = null;
-                var origBaniColor = null;
-
-                try {
-                    if (card.baniFrame.characters.length > 0) {
-                        var bca = card.baniFrame.characters[0].characterAttributes;
-                        origBaniFont = bca.textFont;
-                        origBaniSize = bca.size;
-                        origBaniLeading = bca.leading;
-                        origBaniColor = bca.fillColor;
+            if (fillBani && entry.bani && entry.bani.replace(/\s+/g, '').length > 0) {
+                var targetBaniFrame = card.baniFrame;
+                if (!targetBaniFrame && card.group && card.group.pageItems) {
+                    for (var bgi = 0; bgi < card.group.pageItems.length; bgi++) {
+                        var bgIt = card.group.pageItems[bgi];
+                        if (bgIt && bgIt.typename === "TextFrame" && !this.isItemHidden(bgIt)) {
+                            if (bgIt !== card.nameFrame && bgIt !== card.qtyFrame && bgIt !== card.badgeFrame && bgIt !== card.serialFrame) {
+                                targetBaniFrame = bgIt;
+                                card.baniFrame = bgIt;
+                                break;
+                            }
+                        }
                     }
-                } catch(be) {}
+                }
 
-                var cleanBani = entry.bani.split('\r\n').join('\r').split('\n').join('\r');
-                card.baniFrame.contents = cleanBani;
-                try {
-                    var bTr = card.baniFrame.textRange;
-                    if (origBaniFont) bTr.characterAttributes.textFont = origBaniFont;
-                    if (origBaniSize) bTr.characterAttributes.size = origBaniSize;
-                    if (origBaniLeading) bTr.characterAttributes.leading = origBaniLeading;
-                    if (origBaniColor) bTr.characterAttributes.fillColor = origBaniColor;
-                } catch(bStyErr) {}
+                if (targetBaniFrame) {
+                    var origBaniFont = null;
+                    var origBaniSize = null;
+                    var origBaniLeading = null;
+                    var origBaniColor = null;
+
+                    try {
+                        if (targetBaniFrame.characters.length > 0) {
+                            var bca = targetBaniFrame.characters[0].characterAttributes;
+                            origBaniFont = bca.textFont;
+                            origBaniSize = bca.size;
+                            origBaniLeading = bca.leading;
+                            origBaniColor = bca.fillColor;
+                        }
+                    } catch(be) {}
+
+                    var cleanBani = entry.bani.split('\r\n').join('\r').split('\n').join('\r');
+                    cleanBani = cleanBani.replace(/^(?:বাণী|বানী|Bani)\s*[:\-]\s*/i, '');
+                    targetBaniFrame.contents = cleanBani;
+                    try {
+                        var bTr = targetBaniFrame.textRange;
+                        if (origBaniFont) bTr.characterAttributes.textFont = origBaniFont;
+                        if (origBaniSize) bTr.characterAttributes.size = origBaniSize;
+                        if (origBaniLeading) bTr.characterAttributes.leading = origBaniLeading;
+                        if (origBaniColor) bTr.characterAttributes.fillColor = origBaniColor;
+                    } catch(bStyErr) {}
+                }
             }
 
             filledCount++;
@@ -2377,7 +2365,7 @@ var CardAutoFiller = {
 
         var layoutGrid = payload.layoutGrid || "auto";
         var frameMode = payload.frameMode || "auto";
-        var cards = this.detectCards(scope, order, { layoutGrid: layoutGrid, frameMode: frameMode });
+        var cards = this.detectCards(scope, order, { isKeyring: false, layoutGrid: layoutGrid, frameMode: frameMode });
         if (!cards.length) {
             return JSON.stringify({
                 status: "error",

@@ -53,9 +53,7 @@
     if (!fontReg && fontBold) fontReg = fontBold;
 
     if (!fontReg) {
-        alert("❌ ত্রুটি: Bornomala ফন্টটি Illustrator-এ খুঁজে পাওয়া যায়নি!
-
-দয়া করে ফন্ট ফোল্ডারে থাকা Bornomala-Regular.ttf এবং Bornomala-Bold.ttf ইনস্টল করুন।", "Bornomala Font Not Found");
+        alert("❌ ত্রুটি: Bornomala ফন্টটি Illustrator-এ খুঁজে পাওয়া যায়নি!\n\nদয়া করে ফন্ট ফোল্ডারে থাকা Bornomala-Regular.ttf এবং Bornomala-Bold.ttf ইনস্টল করুন।", "Bornomala Font Not Found");
         return;
     }
 
@@ -128,18 +126,11 @@
         }
     }
 
-    var msg = "🎉 সফল হয়েছে!
-
-";
-    msg += "• ডিফল্ট ফন্ট সেট করা হয়েছে: " + fontReg.name + "
-";
-    if (fontBold) msg += "• বোল্ড স্টাইল যুক্ত করা হয়েছে: " + fontBold.name + "
-";
-    msg += "• ওপেন থাকা ডকুমেন্ট আপডেট: " + app.documents.length + " টি
-";
-    msg += "• আপডেট করা টেমপ্লেট প্রোফাইল সংখ্যা: " + updatedCount + " টি
-
-";
+    var msg = "🎉 সফল হয়েছে!\n\n";
+    msg += "• ডিফল্ট ফন্ট সেট করা হয়েছে: " + fontReg.name + "\n";
+    if (fontBold) msg += "• বোল্ড স্টাইল যুক্ত করা হয়েছে: " + fontBold.name + "\n";
+    msg += "• ওপেন থাকা ডকুমেন্ট আপডেট: " + app.documents.length + " টি\n";
+    msg += "• আপডেট করা টেমপ্লেট প্রোফাইল সংখ্যা: " + updatedCount + " টি\n\n";
     msg += "এখন থেকে নতুন টেক্সট বক্স নিলে বা যেকোনো নতুন ফাইল (Cmd+N) তৈরি করলেই ডিফল্ট ফন্ট হিসেবে Bornomala আসবে!";
 
     alert(msg, "Bornomala Default Font Configured");

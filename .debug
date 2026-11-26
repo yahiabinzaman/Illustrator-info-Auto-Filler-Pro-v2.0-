@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ExtensionList>
-    <Extension Id="com.colorlab.cardautofiller.panel">
+    <Extension Id="com.colorlab.autofillerpro.panel">
         <HostList>
             <Host Name="ILST" Port="8088"/>
         </HostList>

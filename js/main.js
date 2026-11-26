@@ -1,7 +1,7 @@
 /**
- * Illustrator Name & Bio Card Auto-Filler Engine
+ * Auto Filler Pro — ColorLab Edition
  * Author: Yahia Bin Zaman (https://github.com/yahiabinzaman)
- * Version: 2.8.0 Pro - Dual Mode: Keyring Filler & Diary Filler
+ * Version: 3.0.0 Pro — Keyring, Diary / ID, Duplicator & Canvas Move Engine
  */
 
 (function() {
@@ -404,6 +404,13 @@
         };
     }
 
+    function setBtnLabel(btn, text) {
+        if (!btn) return;
+        var lbl = btn.querySelector('.btn-label');
+        if (lbl) lbl.textContent = text;
+        else btn.textContent = text;
+    }
+
     function showToast(message, type) {
         var toast = document.getElementById('panelToast');
         if (!toast) return;
@@ -498,7 +505,8 @@
     // ==========================================
     var serialLineRegex = /^(?:[০-৯0-9]{1,4}|[০-৯0-9]{1,4}[\.\-\)\:]|[০-৯0-9]{1,4}\s*[\.\-\)\:])$/;
     var serialPrefixRegex = /^(?:[০-৯0-9]{1,4}[\.\-\)\:]\s*|[০-৯0-9]{1,4}\s+)/;
-    var qtyRegex = /(?:পরিমাণ|পরিমান|সংখ্যা|পিস|Pcs|Qty|Quantity|Order)\s*[:\-\s]?\s*([০-৯0-9]+)/i;
+    var qtyRegex = /(?:পরিমাণ|পরিমান|সংখ্যা|পিস|রিংস|রিং|কিরিং|কি-রিং|Pcs|Qty|Quantity|Order)\s*[:\-\s]?\s*([০-৯0-9]+)/i;
+    var inlineQtyRegex = /[-–—•,\(]?\s*(?:রিংস|রিং|কিরিং|কি-রিং|পরিমাণ|পরিমান|সংখ্যা|পিস|Pcs|Qty|Quantity|Order)\s*[:\-\s]?\s*([০-৯0-9]+)(?:\s*(?:পিস|টি|Pcs))?\s*[\)]?$/i;
     var baniRegex = /^(?:বাণী|বানী|Bani|বাণী\s*[:\-])\s*(.*)/i;
     var formRegex = /^(?:ফরম|ফরম\s*নম্বর|ফরম\s*নং|দাখেলা|রোল|Form|Roll|No\.?|‡¶´|‡dvi|diBk|‡ivj)\s*[:\-\s]?\s*(.+)/i;
 
@@ -518,8 +526,16 @@
             } else {
                 var isSerial = serialLineRegex.test(line) && line.replace(/\D/g, '').length < 6;
                 if (curLines.length >= 2 && isSerial) {
-                    blocks.push(curLines);
-                    curLines = [line];
+                    var curHasSerial = serialLineRegex.test(curLines[0]);
+                    var nextLine = (i + 1 < lines.length) ? lines[i + 1].trim() : "";
+                    var nextLooksLikeName = nextLine && !serialLineRegex.test(nextLine);
+
+                    if (curHasSerial && !nextLooksLikeName) {
+                        curLines.push(line);
+                    } else {
+                        blocks.push(curLines);
+                        curLines = [line];
+                    }
                 } else {
                     curLines.push(line);
                 }
@@ -558,6 +574,15 @@
                     baniLines.push(lText);
                     continue;
                 }
+
+                // Check inline quantity (e.g. "মোবাইল: ০১৩০৪০৩৩৬৪৩ - রিংস ১২" or "রিংস ১২")
+                var iqm = lText.match(inlineQtyRegex);
+                if (iqm) {
+                    item.qty = iqm[1];
+                    lText = lText.replace(inlineQtyRegex, '').replace(/[-–—•,:\s]+$/, '').trim();
+                    if (!lText) continue;
+                }
+
                 var qm = lText.match(qtyRegex);
                 if (qm) {
                     item.qty = qm[1];
@@ -575,6 +600,15 @@
                 }
 
                 nonMeta.push(lText);
+            }
+
+            // If still no qty found, check if last non-meta line is just a standalone count (e.g. "৫০" or "১২")
+            if (!item.qty && nonMeta.length > 1) {
+                var lastL = nonMeta[nonMeta.length - 1];
+                if (/^[০-৯0-9]{1,4}$/.test(lastL)) {
+                    item.qty = lastL;
+                    nonMeta.pop();
+                }
             }
 
             if (baniLines.length > 0) {
@@ -726,21 +760,23 @@
 
             var skipFilled = chkSkipFilled ? chkSkipFilled.checked : false;
             var autoRemove = chkAutoRemove ? chkAutoRemove.checked : true;
+            var chkKeepTemplateStyle = document.getElementById('chkKeepTemplateStyleKeyring');
+            var keepTemplateStyle = chkKeepTemplateStyle ? chkKeepTemplateStyle.checked : true;
 
             var inputDetHScale = document.getElementById('inputDetailsHScaleKeyring');
             var inputNmHScale = document.getElementById('inputNameHScaleKeyring');
-            var detHScale = inputDetHScale ? (parseFloat(inputDetHScale.value) || 85) : 85;
+            var detHScale = inputDetHScale ? (parseFloat(inputDetHScale.value) || 100) : 100;
             var nmHScale = inputNmHScale ? (parseFloat(inputNmHScale.value) || 100) : 100;
 
             var inputDetLead = document.getElementById('inputDetailsLeadingKeyring');
             var inputNmLead = document.getElementById('inputNameLeadingKeyring');
-            var detLead = inputDetLead ? inputDetLead.value.trim() : "9.6";
+            var detLead = inputDetLead ? inputDetLead.value.trim() : "Auto";
             var nmLead = inputNmLead ? inputNmLead.value.trim() : "Auto";
 
             var chkAutoFitK = document.getElementById('chkAutoFitKeyring');
             var inputSafeWidthK = document.getElementById('inputSafeWidthKeyring');
             var inputMinHScaleK = document.getElementById('inputMinHScaleKeyring');
-            var autoFitK = chkAutoFitK ? chkAutoFitK.checked : true;
+            var autoFitK = chkAutoFitK ? chkAutoFitK.checked : false;
             var safeWidthK = inputSafeWidthK ? (parseFloat(inputSafeWidthK.value) || 45) : 45;
             var minHScaleK = inputMinHScaleK ? (parseFloat(inputMinHScaleK.value) || 60) : 60;
 
@@ -750,6 +786,7 @@
             var frameModeK = selectFrameModeK ? selectFrameModeK.value : "auto";
 
             var payload = {
+                keepTemplateStyle: keepTemplateStyle,
                 autoFit: autoFitK,
                 safeWidthMm: safeWidthK,
                 minHScale: minHScaleK,
@@ -777,7 +814,7 @@
 
             if (btnAutoFill) {
                 btnAutoFill.disabled = true;
-                btnAutoFill.textContent = 'Populating Keyring Cards...';
+                setBtnLabel(btnAutoFill, 'Populating Keyring Cards...');
             }
 
             var payloadStr = encodeURIComponent(JSON.stringify(payload));
@@ -786,7 +823,7 @@
             evalHostScript(scriptCall, function(resStr) {
                 if (btnAutoFill) {
                     btnAutoFill.disabled = false;
-                    btnAutoFill.textContent = 'Auto Fill Keyring Cards';
+                    setBtnLabel(btnAutoFill, 'Auto Fill Keyring Cards');
                 }
 
                 try {
@@ -819,7 +856,7 @@
         } catch(err) {
             if (btnAutoFill) {
                 btnAutoFill.disabled = false;
-                btnAutoFill.textContent = 'Auto Fill Keyring Cards';
+                setBtnLabel(btnAutoFill, 'Auto Fill Keyring Cards');
             }
             showToast('Error: ' + err.message, 'error');
         }
@@ -1016,7 +1053,7 @@
 
             if (btnAutoFill) {
                 btnAutoFill.disabled = true;
-                btnAutoFill.textContent = 'Populating Diary Names...';
+                setBtnLabel(btnAutoFill, 'Populating Diary Names...');
             }
 
             var payloadStr = encodeURIComponent(JSON.stringify(payload));
@@ -1025,7 +1062,7 @@
             evalHostScript(scriptCall, function(resStr) {
                 if (btnAutoFill) {
                     btnAutoFill.disabled = false;
-                    btnAutoFill.textContent = 'Auto Fill Diary Names';
+                    setBtnLabel(btnAutoFill, 'Auto Fill Diary Names');
                 }
 
                 try {
@@ -1058,7 +1095,7 @@
         } catch(err) {
             if (btnAutoFill) {
                 btnAutoFill.disabled = false;
-                btnAutoFill.textContent = 'Auto Fill Diary Names';
+                setBtnLabel(btnAutoFill, 'Auto Fill Diary Names');
             }
             showToast('Error: ' + err.message, 'error');
         }
@@ -1121,7 +1158,7 @@
 
         if (btnRun) {
             btnRun.disabled = true;
-            btnRun.textContent = 'Generating Templates...';
+            setBtnLabel(btnRun, 'Generating Templates...');
         }
 
         var payloadStr = encodeURIComponent(JSON.stringify(payload));
@@ -1129,7 +1166,7 @@
         evalHostScript(scriptCall, function(resStr) {
             if (btnRun) {
                 btnRun.disabled = false;
-                btnRun.textContent = 'Duplicate Templates & Create Artboards';
+                setBtnLabel(btnRun, 'Duplicate Templates & Create Artboards');
             }
             try {
                 var res = JSON.parse(resStr);
@@ -1177,7 +1214,7 @@
 
         if (btnPlace) {
             btnPlace.disabled = true;
-            btnPlace.textContent = 'Moving Text into Cards...';
+            setBtnLabel(btnPlace, 'Moving Text into Cards...');
         }
 
         var payloadStr = encodeURIComponent(JSON.stringify(payload));
@@ -1185,7 +1222,7 @@
         evalHostScript(scriptCall, function(resStr) {
             if (btnPlace) {
                 btnPlace.disabled = false;
-                btnPlace.textContent = 'Move & Place Text into Cards';
+                setBtnLabel(btnPlace, 'Move & Place Text into Cards');
             }
             try {
                 var res = JSON.parse(resStr);

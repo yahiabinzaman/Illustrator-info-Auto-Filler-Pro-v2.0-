@@ -1,6 +1,24 @@
 # Changelog
 
-All notable changes to the **Illustrator Name & Card Auto-Filler Pro** extension will be documented in this file.
+All notable changes to **Auto Filler Pro (ColorLab Edition)** will be documented in this file.
+
+## [3.0.0 Pro] - 2026-11-26
+
+### Rebranded & Unified
+- **Rebranded to Auto Filler Pro (`com.colorlab.autofillerpro`)**:
+  - Consolidated legacy `Keyring Auto-Filler Pro` and `Name & Card Auto-Filler` variants into a single unified extension under `Window > Extensions > Auto Filler Pro`.
+  - Redesigned panel UI with Apple-native macOS dark styling (`css/style.css`), branded header (`v3.0`), SVG action buttons, and clean ColorLab footer.
+  - Generated custom **Auto Filler Pro** icon suite (`generate_icons.py`, `icons/icon-*.png`).
+- **Streamlined Installers & Repository**:
+  - Added 1-line installers (`install.sh` for macOS, `install.ps1` for Windows PowerShell) with automatic legacy duplicate cleanup.
+  - Replaced duplicate installer scripts with unified `Install_Mac.command`, `Install_Windows.bat`, and `Install_Auto_Filler_Pro.jsx`.
+  - Fixed string newline syntax errors in `Set_Bornomala_Default.jsx`.
+  - Removed redundant 26 MB `.zip` bundle and old variant clones from the repository.
+- **Keyring & Engine Improvements**:
+  - Enhanced `hasStudentBiodata` vs `isBaniText` classifier so student details are never misidentified as quotes.
+  - Added inline (`রিংস ১২`, `পরিমাণ: ২৫ পিস`) and trailing standalone quantity parsing in `main.js`.
+  - Added `keepTemplateStyle` toggle in Keyring mode and refined `fitTextFrameToWidth` safe-margin scaling.
+  - Improved synchronous UTF-8 clipboard paste (`pbpaste` / PowerShell `Get-Clipboard`) and form number vertical layout alignment.
 
 ## [2.4.4 Pro] - 2026-09-05
 

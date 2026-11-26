@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<ExtensionManifest Version="7.0" ExtensionBundleId="com.colorlab.cardautofiller" ExtensionBundleVersion="1.0.0"
-    ExtensionBundleName="Name &amp; Card Auto-Filler" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+<ExtensionManifest Version="7.0" ExtensionBundleId="com.colorlab.autofillerpro" ExtensionBundleVersion="3.0.0"
+    ExtensionBundleName="Auto Filler Pro" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
     <ExtensionList>
-        <Extension Id="com.colorlab.cardautofiller.panel" Version="1.0.0" />
+        <Extension Id="com.colorlab.autofillerpro.panel" Version="3.0.0" />
     </ExtensionList>
     <ExecutionEnvironment>
         <HostList>
@@ -16,7 +16,7 @@
         </RequiredRuntimeList>
     </ExecutionEnvironment>
     <DispatchInfoList>
-        <Extension Id="com.colorlab.cardautofiller.panel">
+        <Extension Id="com.colorlab.autofillerpro.panel">
             <DispatchInfo>
                 <Resources>
                     <MainPath>./index.html</MainPath>
@@ -31,15 +31,15 @@
                 </Lifecycle>
                 <UI>
                     <Type>Panel</Type>
-                    <Menu>Name &amp; Card Auto-Filler</Menu>
+                    <Menu>Auto Filler Pro</Menu>
                     <Geometry>
                         <Size>
-                            <Height>680</Height>
-                            <Width>440</Width>
+                            <Height>720</Height>
+                            <Width>450</Width>
                         </Size>
                         <MinSize>
-                            <Height>450</Height>
-                            <Width>340</Width>
+                            <Height>480</Height>
+                            <Width>360</Width>
                         </MinSize>
                         <MaxSize>
                             <Height>1400</Height>
