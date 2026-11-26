@@ -98,7 +98,7 @@
     }
 
     // 2. Scan and update all New Document Profiles across Adobe Illustrator installations
-    var versions = ["30", "29", "28", "27", "26"];
+    var versions = ["30", "29", "28", "27", "26", "25", "24", "23", "22", "20"];
     var locales = ["en_US", "en_GB", "en_AE", "en_IL"];
 
     for (var v = 0; v < versions.length; v++) {

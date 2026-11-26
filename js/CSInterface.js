@@ -3,7 +3,15 @@
  */
 function CSInterface() {}
 
-CSInterface.prototype.hostEnvironment = window.__adobe_cep__ ? JSON.parse(window.__adobe_cep__.getHostEnvironment()) : null;
+CSInterface.prototype.hostEnvironment = (function() {
+    try {
+        return (typeof window !== "undefined" && window.__adobe_cep__)
+            ? JSON.parse(window.__adobe_cep__.getHostEnvironment())
+            : null;
+    } catch (e) {
+        return null;
+    }
+})();
 
 CSInterface.prototype.evalScript = function(script, callback) {
     if (window.__adobe_cep__) {
@@ -59,12 +67,26 @@ var SystemPath = {
 };
 
 CSInterface.prototype.getSystemPath = function(pathType) {
-    var path = decodeURI(window.__adobe_cep__ ? window.__adobe_cep__.getSystemPath(pathType) : "");
-    var OSVersion = this.hostEnvironment ? this.hostEnvironment.OSVersion : "";
-    if (OSVersion.indexOf("Windows") >= 0) {
-        path = path.replace("file:///", "");
-    } else if (OSVersion.indexOf("Mac") >= 0) {
-        path = path.replace("file://", "");
+    var rawPath = (typeof window !== "undefined" && window.__adobe_cep__)
+        ? window.__adobe_cep__.getSystemPath(pathType)
+        : "";
+    var path = rawPath;
+    try {
+        path = decodeURI(rawPath);
+    } catch (e) {
+        path = rawPath;
+    }
+    var OSVersion = (this.hostEnvironment && this.hostEnvironment.OSVersion) ? this.hostEnvironment.OSVersion : "";
+    var isWin = OSVersion.indexOf("Windows") >= 0 ||
+        (typeof navigator !== "undefined" && navigator.platform && navigator.platform.indexOf("Win") >= 0) ||
+        /^file:\/\/\/?(?:localhost\/)?[A-Za-z]:/i.test(path) ||
+        /^[A-Za-z]:[\\\/]/.test(path);
+    if (isWin) {
+        path = path.replace(/^file:\/\/\/?(?:localhost\/)?/i, "");
+        path = path.replace(/^\/([A-Za-z]:)/, "$1");
+        path = path.replace(/\\/g, "/");
+    } else if (OSVersion.indexOf("Mac") >= 0 || path.indexOf("file://") === 0) {
+        path = path.replace(/^file:\/\/(?:localhost)?/i, "");
     }
     return path;
 };

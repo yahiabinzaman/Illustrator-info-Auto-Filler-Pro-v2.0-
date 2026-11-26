@@ -1,11 +1,35 @@
 /**
  * Auto Filler Pro — ColorLab Edition
  * Author: Yahia Bin Zaman (https://github.com/yahiabinzaman)
- * Version: 3.2.0 Pro — Keyring, Diary / ID, Note Bani, Duplicator & Canvas Move Engine
+ * Version: 3.3.0 Pro — Cross-Platform Windows/macOS & Illustrator 20–2026+ Engine
  */
 
 (function() {
     'use strict';
+
+    // Polyfill NodeList.prototype.forEach for Chrome 41 (Illustrator CC 2015.3 / v20)
+    if (typeof NodeList !== 'undefined' && NodeList.prototype && !NodeList.prototype.forEach) {
+        NodeList.prototype.forEach = Array.prototype.forEach;
+    }
+
+    function copyEnv(extra) {
+        var out = {};
+        if (typeof process !== 'undefined' && process.env) {
+            for (var k in process.env) {
+                if (Object.prototype.hasOwnProperty.call(process.env, k)) {
+                    out[k] = process.env[k];
+                }
+            }
+        }
+        if (extra) {
+            for (var ek in extra) {
+                if (Object.prototype.hasOwnProperty.call(extra, ek)) {
+                    out[ek] = extra[ek];
+                }
+            }
+        }
+        return out;
+    }
 
     var csInterface = new CSInterface();
     var bnDigits = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
@@ -15,60 +39,71 @@
     // ==========================================
     try {
         var keyEventsInterest = [];
-        for (var k = 0; k <= 255; k++) {
-            keyEventsInterest.push({ keyCode: k, ctrlKey: false, altKey: false, shiftKey: false, metaKey: true }); // Mac Cmd
-            keyEventsInterest.push({ keyCode: k, ctrlKey: true, altKey: false, shiftKey: false, metaKey: false });  // Win Ctrl
-            keyEventsInterest.push({ keyCode: k, ctrlKey: true, altKey: false, shiftKey: true, metaKey: false });   // Win Ctrl+Shift
-            keyEventsInterest.push({ keyCode: k, ctrlKey: false, altKey: false, shiftKey: true, metaKey: true });  // Mac Cmd+Shift
+        // Targeted edit shortcuts (A, C, V, X, Y, Z) so Illustrator shortcuts remain intact
+        var editKeyCodes = [65, 67, 86, 88, 89, 90];
+        for (var ki = 0; ki < editKeyCodes.length; ki++) {
+            var kc = editKeyCodes[ki];
+            keyEventsInterest.push({ keyCode: kc, ctrlKey: false, altKey: false, shiftKey: false, metaKey: true });  // Mac Cmd
+            keyEventsInterest.push({ keyCode: kc, ctrlKey: true, altKey: false, shiftKey: false, metaKey: false });  // Win Ctrl
+            keyEventsInterest.push({ keyCode: kc, ctrlKey: true, altKey: false, shiftKey: true, metaKey: false });   // Win Ctrl+Shift
+            keyEventsInterest.push({ keyCode: kc, ctrlKey: false, altKey: false, shiftKey: true, metaKey: true });   // Mac Cmd+Shift
         }
+        keyEventsInterest.push({ keyCode: 45, ctrlKey: false, altKey: false, shiftKey: true, metaKey: false });      // Win Shift+Insert
+        keyEventsInterest.push({ keyCode: 45, ctrlKey: true, altKey: false, shiftKey: false, metaKey: false });      // Win Ctrl+Insert
         if (window.__adobe_cep__ && window.__adobe_cep__.registerKeyEventsInterest) {
             window.__adobe_cep__.registerKeyEventsInterest(JSON.stringify(keyEventsInterest));
         }
     } catch (e) {}
 
+    function stripBom(str) {
+        if (!str) return '';
+        return str.charAt(0) === '\uFEFF' ? str.slice(1) : str;
+    }
+
     function getSystemClipboardTextSync() {
         try {
-            if (typeof require !== 'undefined') {
+            if (typeof require !== 'undefined' && typeof process !== 'undefined') {
                 var cp = require('child_process');
-                var utf8Env = Object.assign({}, process.env, {
+                var utf8Env = copyEnv({
                     LANG: 'en_US.UTF-8',
                     LC_ALL: 'en_US.UTF-8'
                 });
 
                 if (process.platform === 'darwin') {
-                    try {
-                        var out = cp.execSync('/usr/bin/pbpaste -Prefer utf8', {
-                            env: utf8Env,
-                            encoding: 'utf8',
-                            maxBuffer: 20 * 1024 * 1024
-                        });
-                        if (out && out.length > 0) return out;
-                    } catch(pbe1) {}
-
-                    try {
-                        var outTxt = cp.execSync('/usr/bin/pbpaste -Prefer txt', {
-                            env: utf8Env,
-                            encoding: 'utf8',
-                            maxBuffer: 20 * 1024 * 1024
-                        });
-                        if (outTxt && outTxt.length > 0) return outTxt;
-                    } catch(pbe2) {}
-
-                    try {
-                        var outPlain = cp.execSync('/usr/bin/pbpaste', {
-                            env: utf8Env,
-                            encoding: 'utf8',
-                            maxBuffer: 20 * 1024 * 1024
-                        });
-                        if (outPlain && outPlain.length > 0) return outPlain;
-                    } catch(pbe3) {}
+                    var pbpasteCmds = [
+                        '/usr/bin/pbpaste -Prefer utf8',
+                        '/usr/bin/pbpaste -Prefer txt',
+                        '/usr/bin/pbpaste'
+                    ];
+                    for (var pi = 0; pi < pbpasteCmds.length; pi++) {
+                        try {
+                            var out = cp.execSync(pbpasteCmds[pi], {
+                                env: utf8Env,
+                                encoding: 'utf8',
+                                maxBuffer: 20 * 1024 * 1024
+                            });
+                            if (out && out.length > 0) return stripBom(out);
+                        } catch (pbe) {}
+                    }
                 } else if (process.platform === 'win32') {
-                    var outWin = cp.execSync('powershell.exe -NoProfile -Command "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; Get-Clipboard -Raw"', {
-                        env: utf8Env,
-                        encoding: 'utf8',
-                        maxBuffer: 20 * 1024 * 1024
-                    });
-                    if (outWin !== undefined && outWin !== null) return outWin;
+                    var psCmd = '[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; ' +
+                        'try { Add-Type -AssemblyName System.Windows.Forms -ErrorAction SilentlyContinue; ' +
+                        'if ([System.Windows.Forms.Clipboard]::ContainsText()) { ' +
+                        '[System.Windows.Forms.Clipboard]::GetText([System.Windows.Forms.TextDataFormat]::UnicodeText); exit 0 } } catch {}; ' +
+                        'if (Get-Command Get-Clipboard -ErrorAction SilentlyContinue) { Get-Clipboard -Raw }';
+                    var outWin = cp.execSync(
+                        'powershell.exe -NoProfile -NonInteractive -WindowStyle Hidden -STA -Command "' + psCmd.replace(/"/g, '\\"') + '"',
+                        {
+                            env: utf8Env,
+                            encoding: 'utf8',
+                            windowsHide: true,
+                            maxBuffer: 20 * 1024 * 1024
+                        }
+                    );
+                    if (outWin !== undefined && outWin !== null) {
+                        var cleaned = stripBom(String(outWin).replace(/\r\n/g, '\n'));
+                        return cleaned;
+                    }
                 }
             }
         } catch (ne) {}
@@ -98,21 +133,26 @@
     function setSystemClipboardText(text) {
         if (!text) return;
         try {
-            if (typeof require !== 'undefined') {
+            if (typeof require !== 'undefined' && typeof process !== 'undefined') {
                 var cp = require('child_process');
-                var utf8Env = Object.assign({}, process.env, {
+                var utf8Env = copyEnv({
                     LANG: 'en_US.UTF-8',
                     LC_ALL: 'en_US.UTF-8'
                 });
                 if (process.platform === 'darwin') {
-                    var proc = cp.spawn('/usr/bin/pbcopy', [], { env: utf8Env });
-                    proc.stdin.write(text, 'utf8');
-                    proc.stdin.end();
+                    var procMac = cp.spawn('/usr/bin/pbcopy', [], { env: utf8Env });
+                    procMac.stdin.write(text, 'utf8');
+                    procMac.stdin.end();
                     return;
                 } else if (process.platform === 'win32') {
-                    var proc = cp.spawn('clip', [], { env: utf8Env });
-                    proc.stdin.write(text, 'utf8');
-                    proc.stdin.end();
+                    // Windows clip.exe expects UTF-16LE with BOM for Bangla/Arabic Unicode text
+                    var utf16Payload = '\uFEFF' + String(text).replace(/\r?\n/g, '\r\n');
+                    var utf16Buf = (typeof Buffer !== 'undefined' && typeof Buffer.from === 'function')
+                        ? Buffer.from(utf16Payload, 'utf16le')
+                        : new Buffer(utf16Payload, 'utf16le');
+                    var procWin = cp.spawn('clip', [], { env: utf8Env, windowsHide: true });
+                    procWin.stdin.write(utf16Buf);
+                    procWin.stdin.end();
                     return;
                 }
             }
@@ -285,9 +325,9 @@
 
         if (key === 'v' || keyCode === 86) {
             if (isInput) {
-                e.preventDefault();
                 var clipText = getSystemClipboardTextSync();
                 if (clipText) {
+                    e.preventDefault();
                     insertTextIntoElement(active, clipText, false);
                     if (active.id === 'rawTextInputDiary') {
                         var rawK = document.getElementById('rawTextInputKeyring');
@@ -300,23 +340,6 @@
                     } else if (active.id === 'rawTextInputNoteBani') {
                         parseNoteBaniInput();
                     }
-                } else {
-                    getSystemClipboardText(function(text) {
-                        if (text) {
-                            insertTextIntoElement(active, text, false);
-                            if (active.id === 'rawTextInputDiary') {
-                                var rawK = document.getElementById('rawTextInputKeyring');
-                                if (rawK) rawK.value = active.value;
-                                parseDiaryInput();
-                            } else if (active.id === 'rawTextInputKeyring') {
-                                var rawD = document.getElementById('rawTextInputDiary');
-                                if (rawD) rawD.value = active.value;
-                                parseKeyringInput();
-                            } else if (active.id === 'rawTextInputNoteBani') {
-                                parseNoteBaniInput();
-                            }
-                        }
-                    });
                 }
             }
         } else if (key === 'a' || keyCode === 65) {
@@ -384,14 +407,15 @@
         try {
             extPath = csInterface.getSystemPath(SystemPath.EXTENSION).replace(/\\/g, '/');
         } catch(e) {}
-        
+
         var fullCode = '';
         if (extPath) {
-            fullCode = 'if (typeof CardAutoFiller === "undefined" || typeof __AUTOFILLER_VER__ === "undefined" || __AUTOFILLER_VER__ !== "3.2.0") { try { $.evalFile(new File("' + extPath + '/jsx/hostscript.jsx")); } catch(_e) { try { var _f = new File("' + extPath + '/jsx/hostscript.jsx"); if (_f.exists) { _f.encoding = "UTF-8"; _f.open("r"); var _c = _f.read().replace(/^\\s*#[^\\r\\n]*/gm, ""); _f.close(); eval(_c); } } catch(_e2) {} } } ' + code;
+            var jsxLiteral = JSON.stringify(extPath + '/jsx/hostscript.jsx');
+            fullCode = 'if (typeof CardAutoFiller === "undefined" || typeof __AUTOFILLER_VER__ === "undefined" || __AUTOFILLER_VER__ !== "3.3.0") { try { $.evalFile(new File(' + jsxLiteral + ')); } catch(_e) { try { var _f = new File(' + jsxLiteral + '); if (_f.exists) { _f.encoding = "UTF-8"; _f.open("r"); var _c = _f.read().replace(/^\\s*#[^\\r\\n]*/gm, ""); _f.close(); eval(_c); } } catch(_e2) {} } } ' + code;
         } else {
             fullCode = code;
         }
-        
+
         csInterface.evalScript(fullCode, callback);
     }
 
@@ -503,10 +527,15 @@
         };
     }
 
+    function pad2Hex(n) {
+        var h = Math.max(0, Math.min(255, Math.round(n))).toString(16);
+        return h.length < 2 ? ('0' + h) : h;
+    }
+
     function rgbToHex(r, g, b) {
-        var hexR = r.toString(16).padStart(2, '0');
-        var hexG = g.toString(16).padStart(2, '0');
-        var hexB = b.toString(16).padStart(2, '0');
+        var hexR = pad2Hex(r);
+        var hexG = pad2Hex(g);
+        var hexB = pad2Hex(b);
         return ('#' + hexR + hexG + hexB).toUpperCase();
     }
 

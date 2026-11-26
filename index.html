@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Auto Filler Pro — ColorLab</title>
-    <link rel="stylesheet" href="css/style.css?v=3.2.0">
+    <link rel="stylesheet" href="css/style.css?v=3.3.0">
     <script>
     function switchTab(tabId) {
         if (!tabId) return;
@@ -34,7 +34,7 @@
         try {
             var cs = new CSInterface();
             var extPath = cs.getSystemPath(SystemPath.EXTENSION).replace(/\\/g, '/');
-            var loadScript = "try { $.evalFile(new File('" + extPath + "/jsx/hostscript.jsx')); } catch(e) {}";
+            var loadScript = "try { $.evalFile(new File(" + JSON.stringify(extPath + "/jsx/hostscript.jsx") + ")); } catch(e) {}";
             cs.evalScript(loadScript, function() {
                 var url = window.location.href.split('?')[0] + '?t=' + new Date().getTime();
                 window.location.href = url;
@@ -54,7 +54,7 @@
             <div class="brand-title">
                 <span>Auto Filler Pro</span>
                 <span class="brand-sub">ColorLab</span>
-                <span class="version-badge">v3.2</span>
+                <span class="version-badge">v3.3</span>
             </div>
         </div>
         <div class="header-actions">
@@ -86,7 +86,7 @@
             <div class="section-box">
                 <div class="section-header">
                     <span class="section-title">Data List (Unicode / ANSI)</span>
-                    <div style="display: flex; gap: 4px;">
+                    <div class="flex-row gap-4">
                         <button type="button" id="btnPasteKeyring" class="btn btn-sm btn-accent" title="Paste text from clipboard">📋 Paste</button>
                         <button type="button" id="btnLoadSampleKeyring" class="btn btn-sm">Sample</button>
                         <button type="button" id="btnClearKeyring" class="btn btn-sm">Clear</button>
@@ -165,7 +165,7 @@ Example:
                         <span>⚙️ ঐচ্ছিক অ্যাডভান্সড সেটিংস (কালার / স্কেল / বাণী)</span>
                         <span>▾</span>
                     </summary>
-                    <div style="display: flex; flex-direction: column; gap: 7px;">
+                    <div class="flex-col gap-7">
                         <input type="hidden" id="selectLayoutGridKeyring" value="auto">
                         <input type="hidden" id="selectFrameModeKeyring" value="auto">
 
@@ -175,9 +175,9 @@ Example:
                         </label>
 
                         <div class="control-group">
-                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div class="flex-between">
                                 <label>Name Color (কালার পরিবর্তন করতে চাইলে)</label>
-                                <span id="labelColorNameKeyring" style="font-size: 10px; color: var(--text-secondary); font-family: monospace;">#A22F10</span>
+                                <span id="labelColorNameKeyring" style="font-size: 10px; color: #98989d; font-family: monospace;">#A22F10</span>
                             </div>
                             <div class="color-picker-wrapper">
                                 <input type="color" id="colorPickerKeyring" value="#A22F10" class="color-input-native" title="Choose color">
@@ -187,7 +187,7 @@ Example:
                                 </button>
                             </div>
                             <div class="cmyk-control-bar">
-                                <span style="color: var(--text-secondary); font-weight: 600;">CMYK:</span>
+                                <span style="color: #98989d; font-weight: 600;">CMYK:</span>
                                 <label>C: <input type="number" id="inputColorC_Keyring" min="0" max="100" value="20">%</label>
                                 <label>M: <input type="number" id="inputColorM_Keyring" min="0" max="100" value="90">%</label>
                                 <label>Y: <input type="number" id="inputColorY_Keyring" min="0" max="100" value="100">%</label>
@@ -213,7 +213,7 @@ Example:
                             </div>
                             <div class="control-group">
                                 <label for="inputStartIndexKeyring">Start Entry #</label>
-                                <div style="display: flex; gap: 4px; align-items: center;">
+                                <div class="flex-row gap-4">
                                     <input type="number" id="inputStartIndexKeyring" value="1" min="1" style="width: 52px; text-align: center;">
                                     <button type="button" id="btnResetIndexKeyring" class="btn btn-sm" style="flex: 1;" title="Reset to #1">Reset</button>
                                 </div>
@@ -225,10 +225,10 @@ Example:
                                 <input type="checkbox" id="chkAutoFitKeyring">
                                 <span>Safe Margin Auto-Fit (প্রয়োজন হলে)</span>
                             </label>
-                            <div style="display: flex; gap: 6px; align-items: center;">
-                                <span style="font-size: 10px; color: var(--text-secondary);">Max Width:</span>
+                            <div class="flex-row gap-6">
+                                <span style="font-size: 10px; color: #98989d;">Max Width:</span>
                                 <input type="number" id="inputSafeWidthKeyring" min="10" max="500" step="0.5" value="45" style="width: 52px; text-align: center;">
-                                <span style="font-size: 10px; color: var(--text-tertiary);">mm</span>
+                                <span style="font-size: 10px; color: #636366;">mm</span>
                                 <button type="button" id="btnPickSafeWidthKeyring" class="btn btn-sm" style="margin-left: auto;">🎯 Pick</button>
                             </div>
                             <input type="hidden" id="inputMinHScaleKeyring" value="60">
@@ -262,7 +262,7 @@ Example:
             <div class="section-box">
                 <div class="section-header">
                     <span class="section-title">Data List (Unicode / ANSI)</span>
-                    <div style="display: flex; gap: 4px;">
+                    <div class="flex-row gap-4">
                         <button type="button" id="btnPasteDiary" class="btn btn-sm btn-accent" title="Paste text from clipboard">📋 Paste</button>
                         <button type="button" id="btnLoadSampleDiary" class="btn btn-sm">Sample</button>
                         <button type="button" id="btnClearDiary" class="btn btn-sm">Clear</button>
@@ -311,7 +311,7 @@ Example:
                     </div>
                     <div class="control-group">
                         <label for="inputStartIndexDiary">Start Entry #</label>
-                        <div style="display: flex; gap: 4px; align-items: center;">
+                        <div class="flex-row gap-4">
                             <input type="number" id="inputStartIndexDiary" value="1" min="1" style="width: 52px; text-align: center;">
                             <button type="button" id="btnResetIndexDiary" class="btn btn-sm" style="flex: 1;" title="Reset to #1">Reset</button>
                         </div>
@@ -339,9 +339,9 @@ Example:
                 </div>
 
                 <div class="control-group">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div class="flex-between">
                         <label>Name Color</label>
-                        <span id="labelColorNameDiary" style="font-size: 10px; color: var(--text-secondary); font-family: monospace;">#1E5AA8</span>
+                        <span id="labelColorNameDiary" style="font-size: 10px; color: #98989d; font-family: monospace;">#1E5AA8</span>
                     </div>
                     <div class="color-picker-wrapper">
                         <input type="color" id="colorPickerDiary" value="#1E5AA8" class="color-input-native">
@@ -351,7 +351,7 @@ Example:
                         </button>
                     </div>
                     <div class="color-swatch-bar">
-                        <span style="font-size: 9.5px; color: var(--text-tertiary);">Presets:</span>
+                        <span style="font-size: 9.5px; color: #636366;">Presets:</span>
                         <div class="color-swatch active" data-tab="diary" data-color="#1E5AA8" style="background:#1E5AA8;" title="Royal Blue"></div>
                         <div class="color-swatch" data-tab="diary" data-color="#000000" style="background:#000000;" title="Solid Black"></div>
                         <div class="color-swatch" data-tab="diary" data-color="#006F9A" style="background:#006F9A;" title="Deep Teal"></div>
@@ -364,7 +364,7 @@ Example:
                 <div class="grid-2">
                     <div class="control-group">
                         <label for="inputDetailsHScaleDiary">ঠিকানার স্কেল (Address Scale)</label>
-                        <div style="display: flex; gap: 3px; align-items: center; flex-wrap: wrap;">
+                        <div class="flex-row flex-wrap gap-3">
                             <input type="number" id="inputDetailsHScaleDiary" min="30" max="200" value="85" style="width: 46px; text-align: center; font-weight: bold;">
                             <button type="button" class="btn btn-sm btn-scale-preset" data-target="inputDetailsHScaleDiary" data-val="75">75%</button>
                             <button type="button" class="btn btn-sm btn-scale-preset" data-target="inputDetailsHScaleDiary" data-val="80">80%</button>
@@ -375,7 +375,7 @@ Example:
                     </div>
                     <div class="control-group">
                         <label for="inputNameHScaleDiary">নামের স্কেল (Name Scale)</label>
-                        <div style="display: flex; gap: 3px; align-items: center; flex-wrap: wrap;">
+                        <div class="flex-row flex-wrap gap-3">
                             <input type="number" id="inputNameHScaleDiary" min="30" max="200" value="80" style="width: 46px; text-align: center; font-weight: bold;">
                             <button type="button" class="btn btn-sm btn-scale-preset" data-target="inputNameHScaleDiary" data-val="75">75%</button>
                             <button type="button" class="btn btn-sm btn-scale-preset active" data-target="inputNameHScaleDiary" data-val="80">80%</button>
@@ -388,7 +388,7 @@ Example:
                 <div class="grid-2">
                     <div class="control-group">
                         <label for="inputNameSizeDiary">নামের সাইজ (Name Size)</label>
-                        <div style="display: flex; gap: 3px; align-items: center; flex-wrap: wrap;">
+                        <div class="flex-row flex-wrap gap-3">
                             <input type="text" id="inputNameSizeDiary" value="Auto" placeholder="Auto" style="width: 46px; text-align: center; font-weight: bold;" title="Auto copies size directly from template">
                             <button type="button" class="btn btn-sm btn-leading-preset active" data-target="inputNameSizeDiary" data-val="Auto">Auto</button>
                             <button type="button" class="btn btn-sm btn-leading-preset" data-target="inputNameSizeDiary" data-val="8.5">8.5</button>
@@ -400,7 +400,7 @@ Example:
                     </div>
                     <div class="control-group">
                         <label for="inputDetailsSizeDiary">ঠিকানার সাইজ (Details Size)</label>
-                        <div style="display: flex; gap: 3px; align-items: center; flex-wrap: wrap;">
+                        <div class="flex-row flex-wrap gap-3">
                             <input type="text" id="inputDetailsSizeDiary" value="Auto" placeholder="Auto" style="width: 46px; text-align: center; font-weight: bold;" title="Auto copies size directly from template">
                             <button type="button" class="btn btn-sm btn-leading-preset active" data-target="inputDetailsSizeDiary" data-val="Auto">Auto</button>
                             <button type="button" class="btn btn-sm btn-leading-preset" data-target="inputDetailsSizeDiary" data-val="6.6">6.6</button>
@@ -413,7 +413,7 @@ Example:
 
                 <div class="control-group">
                     <label for="inputDetailsLeadingDiary">লাইন লিডিং (Line Leading)</label>
-                    <div style="display: flex; gap: 3px; align-items: center; flex-wrap: wrap;">
+                    <div class="flex-row flex-wrap gap-3">
                         <input type="text" id="inputDetailsLeadingDiary" value="Auto" placeholder="Auto" style="width: 46px; text-align: center; font-weight: bold;" title="Auto copies leading directly from template">
                         <button type="button" class="btn btn-sm btn-leading-preset active" data-target="inputDetailsLeadingDiary" data-val="Auto">Auto</button>
                         <button type="button" class="btn btn-sm btn-leading-preset" data-target="inputDetailsLeadingDiary" data-val="8.4">8.4</button>
@@ -424,7 +424,7 @@ Example:
 
                 <!-- Safe Margin & Auto-Fit Controls -->
                 <div class="control-group safefit-box">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                    <div class="flex-between" style="margin-bottom: 5px;">
                         <label class="checkbox-label checkbox-highlight" style="margin-bottom: 0;">
                             <input type="checkbox" id="chkAutoFitDiary" checked>
                             <span>সেফ মার্জিন অটো-ফিট (Auto-Fit Long Text)</span>
@@ -433,23 +433,23 @@ Example:
                             🎯 Pick Width
                         </button>
                     </div>
-                    <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
-                        <div style="display: flex; align-items: center; gap: 3px;">
-                            <span style="font-size: 10px; color: var(--text-secondary);">Max Width:</span>
+                    <div class="flex-row flex-wrap gap-6">
+                        <div class="flex-row gap-3">
+                            <span style="font-size: 10px; color: #98989d;">Max Width:</span>
                             <input type="number" id="inputSafeWidthDiary" min="10" max="500" step="0.5" value="50" style="width: 48px; text-align: center; font-weight: bold;">
-                            <span style="font-size: 10px; color: var(--text-tertiary);">mm</span>
+                            <span style="font-size: 10px; color: #636366;">mm</span>
                         </div>
-                        <div style="display: flex; gap: 2px; align-items: center;">
+                        <div class="flex-row gap-2">
                             <button type="button" class="btn btn-sm btn-safewidth-preset" data-target="inputSafeWidthDiary" data-val="40">40</button>
                             <button type="button" class="btn btn-sm btn-safewidth-preset" data-target="inputSafeWidthDiary" data-val="45">45</button>
                             <button type="button" class="btn btn-sm btn-safewidth-preset active" data-target="inputSafeWidthDiary" data-val="50">50</button>
                             <button type="button" class="btn btn-sm btn-safewidth-preset" data-target="inputSafeWidthDiary" data-val="55">55</button>
                             <button type="button" class="btn btn-sm btn-safewidth-preset" data-target="inputSafeWidthDiary" data-val="60">60</button>
                         </div>
-                        <div style="display: flex; align-items: center; gap: 3px; margin-left: auto;">
-                            <span style="font-size: 10px; color: var(--text-secondary);" title="Minimum horizontal scale before shrinking font size">Min:</span>
+                        <div class="flex-row gap-3" style="margin-left: auto;">
+                            <span style="font-size: 10px; color: #98989d;" title="Minimum horizontal scale before shrinking font size">Min:</span>
                             <input type="number" id="inputMinHScaleDiary" min="30" max="90" value="60" style="width: 40px; text-align: center;">
-                            <span style="font-size: 10px; color: var(--text-tertiary);">%</span>
+                            <span style="font-size: 10px; color: #636366;">%</span>
                         </div>
                     </div>
                 </div>
@@ -501,7 +501,7 @@ Example:
             <div class="section-box">
                 <div class="section-header">
                     <span class="section-title">Note Bani List (১৬–৩২ টি বাণী)</span>
-                    <div style="display: flex; gap: 4px;">
+                    <div class="flex-row gap-4">
                         <button type="button" id="btnPasteNoteBani" class="btn btn-sm btn-accent" title="Paste quotes from clipboard">📋 Paste</button>
                         <button type="button" id="btnLoadSampleNoteBani" class="btn btn-sm">Sample</button>
                         <button type="button" id="btnClearNoteBani" class="btn btn-sm">Clear</button>
@@ -516,7 +516,7 @@ Example:
 ২. ইসলামকে যুগোপযোগী করা যাবে না; বরং যুগকে ইসলাম-উপযোগী করতে হবে।
 — আল্লামা জুনায়েদ বাবুনগরী রহ."></textarea>
 
-                <div style="display: flex; gap: 5px;">
+                <div class="flex-row gap-5">
                     <button type="button" id="btnScanNoteBanis" class="btn btn-sm" style="flex: 1;" title="Scan how many Note Bani slots are in the document">
                         🔍 Scan Note Slots
                     </button>
@@ -569,7 +569,7 @@ Example:
                     </div>
                     <div class="control-group">
                         <label for="inputStartIndexNoteBani">Start Bani #</label>
-                        <div style="display: flex; gap: 4px; align-items: center;">
+                        <div class="flex-row gap-4">
                             <input type="number" id="inputStartIndexNoteBani" value="1" min="1" style="width: 52px; text-align: center;">
                             <button type="button" id="btnResetIndexNoteBani" class="btn btn-sm" style="flex: 1;" title="Reset to #1">Reset</button>
                         </div>
@@ -726,7 +726,7 @@ Example:
                 <div class="section-header">
                     <span class="section-title">Canvas Direct Placement</span>
                 </div>
-                <p style="font-size: 10.5px; color: var(--text-secondary); line-height: 1.4;">
+                <p style="font-size: 10.5px; color: #98989d; line-height: 1.4;">
                     Select blank template cards on canvas and floating text frames, then move them directly into position.
                 </p>
 
@@ -789,7 +789,7 @@ Example:
 
     <!-- Scripts -->
     <script src="js/CSInterface.js"></script>
-    <script src="js/main.js?v=3.2.0"></script>
+    <script src="js/main.js?v=3.3.0"></script>
     <script>
     function openAuthorProfile(e) {
         if (e) { e.preventDefault(); e.stopPropagation(); }

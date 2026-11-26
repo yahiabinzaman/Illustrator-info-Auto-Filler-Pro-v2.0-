@@ -2,6 +2,23 @@
 
 All notable changes to **Auto Filler Pro (ColorLab Edition)** will be documented in this file.
 
+## [3.3.0 Pro] - 2026-11-26
+
+### Fixed (Windows & Illustrator CC 2015.3 v20 / CC 2020 Compatibility)
+- **🪟 Windows `CSInterface.getSystemPath` Fix (`js/CSInterface.js`)**:
+  - Replaced unreliable `OSVersion.indexOf("Windows")` check with multi-signal detection (`OSVersion`, `navigator.platform`, drive-letter patterns) and proper `file:///` / backslash normalization so `hostscript.jsx` loads reliably on all Windows builds.
+- **📋 Windows Bangla/Unicode Clipboard Engine (`js/main.js`)**:
+  - Switched Windows `clip.exe` output to UTF-16LE with BOM (fixing Bangla/Arabic mojibake when copying from the panel).
+  - Updated `getSystemClipboardTextSync` on `win32` with `windowsHide: true`, hidden `-STA` `.NET Clipboard::GetText('UnicodeText')` + `Get-Clipboard -Raw` fallback, and UTF-8 BOM stripping.
+  - Restricted `registerKeyEventsInterest` to targeted editing shortcuts (`A/C/V/X/Y/Z` + `Insert`) instead of `0..255` so native Illustrator shortcuts remain responsive, and avoided swallowing `Ctrl+V` when sync clipboard read returns empty.
+- **⚙️ Illustrator CC 2015.3 (v20 / CSXS 7 / CEF 41) & CC 2020 (v24 / CSXS 9-10 / CEF 74) Support**:
+  - Lowered `CSXS/manifest.xml` manifest/runtime to `ExtensionManifest Version="6.0"` & `CSXS Version="6.0"` (`ILST [18.0,99.9]`) with `--allow-file-access-from-files` so Illustrator v20–2026+ load the extension.
+  - Removed ES6+ runtime blockers in `js/main.js` (`Object.assign`, `String.prototype.padStart`, `NodeList.prototype.forEach`) and wrapped host script paths via `JSON.stringify`.
+  - Replaced all flexbox `gap` rules in `css/style.css` and `index.html` with cross-browser flex margin classes, added Chrome 41 CSS Custom Property static fallbacks + `@supports (display: grid)` fallbacks + `grid-gap`, so both CEF 41 (v20) and CEF 74 (2020) render accurately.
+- **🚀 Universal Windows Installers (`Install_Windows.bat`, `install.ps1`, `Set_Bornomala_Default.jsx`)**:
+  - Rewrote `Install_Windows.bat` as a standalone pure-batch installer (zero PowerShell policy blocks) configuring `CSXS.4–CSXS.24` (`HKCU`, `HKLM`, `Wow6432Node`), clearing Windows CEP caches, installing `Bornomala` fonts, and copying scripts cleanly.
+  - Hardened `install.ps1` for older PowerShell / .NET TLS 1.2 + Zip extraction and added Illustrator `25`–`20` support in `Set_Bornomala_Default.jsx`.
+
 ## [3.2.0 Pro] - 2026-11-26
 
 ### Added & Fixed

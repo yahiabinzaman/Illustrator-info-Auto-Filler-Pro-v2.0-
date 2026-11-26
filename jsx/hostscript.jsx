@@ -1,11 +1,11 @@
 /**
  * Auto Filler Pro — ExtendScript Host Engine (ColorLab Edition)
  * Author: Yahia Bin Zaman (https://github.com/yahiabinzaman)
- * Version: 3.2.0 Pro — Keyring, Diary / ID, Note Bani, Duplicator & Canvas Placement
+ * Version: 3.3.0 Pro — Cross-Platform Windows/macOS & Illustrator 20–2026+ Engine
  */
 
 // Safe for direct eval in ExtendScript and CEP engine
-var __AUTOFILLER_VER__ = "3.2.0";
+var __AUTOFILLER_VER__ = "3.3.0";
 
 // Safe JSON parser for ExtendScript supporting Unicode Bengali text
 if (typeof JSON !== "object") {
@@ -3957,19 +3957,22 @@ function openWebUrl(url) {
                 }
             } catch (err2) {}
         } else {
+            var opened = false;
             try {
                 var urlFile = new File(Folder.temp.fsName + "/open_link.url");
                 urlFile.open("w");
                 urlFile.write('[InternetShortcut]\r\nURL=' + url + '\r\n');
                 urlFile.close();
-                urlFile.execute();
+                opened = urlFile.execute();
             } catch (err3) {}
 
-            try {
-                if (typeof app.system === "function") {
-                    app.system('cmd.exe /c start "" "' + url + '"');
-                }
-            } catch (err4) {}
+            if (!opened) {
+                try {
+                    if (typeof app.system === "function") {
+                        app.system('cmd.exe /c start "" "' + url + '"');
+                    }
+                } catch (err4) {}
+            }
         }
     } catch (e) {}
 }

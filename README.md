@@ -5,9 +5,9 @@
 # Auto Filler Pro (অটো ফিলার প্রো)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Adobe Illustrator](https://img.shields.io/badge/Adobe%20Illustrator-CC%202018%20--%202026%2B-orange.svg)](https://www.adobe.com/products/illustrator.html)
+[![Adobe Illustrator](https://img.shields.io/badge/Adobe%20Illustrator-CC%202015.3%20(v20)%20--%202026%2B-orange.svg)](https://www.adobe.com/products/illustrator.html)
 [![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Windows-blue.svg)](https://github.com/yahiabinzaman/Illustrator-info-Auto-Filler-Pro-v2.0-)
-[![Version](https://img.shields.io/badge/Version-3.2.0%20Pro-007acc.svg)](https://github.com/yahiabinzaman/Illustrator-info-Auto-Filler-Pro-v2.0-)
+[![Version](https://img.shields.io/badge/Version-3.3.0%20Pro-007acc.svg)](https://github.com/yahiabinzaman/Illustrator-info-Auto-Filler-Pro-v2.0-)
 [![Author](https://img.shields.io/badge/Developed%20by-Yahia%20Bin%20Zaman-007acc.svg)](https://github.com/yahiabinzaman)
 
 **Auto Filler Pro** (ColorLab Edition) হলো Adobe Illustrator-এর জন্য একটি আধুনিক, দ্রুত এবং সম্পূর্ণ স্বয়ংক্রিয় CEP এক্সটেনশন। কিরিং (Keyring), ডায়েরি (Diary), আইডি কার্ড, নেম-ট্যাগ এবং প্রিন্ট টেমপ্লেটে শত শত বাংলা/ইংরেজি নাম, বায়োডাটা, পিস সংখ্যা (Quantity), বাণী ও ফরম নম্বর কয়েক সেকেন্ডের মধ্যে নির্ভুলভাবে বসিয়ে দেয়।
@@ -18,7 +18,7 @@ Developed with ❤️ by **[Yahia Bin Zaman](https://github.com/yahiabinzaman)**
 
 ## ⚡ ১-লাইনে অটো ইনস্টল (1-Line Quick Install)
 
-কোনো ফোল্ডার খোঁজা বা ম্যানুয়ালি কপি করার ঝামেলা ছাড়াই নিচের কমান্ডটি রান করলে **Auto Filler Pro v3.0** (এবং Bornomala ফন্ট) স্বয়ংক্রিয়ভাবে ইনস্টল হয়ে যাবে:
+কোনো ফোল্ডার খোঁজা বা ম্যানুয়ালি কপি করার ঝামেলা ছাড়াই নিচের কমান্ডটি রান করলে **Auto Filler Pro v3.3** (এবং Bornomala ফন্ট) স্বয়ংক্রিয়ভাবে ইনস্টল হয়ে যাবে:
 
 ### 🍎 macOS (Terminal):
 ```bash
@@ -80,7 +80,7 @@ irm https://raw.githubusercontent.com/yahiabinzaman/Illustrator-info-Auto-Filler
 ```text
 Auto Filler Pro/
 ├── CSXS/
-│   └── manifest.xml                # Adobe CEP 9+ Extension Manifest (com.colorlab.autofillerpro)
+│   └── manifest.xml                # Adobe CEP 6-12+ Manifest (Illustrator v20–2026+)
 ├── css/
 │   └── style.css                   # Apple-Native macOS Dark UI Stylesheet
 ├── fonts/
@@ -111,9 +111,10 @@ Auto Filler Pro/
 
 | সমস্যা | সমাধান |
 |---|---|
-| **`Window > Extensions` মেন্যুতে `Auto Filler Pro` দেখা যাচ্ছে না** | Illustrator সম্পূর্ণ বন্ধ করে আবার চালু করুন। `install.sh` / `install.ps1` রান করলে `PlayerDebugMode` অটো অন হয়ে যায়। |
-| **পুরোনো `Keyring Auto-Filler Pro` বা `Name & Card Auto-Filler` দেখাচ্ছে** | নতুন `install.sh` / `install.ps1` পুরোনো ডুপ্লিকেট ফোল্ডার স্বয়ংক্রিয়ভাবে রিমুভ করে দেয়; Illustrator রিস্টার্ট করুন। |
-| **বাংলা যুক্তাক্ষর বা ফন্ট ভেঙে যাচ্ছে** | টেমপ্লেটে `Bornomala` বা `SutonnyMJ` ফন্ট ব্যবহার করুন এবং প্রয়োজনে `Set_Bornomala_Default.jsx` চালিয়ে ডিফল্ট সেট করুন। |
+| **`Window > Extensions` মেন্যুতে `Auto Filler Pro` দেখা যাচ্ছে না** | Illustrator সম্পূর্ণ বন্ধ করে আবার চালু করুন। Windows-এ `Install_Windows.bat` বা `install.ps1` রান করলে `CSXS.4–CSXS.24` (v20–2026+) `PlayerDebugMode` অটো অন হয়ে যায় এবং CEP cache পরিষ্কার হয়। |
+| **Windows-এ Paste করলে বাংলা লেখা আসছে না বা ভেঙে যাচ্ছে** | `v3.3.0 Pro` আপডেট ইনস্টল করুন — এতে Windows `clip.exe` UTF-16LE এবং `-STA` PowerShell Unicode ক্লিপবোর্ড সাপোর্ট যুক্ত করা হয়েছে। |
+| **পুরোনো `Keyring Auto-Filler Pro` বা `Name & Card Auto-Filler` দেখাচ্ছে** | নতুন `install.sh` / `Install_Windows.bat` / `install.ps1` পুরোনো ডুপ্লিকেট ফোল্ডার স্বয়ংক্রিয়ভাবে রিমুভ করে দেয়; Illustrator রিস্টার্ট করুন। |
+| **বাংলা যুক্তাক্ষর বা ফন্ট ভেঙে যাচ্ছে** | টেমপ্লেটে `Bornomala` বা `SutonnyMJ` ফন্ট ব্যবহার করুন এবং প্রয়োজনে `Set_Bornomala_Default.jsx` চালিয়ে ডিফল্ট সেট করুন। Windows ইনস্টলার নিজেই `Bornomala` ফন্ট ইনস্টল করে দেয়। |
 
 ---
 
@@ -121,4 +122,4 @@ Auto Filler Pro/
 
 - **Developed by:** [Yahia Bin Zaman](https://github.com/yahiabinzaman) / **ColorLab**
 - **Repository:** [Illustrator-info-Auto-Filler-Pro-v2.0-](https://github.com/yahiabinzaman/Illustrator-info-Auto-Filler-Pro-v2.0-)
-- **Version:** `3.2.0 Pro`
+- **Version:** `3.3.0 Pro`
