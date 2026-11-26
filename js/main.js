@@ -1,7 +1,7 @@
 /**
  * Auto Filler Pro — ColorLab Edition
  * Author: Yahia Bin Zaman (https://github.com/yahiabinzaman)
- * Version: 3.0.0 Pro — Keyring, Diary / ID, Duplicator & Canvas Move Engine
+ * Version: 3.2.0 Pro — Keyring, Diary / ID, Note Bani, Duplicator & Canvas Move Engine
  */
 
 (function() {
@@ -135,10 +135,20 @@
         } catch (e) {}
     }
 
+    function isTextSelectable(el) {
+        if (!el) return false;
+        if (el.tagName === 'TEXTAREA') return true;
+        if (el.tagName === 'INPUT') {
+            var t = (el.type || 'text').toLowerCase();
+            return (t === 'text' || t === 'search' || t === 'url' || t === 'tel' || t === 'password');
+        }
+        return false;
+    }
+
     function insertTextIntoElement(target, text, replaceAll) {
         if (!target) return;
         target.focus();
-        if (replaceAll || !target.value) {
+        if (replaceAll || !target.value || !isTextSelectable(target)) {
             target.value = text;
         } else {
             var start = target.selectionStart !== undefined ? target.selectionStart : target.value.length;
@@ -201,9 +211,14 @@
             btnCopy.addEventListener('click', function() {
                 if (menu) menu.style.display = 'none';
                 if (activeTarget) {
-                    var start = activeTarget.selectionStart;
-                    var end = activeTarget.selectionEnd;
-                    var selected = (start !== undefined && end !== undefined && start !== end) ? activeTarget.value.substring(start, end) : activeTarget.value;
+                    var selected = activeTarget.value;
+                    if (isTextSelectable(activeTarget)) {
+                        var start = activeTarget.selectionStart;
+                        var end = activeTarget.selectionEnd;
+                        if (start !== undefined && end !== undefined && start !== end) {
+                            selected = activeTarget.value.substring(start, end);
+                        }
+                    }
                     if (selected) {
                         setSystemClipboardText(selected);
                         showToast('Copied to clipboard', 'info');
@@ -217,12 +232,17 @@
             btnCut.addEventListener('click', function() {
                 if (menu) menu.style.display = 'none';
                 if (activeTarget) {
-                    var start = activeTarget.selectionStart;
-                    var end = activeTarget.selectionEnd;
-                    var selected = (start !== undefined && end !== undefined && start !== end) ? activeTarget.value.substring(start, end) : activeTarget.value;
+                    var selected = activeTarget.value;
+                    if (isTextSelectable(activeTarget)) {
+                        var start = activeTarget.selectionStart;
+                        var end = activeTarget.selectionEnd;
+                        if (start !== undefined && end !== undefined && start !== end) {
+                            selected = activeTarget.value.substring(start, end);
+                        }
+                    }
                     if (selected) {
                         setSystemClipboardText(selected);
-                        insertTextIntoElement(activeTarget, '', false);
+                        insertTextIntoElement(activeTarget, '', !isTextSelectable(activeTarget));
                         showToast('Cut to clipboard', 'info');
                     }
                 }
@@ -304,16 +324,18 @@
                 active.select();
             }
         } else if (key === 'c' || keyCode === 67) {
-            if (isInput) {
+            if (isInput && isTextSelectable(active)) {
                 var start = active.selectionStart;
                 var end = active.selectionEnd;
                 if (start !== undefined && end !== undefined && start !== end) {
                     var selected = active.value.substring(start, end);
                     if (selected) setSystemClipboardText(selected);
                 }
+            } else if (isInput && active.value) {
+                setSystemClipboardText(active.value);
             }
         } else if (key === 'x' || keyCode === 88) {
-            if (isInput) {
+            if (isInput && isTextSelectable(active)) {
                 var start = active.selectionStart;
                 var end = active.selectionEnd;
                 if (start !== undefined && end !== undefined && start !== end) {
@@ -365,7 +387,7 @@
         
         var fullCode = '';
         if (extPath) {
-            fullCode = 'try { $.evalFile(new File("' + extPath + '/jsx/hostscript.jsx")); } catch(_e) { try { var _f = new File("' + extPath + '/jsx/hostscript.jsx"); if (_f.exists) { _f.encoding = "UTF-8"; _f.open("r"); var _c = _f.read().replace(/^\\s*#[^\\r\\n]*/gm, ""); _f.close(); eval(_c); } } catch(_e2) {} }; ' + code;
+            fullCode = 'if (typeof CardAutoFiller === "undefined" || typeof __AUTOFILLER_VER__ === "undefined" || __AUTOFILLER_VER__ !== "3.2.0") { try { $.evalFile(new File("' + extPath + '/jsx/hostscript.jsx")); } catch(_e) { try { var _f = new File("' + extPath + '/jsx/hostscript.jsx"); if (_f.exists) { _f.encoding = "UTF-8"; _f.open("r"); var _c = _f.read().replace(/^\\s*#[^\\r\\n]*/gm, ""); _f.close(); eval(_c); } } catch(_e2) {} } } ' + code;
         } else {
             fullCode = code;
         }
@@ -1043,7 +1065,7 @@
                 layoutGrid: layoutGridD,
                 frameMode: frameModeD,
                 isKeyring: false,
-                fillSerial: true,
+                fillSerial: (!selectSerialFormat || selectSerialFormat.value === 'standalone'),
                 entries: parsedDiaryEntries,
                 order: selectFillOrder ? selectFillOrder.value : "zigzag",
                 scope: selectScope ? selectScope.value : "artboard",
@@ -1424,6 +1446,10 @@
         var selectScope = document.getElementById('selectScopeNoteBani');
         var selectOrder = document.getElementById('selectOrderNoteBani');
         var chkPreserve = document.getElementById('chkPreserveNoteStyle');
+        var chkAutoWrap = document.getElementById('chkAutoWrapNoteBani');
+        var selectMaxLines = document.getElementById('selectMaxLinesNoteBani');
+        var inputMaxWidth = document.getElementById('inputMaxWidthNoteBani');
+        var inputMinSize = document.getElementById('inputMinFontSizeNoteBani');
         var chkAutoRemove = document.getElementById('chkAutoRemoveNoteBani');
         var inputStartIdx = document.getElementById('inputStartIndexNoteBani');
 
@@ -1436,6 +1462,11 @@
                 return;
             }
 
+            var rawMaxW = inputMaxWidth ? inputMaxWidth.value.trim() : 'Auto';
+            var parsedMaxW = /^auto$/i.test(rawMaxW) ? 0 : (parseFloat(rawMaxW) || 0);
+            var maxLinesVal = selectMaxLines ? selectMaxLines.value : 'auto';
+            var minSizeVal = inputMinSize ? (parseFloat(inputMinSize.value) || 6.5) : 6.5;
+
             var entryTexts = parsedNoteBanis.map(function(e) { return e.text; });
             var payload = {
                 entries: entryTexts,
@@ -1443,6 +1474,10 @@
                 scope: selectScope ? selectScope.value : 'all_artboards',
                 order: selectOrder ? selectOrder.value : 'artboard_order',
                 preserveStyle: chkPreserve ? chkPreserve.checked : true,
+                autoWrapFit: chkAutoWrap ? chkAutoWrap.checked : true,
+                maxWidthMm: parsedMaxW,
+                maxLines: maxLinesVal,
+                minFontSize: minSizeVal,
                 sampleProfile: noteBaniSampleProfile
             };
 
@@ -1860,6 +1895,7 @@
                 var rawDiary = document.getElementById('rawTextInputDiary');
                 if (rawDiary) rawDiary.value = rawTextInputK.value;
                 parseKeyringInput();
+                parseDiaryInput();
             }, 200));
         }
 
@@ -1875,6 +1911,7 @@
                         var rawDiary = document.getElementById('rawTextInputDiary');
                         if (rawDiary) rawDiary.value = clipText;
                         parseKeyringInput();
+                        parseDiaryInput();
                         showToast('Pasted from clipboard!', 'success');
                     } else {
                         showToast('Clipboard is empty (ক্লিপবোর্ড খালি)', 'error');
@@ -1890,6 +1927,7 @@
                 var rawDiary = document.getElementById('rawTextInputDiary');
                 if (rawDiary) rawDiary.value = sampleBanglaData;
                 parseKeyringInput();
+                parseDiaryInput();
                 showToast('Sample data loaded!', 'info');
             });
         }
@@ -1901,7 +1939,9 @@
                 var rawDiary = document.getElementById('rawTextInputDiary');
                 if (rawDiary) rawDiary.value = '';
                 parsedKeyringEntries = [];
+                currentKeyringStartIndex = 0;
                 renderKeyringPreview();
+                parseDiaryInput();
                 showToast('Cleared input', 'info');
             });
         }
@@ -1920,12 +1960,19 @@
             btnAutoFillK.addEventListener('click', executeAutoFillKeyring);
         }
 
+        var inputStartIdxK = document.getElementById('inputStartIndexKeyring');
+        if (inputStartIdxK) {
+            inputStartIdxK.addEventListener('input', function() {
+                currentKeyringStartIndex = Math.max(0, (parseInt(this.value, 10) || 1) - 1);
+                renderKeyringPreview();
+            });
+        }
+
         var btnResetIdxK = document.getElementById('btnResetIndexKeyring');
         if (btnResetIdxK) {
             btnResetIdxK.addEventListener('click', function() {
                 currentKeyringStartIndex = 0;
-                var inputIdx = document.getElementById('inputStartIndexKeyring');
-                if (inputIdx) inputIdx.value = 1;
+                if (inputStartIdxK) inputStartIdxK.value = 1;
                 renderKeyringPreview();
                 showToast('Reset to #1', 'info');
             });
@@ -1938,6 +1985,7 @@
                 var rawK = document.getElementById('rawTextInputKeyring');
                 if (rawK) rawK.value = rawTextInputD.value;
                 parseDiaryInput();
+                parseKeyringInput();
             }, 200));
         }
 
@@ -1953,6 +2001,7 @@
                         var rawK = document.getElementById('rawTextInputKeyring');
                         if (rawK) rawK.value = clipText;
                         parseDiaryInput();
+                        parseKeyringInput();
                         showToast('Pasted from clipboard!', 'success');
                     } else {
                         showToast('Clipboard is empty (ক্লিপবোর্ড খালি)', 'error');
@@ -1968,6 +2017,7 @@
                 var rawK = document.getElementById('rawTextInputKeyring');
                 if (rawK) rawK.value = sampleBanglaData;
                 parseDiaryInput();
+                parseKeyringInput();
                 showToast('Sample data loaded!', 'info');
             });
         }
@@ -1979,7 +2029,9 @@
                 var rawK = document.getElementById('rawTextInputKeyring');
                 if (rawK) rawK.value = '';
                 parsedDiaryEntries = [];
+                currentDiaryStartIndex = 0;
                 renderDiaryPreview();
+                parseKeyringInput();
                 showToast('Cleared input', 'info');
             });
         }
@@ -1996,12 +2048,19 @@
         var selectSerialFormatD = document.getElementById('selectSerialFormatDiary');
         if (selectSerialFormatD) selectSerialFormatD.addEventListener('change', parseDiaryInput);
 
+        var inputStartIdxD = document.getElementById('inputStartIndexDiary');
+        if (inputStartIdxD) {
+            inputStartIdxD.addEventListener('input', function() {
+                currentDiaryStartIndex = Math.max(0, (parseInt(this.value, 10) || 1) - 1);
+                renderDiaryPreview();
+            });
+        }
+
         var btnResetIdxD = document.getElementById('btnResetIndexDiary');
         if (btnResetIdxD) {
             btnResetIdxD.addEventListener('click', function() {
                 currentDiaryStartIndex = 0;
-                var inputIdx = document.getElementById('inputStartIndexDiary');
-                if (inputIdx) inputIdx.value = 1;
+                if (inputStartIdxD) inputStartIdxD.value = 1;
                 renderDiaryPreview();
                 showToast('Reset to #1', 'info');
             });
@@ -2104,6 +2163,26 @@
         var btnAutoFillNB = document.getElementById('btnAutoFillNoteBani');
         if (btnAutoFillNB) {
             btnAutoFillNB.addEventListener('click', executeAutoFillNoteBanis);
+        }
+
+        var btnPickWNB = document.getElementById('btnPickWidthNoteBani');
+        if (btnPickWNB) {
+            btnPickWNB.addEventListener('click', function() {
+                evalHostScript('getSelectedCanvasWidth()', function(resStr) {
+                    try {
+                        var res = JSON.parse(resStr);
+                        if (res.status === 'success') {
+                            var inputW = document.getElementById('inputMaxWidthNoteBani');
+                            if (inputW) inputW.value = res.widthMm;
+                            showToast('Note Bani Max Width set to ' + res.widthMm + ' mm', 'success');
+                        } else {
+                            showToast(res.message || 'Select an object on canvas to measure width', 'error');
+                        }
+                    } catch(e) {
+                        showToast('Error picking width', 'error');
+                    }
+                });
+            });
         }
 
         // Duplicator Listeners

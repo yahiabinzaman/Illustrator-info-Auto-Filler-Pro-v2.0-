@@ -1,10 +1,11 @@
 /**
  * Auto Filler Pro — ExtendScript Host Engine (ColorLab Edition)
  * Author: Yahia Bin Zaman (https://github.com/yahiabinzaman)
- * Version: 3.0.0 Pro — Keyring, Diary / ID, Duplicator & Canvas Placement
+ * Version: 3.2.0 Pro — Keyring, Diary / ID, Note Bani, Duplicator & Canvas Placement
  */
 
 // Safe for direct eval in ExtendScript and CEP engine
+var __AUTOFILLER_VER__ = "3.2.0";
 
 // Safe JSON parser for ExtendScript supporting Unicode Bengali text
 if (typeof JSON !== "object") {
@@ -19,7 +20,9 @@ JSON.stringify = function(obj) {
                         .replace(/"/g, '\\"')
                         .replace(/\r/g, '\\r')
                         .replace(/\n/g, '\\n')
-                        .replace(/\t/g, '\\t') + '"';
+                        .replace(/\t/g, '\\t')
+                        .replace(/\u2028/g, '\\u2028')
+                        .replace(/\u2029/g, '\\u2029') + '"';
     }
     if (obj instanceof Array) {
         var a = [];
@@ -669,16 +672,19 @@ var CardAutoFiller = {
         var allTFs = [];
         this.collectTextFrames(candidateItems, allTFs);
 
-        // Deduplicate stacked ghost text frames sitting at the exact same position
+        // Deduplicate true stacked duplicate ghost text frames (exact same position <= 3pt AND identical or empty content)
         var cleanAllTFs = [];
         for (var a = 0; a < allTFs.length; a++) {
             var atf = allTFs[a];
             if (!atf || this.isItemHidden(atf)) continue;
             var agb = atf.geometricBounds;
+            var aTxtNorm = (atf.contents || "").replace(/^\s+|\s+$/g, "");
             var isDup = false;
             for (var c = 0; c < cleanAllTFs.length; c++) {
                 var cgb = cleanAllTFs[c].geometricBounds;
-                if (Math.abs(agb[0] - cgb[0]) < 20 && Math.abs(agb[1] - cgb[1]) < 20) {
+                var cTxtNorm = (cleanAllTFs[c].contents || "").replace(/^\s+|\s+$/g, "");
+                var samePos = (Math.abs(agb[0] - cgb[0]) <= 3 && Math.abs(agb[1] - cgb[1]) <= 3);
+                if (samePos && (aTxtNorm === cTxtNorm || aTxtNorm === "")) {
                     try {
                         atf.contents = "";
                         atf.remove();
@@ -960,16 +966,19 @@ var CardAutoFiller = {
         var groupWidth = Math.abs(groupRight - groupLeft);
         var groupHeight = Math.abs(groupTop - groupBottom);
 
-        // Deduplicate stacked duplicate text frames sitting at the exact same position inside the group
+        // Deduplicate true stacked duplicate text frames inside the group (exact same position <= 3pt AND identical or empty content)
         var uniqueTFs = [];
         for (var d = 0; d < tfs.length; d++) {
             var dtf = tfs[d];
             if (!dtf || this.isItemHidden(dtf)) continue;
             var dgb = dtf.geometricBounds;
+            var dTxtNorm = (dtf.contents || "").replace(/^\s+|\s+$/g, "");
             var isDup = false;
             for (var u = 0; u < uniqueTFs.length; u++) {
                 var ugb = uniqueTFs[u].geometricBounds;
-                if (Math.abs(dgb[0] - ugb[0]) < 25 && Math.abs(dgb[1] - ugb[1]) < 25) {
+                var uTxtNorm = (uniqueTFs[u].contents || "").replace(/^\s+|\s+$/g, "");
+                var samePos = (Math.abs(dgb[0] - ugb[0]) <= 3 && Math.abs(dgb[1] - ugb[1]) <= 3);
+                if (samePos && (dTxtNorm === uTxtNorm || dTxtNorm === "")) {
                     try {
                         dtf.contents = "";
                         dtf.remove();
@@ -1699,13 +1708,13 @@ var CardAutoFiller = {
 
         var totalCopies = parseInt(payload.totalCopies, 10) || 20;
         var cardsPerAB = parseInt(payload.cardsPerArtboard, 10) || 20;
-        var customCols = parseInt(payload.cols, 10) || 0;
+        var customCols = parseInt(payload.cols !== undefined ? payload.cols : payload.columns, 10) || 0;
         var gapX = parseFloat(payload.gapX) || 0;
         var gapY = parseFloat(payload.gapY) || 0;
         var fitArtboard = payload.fitArtboard !== false;
 
-        var customW = parseFloat(payload.cardW) || 0;
-        var customH = parseFloat(payload.cardH) || 0;
+        var customW = parseFloat(payload.cardW !== undefined ? payload.cardW : payload.cardWidth) || 0;
+        var customH = parseFloat(payload.cardH !== undefined ? payload.cardH : payload.cardHeight) || 0;
 
         if (totalCopies <= 0) totalCopies = 1;
         if (cardsPerAB <= 0) cardsPerAB = 20;
@@ -1949,6 +1958,13 @@ var CardAutoFiller = {
         var hasCustomNameLeading = (!isNaN(userNameLeading) && userNameLeading > 0);
 
         var userDetailsLeading = parseFloat(payload.detailsLeading);
+        var hasCustomDetailsLeading = (!isNaN(userDetailsLeading) && userDetailsLeading > 0);
+        var autoFit = (payload.autoFit === true || payload.autoFit === "true");
+        var safeWidthMm = parseFloat(payload.safeWidthMm || payload.safeWidth || payload.maxWidthMm || payload.maxWidth);
+        var safeWidthPt = (!isNaN(safeWidthMm) && safeWidthMm > 0) ? (safeWidthMm * 72.0 / 25.4) : 0;
+        var minHScale = parseFloat(payload.minHScale);
+        if (isNaN(minHScale) || minHScale <= 0) minHScale = 60;
+
         var layoutGrid = payload.layoutGrid || "auto";
         var frameMode = payload.frameMode || "auto";
         var cards = this.detectCards(scope, order, { isKeyring: true, layoutGrid: layoutGrid, frameMode: frameMode });
@@ -1958,8 +1974,6 @@ var CardAutoFiller = {
                 message: "No keyring card templates detected. Make sure your cards are visible and unlocked."
             });
         }
-
-        cards = this.sortCards(cards, order, layoutGrid);
 
         var targetCards = [];
         if (!skipFilledCards || scope === "selection" || startIndex === 0) {
@@ -2095,6 +2109,7 @@ var CardAutoFiller = {
                             if (dca.textFont) origDetFont = dca.textFont;
                             if (dca.size > 0) origDetSize = dca.size;
                             if (dca.leading > 0) origDetLeading = dca.leading;
+                            if (dca.horizontalScale > 0 && keepTemplateStyle) detailsHScale = dca.horizontalScale;
                             origDetTracking = dca.tracking;
                             if (dca.fillColor && dca.fillColor.typename !== "NoColor") {
                                 origDetColor = dca.fillColor;
@@ -2146,9 +2161,11 @@ var CardAutoFiller = {
                         if (card.nameFrame.paragraphs.length > 0) {
                             var p0 = card.nameFrame.paragraphs[0];
                             if (origNameFont) p0.characterAttributes.textFont = origNameFont;
+                            if (makeBold && !keepTemplateStyle) this.applyBoldFont(p0);
+                            else if (!makeBold) this.applyRegularFont(p0);
                             p0.characterAttributes.size = origNameSize;
                             p0.characterAttributes.leading = origNameLeading;
-                            p0.characterAttributes.horizontalScale = nameHScale;
+                            p0.characterAttributes.horizontalScale = origNameHScale;
                             p0.characterAttributes.tracking = origNameTracking;
                             p0.characterAttributes.fillColor = origNameColor;
                             if (origNameJust !== null) p0.paragraphAttributes.justification = origNameJust;
@@ -2168,6 +2185,10 @@ var CardAutoFiller = {
                             if (origDetJust !== null) pIt.paragraphAttributes.justification = origDetJust;
                         }
                     } catch(pDetErr) {}
+
+                    if (autoFit && safeWidthPt > 0) {
+                        this.fitTextFrameToWidth(card.nameFrame, safeWidthPt, detailsHScale, minHScale, origNameSize);
+                    }
                 } else {
                     // Separate Name frame and Details frame
                     card.nameFrame.contents = cleanName;
@@ -2372,8 +2393,6 @@ var CardAutoFiller = {
                 message: "No card templates detected. Make sure your cards are visible and unlocked."
             });
         }
-
-        cards = this.sortCards(cards, order, layoutGrid);
 
         var targetCards = [];
         // If starting from index 0 or in selection scope, populate all detected cards sequentially
@@ -2904,6 +2923,9 @@ var CardAutoFiller = {
                                     } catch(dpe) {}
                                 }
                             } catch(e) {}
+                            if (autoFit && effectiveMaxPt > 0) {
+                                this.fitTextFrameToWidth(card.detailsFrame, effectiveMaxPt, cardDetStyle.hScale, minHScale, cardDetStyle.size);
+                            }
                         }
                     } else {
                         // Single combined text frame (Name on line 1, details on lines 2..N)
@@ -3005,74 +3027,24 @@ var CardAutoFiller = {
 
             // --- STEP 5: POPULATE QTY ---
             try {
-                if (card.qtyFrame && entry.qty) {
-                    var origQtyFont = null;
-                    var origQtySize = null;
-                    var origQtyColor = null;
-                    try {
-                        var qtr = card.qtyFrame.textRange;
-                        origQtyFont = qtr.characterAttributes.textFont;
-                        origQtySize = qtr.characterAttributes.size;
-                        origQtyColor = qtr.characterAttributes.fillColor;
-                    } catch(qe) {}
-
-                    var qVal = String(entry.qty).replace(/^\s+|\s+$/g, '');
-                    card.qtyFrame.contents = qVal;
-
-                    try {
-                        var nQtr = card.qtyFrame.textRange;
-                        if (origQtyFont) nQtr.characterAttributes.textFont = origQtyFont;
-                        if (origQtySize) nQtr.characterAttributes.size = origQtySize;
-                        if (origQtyColor) nQtr.characterAttributes.fillColor = origQtyColor;
-                    } catch(qStyErr) {}
-                }
-            } catch(e) {}
-
-            // --- STEP 5: POPULATE BANI (if in keyring mode and fillBani is enabled) ---
-            try {
-                if (payload.fillBani !== false && card.baniFrame && entry.bani && entry.bani.replace(/\s+/g, '').length > 0) {
-                    var origBaniSize = null;
-                    var origBaniLeading = null;
-                    var origBaniFont = null;
-                    var origBaniColor = null;
-                    try {
-                        origBaniSize = card.baniFrame.textRange.characterAttributes.size;
-                        origBaniLeading = card.baniFrame.textRange.characterAttributes.leading;
-                        origBaniFont = card.baniFrame.textRange.characterAttributes.textFont;
-                        origBaniColor = card.baniFrame.textRange.characterAttributes.fillColor;
-                    } catch(be) {}
-
-                    var cleanBani = entry.bani.split('\r\n').join('\r').split('\n').join('\r');
-                    card.baniFrame.contents = cleanBani;
-                    try {
-                        var bTr = card.baniFrame.textRange;
-                        if (origBaniFont) bTr.characterAttributes.textFont = origBaniFont;
-                        if (origBaniSize) bTr.characterAttributes.size = origBaniSize;
-                        if (origBaniLeading) bTr.characterAttributes.leading = origBaniLeading;
-                        if (origBaniColor) bTr.characterAttributes.fillColor = origBaniColor;
-                    } catch(bStyErr) {}
-                }
-            } catch(e) {}
-
-            // --- STEP 6: POPULATE QTY ---
-            try {
                 if (payload.fillQty !== false && card.qtyFrame && entry.qty) {
                     var origQtySize = null;
                     var origQtyLeading = null;
                     var origQtyFont = null;
                     var origQtyColor = null;
                     try {
-                        origQtySize = card.qtyFrame.textRange.characterAttributes.size;
-                        origQtyLeading = card.qtyFrame.textRange.characterAttributes.leading;
-                        origQtyFont = card.qtyFrame.textRange.characterAttributes.textFont;
-                        origQtyColor = card.qtyFrame.textRange.characterAttributes.fillColor;
+                        var qtr = card.qtyFrame.textRange;
+                        origQtyFont = qtr.characterAttributes.textFont;
+                        origQtySize = qtr.characterAttributes.size;
+                        origQtyLeading = qtr.characterAttributes.leading;
+                        origQtyColor = qtr.characterAttributes.fillColor;
                     } catch(qe) {}
 
                     var qVal = String(entry.qty).replace(/^\s+|\s+$/g, '');
-                    var isAnsiFont = (cardNameStyle.font && /bornomala|sutonny/i.test(cardNameStyle.font.name));
+                    var isAnsiQty = (origQtyFont && /bornomala|sutonny/i.test(origQtyFont.name));
                     var qDigits = qVal.replace(/[^\d০-৯]/g, '');
                     if (qDigits) {
-                        if (isAnsiFont) {
+                        if (isAnsiQty) {
                             var bnToAscii = {'০':'0','১':'1','২':'2','৩':'3','৪':'4','৫':'5','৬':'6','৭':'7','৮':'8','৯':'9'};
                             qVal = qDigits.replace(/[০-৯]/g, function(d) { return bnToAscii[d] || d; });
                         } else {
@@ -3080,12 +3052,13 @@ var CardAutoFiller = {
                         }
                     }
                     card.qtyFrame.contents = qVal;
+
                     try {
-                        var qTr = card.qtyFrame.textRange;
-                        if (origQtyFont) qTr.characterAttributes.textFont = origQtyFont;
-                        if (origQtySize) qTr.characterAttributes.size = origQtySize;
-                        if (origQtyLeading) qTr.characterAttributes.leading = origQtyLeading;
-                        if (origQtyColor) qTr.characterAttributes.fillColor = origQtyColor;
+                        var nQtr = card.qtyFrame.textRange;
+                        if (origQtyFont) nQtr.characterAttributes.textFont = origQtyFont;
+                        if (origQtySize) nQtr.characterAttributes.size = origQtySize;
+                        if (origQtyLeading) nQtr.characterAttributes.leading = origQtyLeading;
+                        if (origQtyColor) nQtr.characterAttributes.fillColor = origQtyColor;
                     } catch(qStyErr) {}
                 }
             } catch(e) {}
@@ -3569,6 +3542,147 @@ var CardAutoFiller = {
         });
     },
 
+    computeNoteMaxWidthPt: function(doc, slot, customMaxMm, allSlots) {
+        if (customMaxMm && customMaxMm > 0) {
+            return customMaxMm * 72.0 / 25.4;
+        }
+        var tf = slot.tf;
+        var style = slot.style || {};
+        var abIdx = slot.abIdx;
+        var gb = null;
+        try { gb = tf.geometricBounds; } catch(e) {}
+        if (!gb) return 190.0;
+
+        var origW = Math.abs(gb[2] - gb[0]);
+        if (abIdx >= 0 && doc && doc.artboards && doc.artboards[abIdx]) {
+            var r = doc.artboards[abIdx].artboardRect;
+            var abL = Math.min(r[0], r[2]);
+            var abR = Math.max(r[0], r[2]);
+            var abT = Math.max(r[1], r[3]);
+            var abB = Math.min(r[1], r[3]);
+            var abW = abR - abL;
+            var abH = abT - abB;
+            var midX = (abL + abR) / 2;
+
+            // Count how many slots sit on this same artboard to detect 2-page spreads
+            var slotsOnAb = 0;
+            if (allSlots) {
+                for (var si = 0; si < allSlots.length; si++) {
+                    if (allSlots[si].abIdx === abIdx) slotsOnAb++;
+                }
+            }
+            var isSpread = (slotsOnAb >= 2) || (abW > abH * 1.15);
+            var outerMargin = 22.0; // ~7.8mm safe page edge margin
+            var spinePad = 14.0;
+            var cx = slot.cx;
+
+            var pageLeft = (isSpread && cx > midX) ? (midX + spinePad) : (abL + outerMargin);
+            var pageRight = (isSpread && cx <= midX) ? (midX - spinePad) : (abR - outerMargin);
+
+            var avail = 0;
+            var just = style.justification;
+            if (typeof Justification !== "undefined") {
+                if (just === Justification.RIGHT) {
+                    avail = gb[2] - pageLeft;
+                } else if (just === Justification.LEFT) {
+                    avail = pageRight - gb[0];
+                } else {
+                    var halfSpace = Math.min(cx - pageLeft, pageRight - cx);
+                    avail = halfSpace * 2;
+                }
+            } else {
+                // Fallback if Justification enum unavailable
+                avail = (cx <= midX) ? (gb[2] - pageLeft) : (pageRight - gb[0]);
+            }
+
+            if (avail >= 80) return avail;
+            return Math.max(120, isSpread ? (abW * 0.36) : (abW * 0.78));
+        }
+
+        return Math.max(origW, 190.0);
+    },
+
+    splitBalancedQuoteLines: function(text, numLines) {
+        if (!text) return "";
+        var clean = text.replace(/\s+/g, " ").replace(/^\s+|\s+$/g, "");
+        if (!clean || numLines <= 1) return clean;
+
+        var words = clean.split(" ");
+        var targetLines = Math.min(numLines, words.length);
+        if (targetLines <= 1) return clean;
+
+        var result = [];
+        var idx = 0;
+        var totalWords = words.length;
+
+        for (var l = 0; l < targetLines; l++) {
+            var remainingLines = targetLines - l;
+            if (remainingLines === 1) {
+                result.push(words.slice(idx).join(" "));
+                break;
+            }
+            var remTextLen = words.slice(idx).join(" ").length;
+            var idealLen = remTextLen / remainingLines;
+            var lineWords = [];
+            var curLen = 0;
+
+            while (idx < totalWords - (remainingLines - 1)) {
+                var w = words[idx];
+                var nextLen = lineWords.length === 0 ? w.length : (curLen + 1 + w.length);
+                if (lineWords.length > 0 && nextLen > idealLen && Math.abs(nextLen - idealLen) > Math.abs(curLen - idealLen)) {
+                    break;
+                }
+                lineWords.push(w);
+                curLen = nextLen;
+                idx++;
+                if (curLen >= idealLen) break;
+            }
+            if (lineWords.length === 0 && idx < totalWords) {
+                lineWords.push(words[idx]);
+                idx++;
+            }
+            result.push(lineWords.join(" "));
+        }
+        return result.join("\r");
+    },
+
+    applyNoteFrameStyle: function(tf, style, sizeOverride, hScaleOverride) {
+        if (!tf || !style) return;
+        var sizeToUse = (sizeOverride && sizeOverride > 0) ? sizeOverride : style.size;
+        var hScaleToUse = (hScaleOverride && hScaleOverride > 0) ? hScaleOverride : style.horizontalScale;
+        var leadToUse = style.leading;
+        if (!style.autoLeading && style.leading > 0 && style.size > 0 && sizeToUse !== style.size) {
+            leadToUse = style.leading * (sizeToUse / style.size);
+        }
+
+        try {
+            var tr = tf.textRange;
+            try { if (style.font) tr.characterAttributes.textFont = style.font; } catch(fe) {}
+            try { if (sizeToUse > 0) tr.characterAttributes.size = sizeToUse; } catch(se) {}
+            try {
+                if (style.autoLeading) {
+                    tr.characterAttributes.autoLeading = true;
+                } else if (leadToUse > 0) {
+                    tr.characterAttributes.autoLeading = false;
+                    tr.characterAttributes.leading = leadToUse;
+                }
+            } catch(le) {}
+            try { if (hScaleToUse > 0) tr.characterAttributes.horizontalScale = hScaleToUse; } catch(he) {}
+            try { if (style.verticalScale > 0) tr.characterAttributes.verticalScale = style.verticalScale; } catch(ve) {}
+            try { tr.characterAttributes.tracking = style.tracking; } catch(te) {}
+            try { if (style.fillColor) tr.characterAttributes.fillColor = style.fillColor; } catch(ce) {}
+
+            try {
+                for (var p = 0; p < tf.paragraphs.length; p++) {
+                    var pAttr = tf.paragraphs[p].paragraphAttributes;
+                    if (style.justification !== null) pAttr.justification = style.justification;
+                    pAttr.spaceBefore = style.spaceBefore;
+                    pAttr.spaceAfter = style.spaceAfter;
+                }
+            } catch(pe) {}
+        } catch(e) {}
+    },
+
     populateNoteBanis: function(payloadJson) {
         var doc = this.getActiveDoc();
         if (!doc) {
@@ -3586,6 +3700,13 @@ var CardAutoFiller = {
         var scope = payload.scope || "all_artboards";
         var order = payload.order || "artboard_order";
         var sampleProfile = payload.sampleProfile || null;
+
+        var autoWrapFit = (payload.autoWrapFit !== false);
+        var maxWidthMm = parseFloat(payload.maxWidthMm);
+        if (isNaN(maxWidthMm) || maxWidthMm <= 0) maxWidthMm = 0;
+        var maxLinesPref = String(payload.maxLines || "auto");
+        var minFontSize = parseFloat(payload.minFontSize);
+        if (isNaN(minFontSize) || minFontSize <= 0) minFontSize = 6.5;
 
         if (!entries.length || startIndex >= entries.length) {
             return JSON.stringify({ status: "error", message: "No Note Banis left to place." });
@@ -3616,37 +3737,157 @@ var CardAutoFiller = {
             if (!cleanBani) continue;
 
             try {
+                var origGb = null;
+                try { origGb = tf.geometricBounds; } catch(gbe) {}
+                var origMidY = origGb ? ((origGb[1] + origGb[3]) / 2) : null;
+                var origAnchorRight = origGb ? origGb[2] : null;
+                var origAnchorLeft = origGb ? origGb[0] : null;
+                var maxWidthPt = autoWrapFit ? this.computeNoteMaxWidthPt(doc, slot, maxWidthMm, slots) : 0;
+
+                // Separate quote lines from trailing author attribution line ("— Author")
+                var bLines = cleanBani.split("\r");
+                var authorLine = "";
+                var quoteBody = cleanBani;
+                if (bLines.length >= 2 && /^[\-–—~]/.test(bLines[bLines.length - 1].replace(/^\s+/, ""))) {
+                    authorLine = bLines[bLines.length - 1].replace(/^\s+|\s+$/g, "");
+                    quoteBody = bLines.slice(0, bLines.length - 1).join(" ").replace(/\s+/g, " ").replace(/^\s+|\s+$/g, "");
+                } else {
+                    quoteBody = bLines.join(" ").replace(/\s+/g, " ").replace(/^\s+|\s+$/g, "");
+                }
+
+                // Initial placement
                 tf.contents = cleanBani;
-
                 if (preserveStyle && style) {
-                    var tr = tf.textRange;
-                    try { if (style.font) tr.characterAttributes.textFont = style.font; } catch(fe) {}
-                    try { if (style.size > 0) tr.characterAttributes.size = style.size; } catch(se) {}
-                    try {
-                        if (style.autoLeading) {
-                            tr.characterAttributes.autoLeading = true;
-                        } else if (style.leading > 0) {
-                            tr.characterAttributes.autoLeading = false;
-                            tr.characterAttributes.leading = style.leading;
-                        }
-                    } catch(le) {}
-                    try { if (style.horizontalScale > 0) tr.characterAttributes.horizontalScale = style.horizontalScale; } catch(he) {}
-                    try { if (style.verticalScale > 0) tr.characterAttributes.verticalScale = style.verticalScale; } catch(ve) {}
-                    try { tr.characterAttributes.tracking = style.tracking; } catch(te) {}
-                    try { if (style.fillColor) tr.characterAttributes.fillColor = style.fillColor; } catch(ce) {}
+                    this.applyNoteFrameStyle(tf, style, style.size, style.horizontalScale);
+                }
 
-                    try {
-                        for (var p = 0; p < tf.paragraphs.length; p++) {
-                            var pAttr = tf.paragraphs[p].paragraphAttributes;
-                            if (style.justification !== null) pAttr.justification = style.justification;
-                            pAttr.spaceBefore = style.spaceBefore;
-                            pAttr.spaceAfter = style.spaceAfter;
+                var isAreaText = false;
+                try {
+                    if (typeof TextType !== "undefined" && tf.kind === TextType.AREATEXT) {
+                        isAreaText = true;
+                    }
+                } catch(tke) {}
+
+                var appliedSize = style ? style.size : 10.0;
+                var appliedHScale = style ? style.horizontalScale : 100.0;
+
+                if (autoWrapFit && !isAreaText && maxWidthPt > 0) {
+                    var curGb = null;
+                    try { curGb = tf.geometricBounds; } catch(cbe) {}
+                    var curW = curGb ? Math.abs(curGb[2] - curGb[0]) : 0;
+
+                    if (curW > maxWidthPt) {
+                        var maxTotalLines = (maxLinesPref === "auto") ? 3 : (parseInt(maxLinesPref, 10) || 3);
+                        var maxQuoteLines = authorLine ? Math.max(1, maxTotalLines - 1) : Math.max(1, maxTotalLines);
+
+                        // If quote is very long (> 2.2x available width) in auto mode, allow up to 3 quote lines + author (4 total)
+                        if (maxLinesPref === "auto" && curW > maxWidthPt * 2.15) {
+                            maxQuoteLines = authorLine ? 3 : 4;
                         }
-                    } catch(pe) {}
+
+                        var bestText = cleanBani;
+                        var bestW = curW;
+
+                        for (var ql = 2; ql <= maxQuoteLines; ql++) {
+                            var wrappedQuote = this.splitBalancedQuoteLines(quoteBody, ql);
+                            var candidateText = authorLine ? (wrappedQuote + "\r" + authorLine) : wrappedQuote;
+                            tf.contents = candidateText;
+                            if (preserveStyle && style) {
+                                this.applyNoteFrameStyle(tf, style, style.size, style.horizontalScale);
+                            }
+                            try { curGb = tf.geometricBounds; } catch(cbe2) { curGb = null; }
+                            var testW = curGb ? Math.abs(curGb[2] - curGb[0]) : bestW;
+                            if (testW < bestW) {
+                                bestW = testW;
+                                bestText = candidateText;
+                            }
+                            if (testW <= maxWidthPt) {
+                                break;
+                            }
+                        }
+
+                        if (tf.contents !== bestText) {
+                            tf.contents = bestText;
+                            if (preserveStyle && style) {
+                                this.applyNoteFrameStyle(tf, style, style.size, style.horizontalScale);
+                            }
+                        }
+
+                        try { curGb = tf.geometricBounds; } catch(cbe3) { curGb = null; }
+                        curW = curGb ? Math.abs(curGb[2] - curGb[0]) : bestW;
+
+                        // If still wider than maxWidthPt after wrapping, gently scale down font size (down to minFontSize)
+                        if (curW > maxWidthPt && style && style.size > minFontSize) {
+                            var sizeRatio = (maxWidthPt / curW) * 0.97;
+                            var targetSize = Math.max(minFontSize, Math.round(style.size * sizeRatio * 10) / 10);
+                            if (targetSize < style.size) {
+                                appliedSize = targetSize;
+                                this.applyNoteFrameStyle(tf, style, appliedSize, appliedHScale);
+                                try { curGb = tf.geometricBounds; } catch(cbe4) { curGb = null; }
+                                curW = curGb ? Math.abs(curGb[2] - curGb[0]) : curW;
+                            }
+                        }
+
+                        // Final horizontal scale trim if still slightly wider at minFontSize
+                        if (curW > maxWidthPt && style) {
+                            var hRatio = (maxWidthPt / curW) * 0.97;
+                            var targetH = Math.max(70.0, Math.floor(appliedHScale * hRatio));
+                            if (targetH < appliedHScale) {
+                                appliedHScale = targetH;
+                                this.applyNoteFrameStyle(tf, style, appliedSize, appliedHScale);
+                            }
+                        }
+                    }
+
+                    // Keep horizontal anchor alignment & vertically center next to ornament with bottom margin safety
+                    try {
+                        var finalGb = tf.geometricBounds;
+                        var dx = 0;
+                        if (typeof Justification !== "undefined" && style && style.justification === Justification.RIGHT && origAnchorRight !== null) {
+                            dx = origAnchorRight - finalGb[2];
+                        } else if (typeof Justification !== "undefined" && style && style.justification === Justification.LEFT && origAnchorLeft !== null) {
+                            dx = origAnchorLeft - finalGb[0];
+                        }
+
+                        var dy = 0;
+                        if (origMidY !== null) {
+                            var newMidY = (finalGb[1] + finalGb[3]) / 2;
+                            dy = origMidY - newMidY;
+
+                            // Clamp so bottom never goes too close to bottom edge of artboard
+                            if (slot.abIdx >= 0 && doc.artboards[slot.abIdx]) {
+                                var abr = doc.artboards[slot.abIdx].artboardRect;
+                                var abBottom = Math.min(abr[1], abr[3]);
+                                var safeBottom = abBottom + 10.0;
+                                if ((finalGb[3] + dy) < safeBottom) {
+                                    dy += (safeBottom - (finalGb[3] + dy));
+                                }
+                            }
+                        }
+                        if (Math.abs(dx) > 0.2 || Math.abs(dy) > 0.2) {
+                            tf.translate(dx, dy);
+                        }
+                    } catch(posErr) {}
+                } else if (autoWrapFit && isAreaText && style && style.size > minFontSize) {
+                    // For Area Text frames, shrink font size gently only if text overflows the box
+                    try {
+                        var safety = 0;
+                        while (safety < 6 && appliedSize > minFontSize) {
+                            safety++;
+                            var visChars = 0;
+                            for (var li = 0; li < tf.lines.length; li++) {
+                                visChars += tf.lines[li].characters.length;
+                            }
+                            var totalNonBreak = tf.contents.replace(/[\r\n]/g, "").length;
+                            if (visChars >= totalNonBreak) break;
+                            appliedSize = Math.max(minFontSize, Math.round((appliedSize - 0.5) * 10) / 10);
+                            this.applyNoteFrameStyle(tf, style, appliedSize, appliedHScale);
+                        }
+                    } catch(areaErr) {}
                 }
 
                 if (style && style.fontName) lastFontName = style.fontName;
-                if (style && style.size > 0) lastFontSize = Math.round(style.size * 10) / 10;
+                if (appliedSize > 0) lastFontSize = Math.round(appliedSize * 10) / 10;
                 filledCount++;
             } catch(tfErr) {}
         }

@@ -2,6 +2,22 @@
 
 All notable changes to **Auto Filler Pro (ColorLab Edition)** will be documented in this file.
 
+## [3.2.0 Pro] - 2026-11-26
+
+### Added & Fixed
+- **📝 Smart Note Bani Auto-Wrap, Resize & Vertical Alignment (`Note Bani`)**:
+  - Automatically computes available page margin width from the active artboard/spread (`computeNoteMaxWidthPt`), or lets you set `Width (mm)` / `🎯 Pick` width.
+  - Balanced multi-line word wrapping (`splitBalancedQuoteLines`) up to 3 lines (or 4 for extra-long quotes) keeping the `— Author` attribution cleanly on the bottom line.
+  - Gently shrinks font size (down to configurable `Min Size`, default `6.5 pt`) and compresses horizontal scale (`>= 70%`) if a wrapped quote still exceeds page width, then vertically re-centers beside the ornament while clamping above the page bottom margin.
+- **🐛 Comprehensive 12-Bug Audit & Fixes**:
+  - Fixed `ReferenceError: hasCustomDetailsLeading is not defined` in `populateKeyringCards` when `Keep Template Style` is disabled.
+  - Fixed Duplicator payload property mismatch (`columns`/`cardWidth`/`cardHeight` vs `cols`/`cardW`/`cardH`).
+  - Fixed Keyring `Safe Margin Auto-Fit`, `makeBold`, and combined-box details `horizontalScale` preservation.
+  - Hardened Ghost TextFrame deduplication (`<= 3 pt` + identical/empty text only) so valid nearby frames are never deleted.
+  - Removed duplicate `STEP 5`/`STEP 6` Bani/Qty blocks in `populateDiaryCards`, added `detailsFrame` auto-fit, and respected `selectSerialFormatDiary` when sending `fillSerial`.
+  - Added live `input` listeners on `inputStartIndexKeyring` and `inputStartIndexDiary`.
+  - Fixed `selectionStart` exception on `<input type="number">` during Cut/Copy/Paste, synced cross-tab previews, cached `hostscript.jsx` eval across clicks, escaped `\u2028`/`\u2029` in `JSON.stringify`, and fixed piped `install.sh` + `Install_Mac.command` error handling.
+
 ## [3.1.0 Pro] - 2026-11-26
 
 ### Added

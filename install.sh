@@ -24,12 +24,16 @@ CEP_BASE="$HOME/Library/Application Support/Adobe/CEP/extensions"
 TARGET_DIR="$CEP_BASE/com.colorlab.autofillerpro"
 mkdir -p "$CEP_BASE"
 
-# Remove legacy duplicate installs so only Auto Filler Pro appears
+# Remove legacy duplicate installs & stale caches so only Auto Filler Pro appears
 rm -rf "$CEP_BASE/Name_Card_AutoFiller" "$CEP_BASE/com.colorlab.keyringautofiller" 2>/dev/null || true
+rm -rf "$HOME/Library/Caches/CSXS/cep_cache/ILST_"*"_com.colorlab."*"autofiller"* 2>/dev/null || true
 
 # 3. Install from local source or download latest archive from GitHub
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]:-$0}" )" >/dev/null 2>&1 && pwd )"
-if [ -f "$SCRIPT_DIR/CSXS/manifest.xml" ]; then
+SCRIPT_DIR=""
+if [ -n "${BASH_SOURCE[0]:-}" ] && [ -f "${BASH_SOURCE[0]}" ]; then
+    SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+fi
+if [ -n "$SCRIPT_DIR" ] && [ -f "$SCRIPT_DIR/CSXS/manifest.xml" ]; then
     echo -e "\033[0;37m[2/4] Installing from local source files...\033[0m"
     rm -rf "$TARGET_DIR"
     mkdir -p "$TARGET_DIR"

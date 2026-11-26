@@ -7,7 +7,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Adobe Illustrator](https://img.shields.io/badge/Adobe%20Illustrator-CC%202018%20--%202026%2B-orange.svg)](https://www.adobe.com/products/illustrator.html)
 [![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Windows-blue.svg)](https://github.com/yahiabinzaman/Illustrator-info-Auto-Filler-Pro-v2.0-)
-[![Version](https://img.shields.io/badge/Version-3.1.0%20Pro-007acc.svg)](https://github.com/yahiabinzaman/Illustrator-info-Auto-Filler-Pro-v2.0-)
+[![Version](https://img.shields.io/badge/Version-3.2.0%20Pro-007acc.svg)](https://github.com/yahiabinzaman/Illustrator-info-Auto-Filler-Pro-v2.0-)
 [![Author](https://img.shields.io/badge/Developed%20by-Yahia%20Bin%20Zaman-007acc.svg)](https://github.com/yahiabinzaman)
 
 **Auto Filler Pro** (ColorLab Edition) হলো Adobe Illustrator-এর জন্য একটি আধুনিক, দ্রুত এবং সম্পূর্ণ স্বয়ংক্রিয় CEP এক্সটেনশন। কিরিং (Keyring), ডায়েরি (Diary), আইডি কার্ড, নেম-ট্যাগ এবং প্রিন্ট টেমপ্লেটে শত শত বাংলা/ইংরেজি নাম, বায়োডাটা, পিস সংখ্যা (Quantity), বাণী ও ফরম নম্বর কয়েক সেকেন্ডের মধ্যে নির্ভুলভাবে বসিয়ে দেয়।
@@ -58,6 +58,7 @@ irm https://raw.githubusercontent.com/yahiabinzaman/Illustrator-info-Auto-Filler
 
 ### 📝 ৩. Note Bani Batch Filler (১৬–৩২ পেজ নোটের বাণী)
 - **১-ক্লিকে সব পেজে বাণী সেট:** ১৬ বা ৩২ পেজের রেডি করা নোট ফাইলে একসাথে সব বাণী পেস্ট করে **Auto Fill Note Banis** ক্লিক করলেই প্রতিটি পেজের নিচের বাণী বক্সে সিরিয়াল অনুযায়ী বসে যায়।
+- **স্মার্ট অটো-র‍্যাপ ও পেজ ফিট (Smart Wrap & Fit):** লম্বা বাণী যাতে ১ লাইনে পৃষ্ঠার বাইরে না চলে যায়, সেজন্য অটোমেটিক ২–৩ লাইন (প্রয়োজনে ৪ লাইন) ব্যালান্সড ওয়ার্ড-র‍্যাপ করে, প্রয়োজনে ফন্ট সাইজ/স্কেল সামঞ্জস্য করে এবং ফুলের পাশে ভ্যার্টিক্যালি সেন্টার করে নিচের মার্জিন নিরাপদ রাখে।
 - **অরিজিনাল ফন্ট ও সাইজ প্রোটেকশন:** টেমপ্লেটে সেট করা exact ফন্ট, ফন্ট সাইজ, লিডিং, কালার এবং অ্যালাইনমেন্ট (বাম/ডান) ১০০% অক্ষত রাখে; হেডার (`শনি-শুক্র`, `বিষয়`, `তারিখ`) স্পর্শ করে না।
 - **স্মার্ট স্যাম্পল লক ও ৩২-পেজ অটো-রিজিউম:** চাইলে ১টি বাণী বক্সে `Pick Sample Bani` দিয়ে লক করা যায়, এবং ৩২টি বাণী দিয়ে ১৬-পেজ ফর্মা-১ ফিলাপ করলে পরের ফর্মা-২ তে অটোমেটিক #১৭ থেকে শুরু হয়।
 
@@ -120,4 +121,4 @@ Auto Filler Pro/
 
 - **Developed by:** [Yahia Bin Zaman](https://github.com/yahiabinzaman) / **ColorLab**
 - **Repository:** [Illustrator-info-Auto-Filler-Pro-v2.0-](https://github.com/yahiabinzaman/Illustrator-info-Auto-Filler-Pro-v2.0-)
-- **Version:** `3.1.0 Pro`
+- **Version:** `3.2.0 Pro`
