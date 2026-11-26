@@ -8,7 +8,8 @@ All notable changes to **Auto Filler Pro (ColorLab Edition)** will be documented
 - **📝 Smart Note Bani Auto-Wrap, Resize & Vertical Alignment (`Note Bani`)**:
   - Automatically computes available page margin width from the active artboard/spread (`computeNoteMaxWidthPt`), or lets you set `Width (mm)` / `🎯 Pick` width.
   - Balanced multi-line word wrapping (`splitBalancedQuoteLines`) up to 3 lines (or 4 for extra-long quotes) keeping the `— Author` attribution cleanly on the bottom line.
-  - Gently shrinks font size (down to configurable `Min Size`, default `6.5 pt`) and compresses horizontal scale (`>= 70%`) if a wrapped quote still exceeds page width, then vertically re-centers beside the ornament while clamping above the page bottom margin.
+  - Added `Left/Right Cut Gap (mm)` (default `20 mm`) and `Bottom Cut Gap (mm)` (default `7 mm`) strict geometric cutting-margin protection so long Bangla/Arabic Banis wrap, scale, and stay clear of trim edges.
+  - Gently shrinks font size (down to configurable `Min Size`, default `6.5 pt`) and compresses horizontal scale (`>= 70%`) if a wrapped quote still exceeds page width, then vertically re-centers beside the ornament while clamping above the `7 mm` bottom cutting edge.
 - **🐛 Comprehensive 12-Bug Audit & Fixes**:
   - Fixed `ReferenceError: hasCustomDetailsLeading is not defined` in `populateKeyringCards` when `Keep Template Style` is disabled.
   - Fixed Duplicator payload property mismatch (`columns`/`cardWidth`/`cardHeight` vs `cols`/`cardW`/`cardH`).

@@ -3542,7 +3542,7 @@ var CardAutoFiller = {
         });
     },
 
-    computeNoteMaxWidthPt: function(doc, slot, customMaxMm, allSlots) {
+    computeNoteMaxWidthPt: function(doc, slot, customMaxMm, allSlots, sideMarginMm) {
         if (customMaxMm && customMaxMm > 0) {
             return customMaxMm * 72.0 / 25.4;
         }
@@ -3552,6 +3552,9 @@ var CardAutoFiller = {
         var gb = null;
         try { gb = tf.geometricBounds; } catch(e) {}
         if (!gb) return 190.0;
+
+        var sMm = (sideMarginMm !== undefined && sideMarginMm >= 0) ? sideMarginMm : 20.0;
+        var sideMarginPt = sMm * 72.0 / 25.4;
 
         var origW = Math.abs(gb[2] - gb[0]);
         if (abIdx >= 0 && doc && doc.artboards && doc.artboards[abIdx]) {
@@ -3572,31 +3575,41 @@ var CardAutoFiller = {
                 }
             }
             var isSpread = (slotsOnAb >= 2) || (abW > abH * 1.15);
-            var outerMargin = 22.0; // ~7.8mm safe page edge margin
             var spinePad = 14.0;
             var cx = slot.cx;
 
-            var pageLeft = (isSpread && cx > midX) ? (midX + spinePad) : (abL + outerMargin);
-            var pageRight = (isSpread && cx <= midX) ? (midX - spinePad) : (abR - outerMargin);
+            var pageLeft = (isSpread && cx > midX) ? (midX + spinePad) : (abL + sideMarginPt);
+            var pageRight = (isSpread && cx <= midX) ? (midX - spinePad) : (abR - sideMarginPt);
 
             var avail = 0;
             var just = style.justification;
             if (typeof Justification !== "undefined") {
                 if (just === Justification.RIGHT) {
-                    avail = gb[2] - pageLeft;
+                    var rightAnchor = Math.min(gb[2], pageRight);
+                    avail = rightAnchor - pageLeft;
                 } else if (just === Justification.LEFT) {
-                    avail = pageRight - gb[0];
+                    var leftAnchor = Math.max(gb[0], pageLeft);
+                    avail = pageRight - leftAnchor;
                 } else {
-                    var halfSpace = Math.min(cx - pageLeft, pageRight - cx);
-                    avail = halfSpace * 2;
+                    // Center-aligned: anchor near flower or center within safe bounds
+                    if (isSpread) {
+                        var safeAnchor = (cx <= midX) ? Math.min(gb[2], pageRight) : Math.max(gb[0], pageLeft);
+                        avail = (cx <= midX) ? (safeAnchor - pageLeft) : (pageRight - safeAnchor);
+                        if (avail < 90) avail = pageRight - pageLeft;
+                    } else {
+                        var halfSpace = Math.min(Math.max(0, cx - pageLeft), Math.max(0, pageRight - cx));
+                        avail = Math.max(halfSpace * 2, (pageRight - pageLeft) * 0.75);
+                    }
                 }
             } else {
-                // Fallback if Justification enum unavailable
-                avail = (cx <= midX) ? (gb[2] - pageLeft) : (pageRight - gb[0]);
+                avail = (isSpread && cx <= midX) ? (Math.min(gb[2], pageRight) - pageLeft) : (pageRight - Math.max(gb[0], pageLeft));
             }
 
-            if (avail >= 80) return avail;
-            return Math.max(120, isSpread ? (abW * 0.36) : (abW * 0.78));
+            // Never exceed the single-page safe zone [pageLeft, pageRight]
+            var zoneMax = Math.max(80, pageRight - pageLeft);
+            if (avail > zoneMax) avail = zoneMax;
+            if (avail >= 70) return avail;
+            return zoneMax;
         }
 
         return Math.max(origW, 190.0);
@@ -3708,6 +3721,13 @@ var CardAutoFiller = {
         var minFontSize = parseFloat(payload.minFontSize);
         if (isNaN(minFontSize) || minFontSize <= 0) minFontSize = 6.5;
 
+        var sideMarginMm = parseFloat(payload.sideMarginMm);
+        if (isNaN(sideMarginMm) || sideMarginMm < 0) sideMarginMm = 20.0;
+        var bottomMarginMm = parseFloat(payload.bottomMarginMm);
+        if (isNaN(bottomMarginMm) || bottomMarginMm < 0) bottomMarginMm = 7.0;
+        var sideMarginPt = sideMarginMm * 72.0 / 25.4;
+        var bottomMarginPt = bottomMarginMm * 72.0 / 25.4;
+
         if (!entries.length || startIndex >= entries.length) {
             return JSON.stringify({ status: "error", message: "No Note Banis left to place." });
         }
@@ -3742,7 +3762,7 @@ var CardAutoFiller = {
                 var origMidY = origGb ? ((origGb[1] + origGb[3]) / 2) : null;
                 var origAnchorRight = origGb ? origGb[2] : null;
                 var origAnchorLeft = origGb ? origGb[0] : null;
-                var maxWidthPt = autoWrapFit ? this.computeNoteMaxWidthPt(doc, slot, maxWidthMm, slots) : 0;
+                var maxWidthPt = autoWrapFit ? this.computeNoteMaxWidthPt(doc, slot, maxWidthMm, slots, sideMarginMm) : 0;
 
                 // Separate quote lines from trailing author attribution line ("— Author")
                 var bLines = cleanBani.split("\r");
@@ -3839,7 +3859,7 @@ var CardAutoFiller = {
                         }
                     }
 
-                    // Keep horizontal anchor alignment & vertically center next to ornament with bottom margin safety
+                    // Keep horizontal anchor alignment, center vertically beside ornament, and strictly enforce 20mm side & 7mm bottom cut gaps
                     try {
                         var finalGb = tf.geometricBounds;
                         var dx = 0;
@@ -3853,17 +3873,29 @@ var CardAutoFiller = {
                         if (origMidY !== null) {
                             var newMidY = (finalGb[1] + finalGb[3]) / 2;
                             dy = origMidY - newMidY;
+                        }
 
-                            // Clamp so bottom never goes too close to bottom edge of artboard
-                            if (slot.abIdx >= 0 && doc.artboards[slot.abIdx]) {
-                                var abr = doc.artboards[slot.abIdx].artboardRect;
-                                var abBottom = Math.min(abr[1], abr[3]);
-                                var safeBottom = abBottom + 10.0;
-                                if ((finalGb[3] + dy) < safeBottom) {
-                                    dy += (safeBottom - (finalGb[3] + dy));
-                                }
+                        if (slot.abIdx >= 0 && doc.artboards[slot.abIdx]) {
+                            var abr = doc.artboards[slot.abIdx].artboardRect;
+                            var abL = Math.min(abr[0], abr[2]);
+                            var abR = Math.max(abr[0], abr[2]);
+                            var abB = Math.min(abr[1], abr[3]);
+
+                            var safeLeft = abL + sideMarginPt;
+                            var safeRight = abR - sideMarginPt;
+                            var safeBottom = abB + bottomMarginPt;
+
+                            if ((finalGb[0] + dx) < safeLeft) {
+                                dx += (safeLeft - (finalGb[0] + dx));
+                            }
+                            if ((finalGb[2] + dx) > safeRight) {
+                                dx -= ((finalGb[2] + dx) - safeRight);
+                            }
+                            if ((finalGb[3] + dy) < safeBottom) {
+                                dy += (safeBottom - (finalGb[3] + dy));
                             }
                         }
+
                         if (Math.abs(dx) > 0.2 || Math.abs(dy) > 0.2) {
                             tf.translate(dx, dy);
                         }

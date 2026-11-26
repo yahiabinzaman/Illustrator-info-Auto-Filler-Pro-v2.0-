@@ -1450,6 +1450,8 @@
         var selectMaxLines = document.getElementById('selectMaxLinesNoteBani');
         var inputMaxWidth = document.getElementById('inputMaxWidthNoteBani');
         var inputMinSize = document.getElementById('inputMinFontSizeNoteBani');
+        var inputSideMargin = document.getElementById('inputSideMarginNoteBani');
+        var inputBottomMargin = document.getElementById('inputBottomMarginNoteBani');
         var chkAutoRemove = document.getElementById('chkAutoRemoveNoteBani');
         var inputStartIdx = document.getElementById('inputStartIndexNoteBani');
 
@@ -1466,6 +1468,10 @@
             var parsedMaxW = /^auto$/i.test(rawMaxW) ? 0 : (parseFloat(rawMaxW) || 0);
             var maxLinesVal = selectMaxLines ? selectMaxLines.value : 'auto';
             var minSizeVal = inputMinSize ? (parseFloat(inputMinSize.value) || 6.5) : 6.5;
+            var sideMarginVal = inputSideMargin ? parseFloat(inputSideMargin.value) : 20;
+            if (isNaN(sideMarginVal) || sideMarginVal < 0) sideMarginVal = 20;
+            var bottomMarginVal = inputBottomMargin ? parseFloat(inputBottomMargin.value) : 7;
+            if (isNaN(bottomMarginVal) || bottomMarginVal < 0) bottomMarginVal = 7;
 
             var entryTexts = parsedNoteBanis.map(function(e) { return e.text; });
             var payload = {
@@ -1478,6 +1484,8 @@
                 maxWidthMm: parsedMaxW,
                 maxLines: maxLinesVal,
                 minFontSize: minSizeVal,
+                sideMarginMm: sideMarginVal,
+                bottomMarginMm: bottomMarginVal,
                 sampleProfile: noteBaniSampleProfile
             };
 
