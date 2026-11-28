@@ -1,5 +1,5 @@
 # ==============================================================================
-# Auto Filler Pro (ColorLab Edition) v3.3 - Automated Installer for Windows
+# Auto Filler Pro (ColorLab Edition) v3.4 - Automated Installer for Windows
 # Supports Illustrator CC 2015.3 (v20) through CC 2026+ (CSXS 4 - 24)
 # Developed by Yahia Bin Zaman | https://github.com/yahiabinzaman
 # ==============================================================================
@@ -8,7 +8,7 @@ $ErrorActionPreference = "Stop"
 
 Write-Host ""
 Write-Host "==========================================================" -ForegroundColor Cyan
-Write-Host " Auto Filler Pro v3.3 - Windows Installer                 " -ForegroundColor Green
+Write-Host " Auto Filler Pro v3.4 - Windows Installer                 " -ForegroundColor Green
 Write-Host " Supports Illustrator CC 2015.3 (v20) - 2026+             " -ForegroundColor Cyan
 Write-Host " ColorLab Automation Suite | Yahia Bin Zaman              " -ForegroundColor Yellow
 Write-Host "==========================================================" -ForegroundColor Cyan
@@ -198,7 +198,7 @@ if (Test-Path $helperScript) {
 
 Write-Host ""
 Write-Host "==========================================================" -ForegroundColor Green
-Write-Host " [SUCCESS] Auto Filler Pro v3.3 installed!                " -ForegroundColor Green
+Write-Host " [SUCCESS] Auto Filler Pro v3.4 installed!                " -ForegroundColor Green
 Write-Host " Extension: $targetDir" -ForegroundColor Gray
 Write-Host " Scripts:   $userScripts" -ForegroundColor Gray
 Write-Host " Restart Adobe Illustrator (v20 - 2026+) and open:" -ForegroundColor Yellow

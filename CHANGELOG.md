@@ -2,6 +2,18 @@
 
 All notable changes to **Auto Filler Pro (ColorLab Edition)** will be documented in this file.
 
+## [3.4.0 Pro] - 2026-11-28
+
+### Added & Changed
+- **🖊️ New Pen Strip Auto-Filler Tab (`Pen`)**:
+  - Replaced `Canvas Move` tab with dedicated **Pen** data entry & auto-fit workflow for compact pen print strips (e.g., `25 × 5 mm` middle area + side quantity number).
+  - **1st Card & Box Reference (`🎯 Pick 1st Card` / `📐 Pick Box (mm)`)**: Automatically reads Card #1's exact Name color, Bold font, size, leading, Father/Last-line typography, side number format (English `20` or বাংলা `২০`), and target horizontal width (`mm`) / vertical height (`mm`) — or locks directly onto a selected `25 × 5 mm` guide box.
+  - **Smart Bidirectional Line Scaling**: Compresses overflowing last lines (`Address | Phone`) cleanly inside the target mm width, while automatically both reducing long Name/Father lines and gently expanding shorter Name/Father lines (`Expand Short Lines`) to balance inside the exact same horizontal space.
+  - **Smart Pen Data Parser & Existing Card Formatter**: Combines multi-line Address + Phone cleanly onto line 3 (`Address | Phone`), parses pen/piece counts (`কলম`, `পেন`, `সংখ্যা`, `পিস`, inline or standalone numbers, plus Excel tab-paste), clones missing frames from Card #1, and provides `✨ Style & Fit Existing Canvas Cards` to fix already-placed unformatted cards on canvas.
+- **🛡️ Keyring Auto-Fit Refinement (`v3.3.1` merged)**:
+  - Improved `fitTextFrameToWidth` with live PointText probe width measurement (`_createTextWidthProbe`, `_measureParaWidthPt`) and Keyring physical card width (`Card W` + `Safe Margin`) controls.
+  - Normalized ExtendScript Bengali regexes/strings with `\uXXXX` escapes and added `.gitattributes` for Windows/macOS cross-platform line endings.
+
 ## [3.3.0 Pro] - 2026-11-26
 
 ### Fixed (Windows & Illustrator CC 2015.3 v20 / CC 2020 Compatibility)

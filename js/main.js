@@ -1,7 +1,7 @@
 /**
  * Auto Filler Pro — ColorLab Edition
  * Author: Yahia Bin Zaman (https://github.com/yahiabinzaman)
- * Version: 3.3.0 Pro — Cross-Platform Windows/macOS & Illustrator 20–2026+ Engine
+ * Version: 3.4.0 Pro — Cross-Platform Windows/macOS & Illustrator 20–2026+ Engine
  */
 
 (function() {
@@ -339,6 +339,8 @@
                         parseKeyringInput();
                     } else if (active.id === 'rawTextInputNoteBani') {
                         parseNoteBaniInput();
+                    } else if (active.id === 'rawTextInputPen') {
+                        parsePenInput();
                     }
                 }
             }
@@ -393,6 +395,8 @@
                     parseKeyringInput();
                 } else if (active.id === 'rawTextInputNoteBani') {
                     parseNoteBaniInput();
+                } else if (active.id === 'rawTextInputPen') {
+                    parsePenInput();
                 }
             }
         }
@@ -411,7 +415,7 @@
         var fullCode = '';
         if (extPath) {
             var jsxLiteral = JSON.stringify(extPath + '/jsx/hostscript.jsx');
-            fullCode = 'if (typeof CardAutoFiller === "undefined" || typeof __AUTOFILLER_VER__ === "undefined" || __AUTOFILLER_VER__ !== "3.3.0") { try { $.evalFile(new File(' + jsxLiteral + ')); } catch(_e) { try { var _f = new File(' + jsxLiteral + '); if (_f.exists) { _f.encoding = "UTF-8"; _f.open("r"); var _c = _f.read().replace(/^\\s*#[^\\r\\n]*/gm, ""); _f.close(); eval(_c); } } catch(_e2) {} } } ' + code;
+            fullCode = 'if (typeof CardAutoFiller === "undefined" || typeof __AUTOFILLER_VER__ === "undefined" || __AUTOFILLER_VER__ !== "3.4.0") { try { $.evalFile(new File(' + jsxLiteral + ')); } catch(_e) { try { var _f = new File(' + jsxLiteral + '); if (_f.exists) { _f.encoding = "UTF-8"; _f.open("r"); var _c = _f.read().replace(/^\\s*#[^\\r\\n]*/gm, ""); _f.close(); eval(_c); } } catch(_e2) {} } } ' + code;
         } else {
             fullCode = code;
         }
@@ -561,6 +565,14 @@
     var currentNoteBaniStartIndex = 0;
     var noteBaniSampleProfile = null;
     var sampleNoteBaniData = "১. অলসতাকে কখনো প্রশ্রয় দেবে না; কেননা, তা সাফল্যের পথে প্রধান অন্তরায়।\n— শায়খুল হাদীস আল্লামা আজিজুল হক রহ.\n\n২. ইসলামকে যুগোপযোগী করা যাবে না; বরং যুগকে ইসলাম-উপযোগী করতে হবে।\n— আল্লামা জুনায়েদ বাবুনগরী রহ.\n\n৩. কোন সুন্নতকে ছোট মনে করে ছাড়বে না, আর কোন গুনাহকে ছোট মনে করে করবে না।\n— আল্লামা আশরাফ আলী থানভী রহ.";
+
+    var parsedPenEntries = [];
+    var currentPenStartIndex = 0;
+    var penSampleProfile = null;
+    var penBoxProfile = null;
+    var currentPenColor = "#A22F10";
+    var currentPenCmyk = [20, 90, 100, 15];
+    var samplePenData = "১. হা: মাও: মুহা: শাহ আলম (শুয়াইব)\nপিতা: মুহা: কিতাব আলী\nভাটিয়া মড়লপাড়া, করিমগঞ্জ, কিশোরগঞ্জ\n০১৮৪২২৫২৫৯১৯\nসংখ্যা: ২০\n\n২. হা: মাও: আব্দুল্লাহ সাকিব রাজাপুরী\nপিতা: মুহা: সিরাজ মিয়া\nকাকুরিয়া, নান্দাইল, ময়মনসিংহ | ০১৬১৩৮৬৩৯৭০\n১০\n\n৩. মাওলানা মুহা: মারুফ আহমেদ\nপিতা: মুহা: আলাউদ্দিন প্রামানিক\nকামারপাড়া, বাগাতিপাড়া, নাটোর\n০১৩১৯১৫২৪৮২\n৩০";
 
     // ==========================================
     // Regex Patterns for Parsing
@@ -836,11 +848,18 @@
             var nmLead = inputNmLead ? inputNmLead.value.trim() : "Auto";
 
             var chkAutoFitK = document.getElementById('chkAutoFitKeyring');
+            var inputCardWidthK = document.getElementById('inputCardWidthKeyring');
+            var inputSafeRightMarginK = document.getElementById('inputSafeRightMarginKeyring');
             var inputSafeWidthK = document.getElementById('inputSafeWidthKeyring');
             var inputMinHScaleK = document.getElementById('inputMinHScaleKeyring');
-            var autoFitK = chkAutoFitK ? chkAutoFitK.checked : false;
-            var safeWidthK = inputSafeWidthK ? (parseFloat(inputSafeWidthK.value) || 45) : 45;
-            var minHScaleK = inputMinHScaleK ? (parseFloat(inputMinHScaleK.value) || 60) : 60;
+            var autoFitK = chkAutoFitK ? chkAutoFitK.checked : true;
+            var rawCardWidthK = inputCardWidthK ? parseFloat(inputCardWidthK.value) : NaN;
+            var cardWidthK = (!isNaN(rawCardWidthK) && rawCardWidthK > 0) ? rawCardWidthK : 0;
+            var rawMarginK = inputSafeRightMarginK ? parseFloat(inputSafeRightMarginK.value) : 8.5;
+            var safeRightMarginK = (!isNaN(rawMarginK) && rawMarginK >= 0) ? rawMarginK : 8.5;
+            var rawSafeWidthK = inputSafeWidthK ? parseFloat(inputSafeWidthK.value) : NaN;
+            var safeWidthK = (!isNaN(rawSafeWidthK) && rawSafeWidthK > 0) ? rawSafeWidthK : 0;
+            var minHScaleK = inputMinHScaleK ? (parseFloat(inputMinHScaleK.value) || 35) : 35;
 
             var selectLayoutGridK = document.getElementById('selectLayoutGridKeyring');
             var selectFrameModeK = document.getElementById('selectFrameModeKeyring');
@@ -850,6 +869,8 @@
             var payload = {
                 keepTemplateStyle: keepTemplateStyle,
                 autoFit: autoFitK,
+                cardWidthMm: cardWidthK,
+                safeRightMarginMm: safeRightMarginK,
                 safeWidthMm: safeWidthK,
                 minHScale: minHScaleK,
                 layoutGrid: layoutGridK,
@@ -1648,7 +1669,579 @@
     }
 
     // ==========================================
-    // Canvas Move & Helper Actions
+    // Pen Strip Parser & Controller
+    // ==========================================
+    var penQtyLineRegex = /^(?:পরিমাণ|পরিমান|সংখ্যা|কলম|পেন|পিস|রিংস|রিং|কিরিং|কি-রিং|Pcs|Pen|Pens|Qty|Quantity|Order)\s*[:\-\s]?\s*([০-৯0-9]{1,4})\s*(?:পিস|টি|কলম|পেন|Pcs|Pc|Pens?)?$/i;
+    var penInlineQtyRegex = /(?:[-–—•,\(\[]|\s)(?:কলম|পেন|পরিমাণ|পরিমান|সংখ্যা|পিস|টি|Pen|Pens|Pcs|Qty|Quantity|Order)\s*[:\-\s]?\s*([০-৯0-9]{1,4})(?:\s*(?:পিস|টি|কলম|পেন|Pcs|Pc|Pens?))?\s*[\)\]]?$/i;
+    var penNumUnitSuffixRegex = /(?:\s*[-–—•,:\|]\s*|\s+)([০-৯0-9]{1,4})\s*(?:পিস|টি|কলম|পেন|Pcs|Pc|Pens?)\s*$/i;
+    var penParenQtyRegex = /[\(\[]\s*([০-৯0-9]{1,4})\s*(?:পিস|টি|কলম|পেন|Pcs|Pc|Pens?)?\s*[\)\]]$/i;
+    var penAfterPhoneQtyRegex = /^(.+?(?:\+?88)?[০-৯0-9]{8,}[০-৯0-9\-\s,]*)\s+[-–—]\s*([০-৯0-9]{1,4})(?:\s*(?:পিস|টি|কলম|পেন|Pcs|Pc|Pens?))?\s*$/i;
+    var penSerialWithNameRegex = /^[০-৯0-9]{1,4}[\.\-\)]\s+\S/;
+    var penFatherRegex = /^(?:পিতা|মাতা|পিতার\s*নাম|বাবার\s*নাম|অভিভাবক|Father|S\/O|C\/O|wcZv)/i;
+    var penPhonePrefixRegex = /^(?:মোবাইল|ফোন|যোগাযোগ|নাম্বার|মোবাঃ|মোঃ|Mobile|Phone|Mob|Cell|Contact)\s*[:\-]?\s*/i;
+
+    function isPenPhoneOnlyLine(line) {
+        if (!line) return false;
+        var stripped = line.replace(penPhonePrefixRegex, '').trim();
+        if (!stripped) return false;
+        if (/[a-zA-Z\u0980-\u09E5\u09F0-\u09FF]/.test(stripped.replace(/(?:মোবাইল|ফোন|Mobile|Phone|Cell)/gi, ''))) {
+            return false;
+        }
+        var digits = stripped.replace(/[^০-৯0-9]/g, '');
+        return digits.length >= 8;
+    }
+
+    function stripPenPhoneLabel(line) {
+        if (!line) return '';
+        return line.replace(penPhonePrefixRegex, '').trim();
+    }
+
+    function buildPenEntryFromLines(blk, stripNum, combineAddrPhone, rawBlockText) {
+        var item = {
+            serial: '',
+            name: '',
+            lines: [],
+            details: '',
+            qty: '',
+            rawText: rawBlockText || blk.join('\n')
+        };
+
+        var nonMeta = [];
+        for (var l = 0; l < blk.length; l++) {
+            var lText = blk[l].trim();
+            if (!lText) continue;
+
+            var qLineM = lText.match(penQtyLineRegex);
+            if (qLineM) {
+                item.qty = qLineM[1];
+                continue;
+            }
+
+            var iqM = lText.match(penInlineQtyRegex);
+            if (iqM) {
+                item.qty = iqM[1];
+                lText = lText.replace(penInlineQtyRegex, '').replace(/[-–—•,:\s]+$/, '').trim();
+                if (!lText) continue;
+            } else {
+                var nuM = lText.match(penNumUnitSuffixRegex);
+                if (nuM) {
+                    item.qty = nuM[1];
+                    lText = lText.replace(penNumUnitSuffixRegex, '').replace(/[-–—•,:\s]+$/, '').trim();
+                    if (!lText) continue;
+                } else {
+                    var pqM = lText.match(penParenQtyRegex);
+                    if (pqM && lText.length > pqM[0].length + 3) {
+                        item.qty = pqM[1];
+                        lText = lText.substring(0, lText.length - pqM[0].length).replace(/[-–—•,:\s]+$/, '').trim();
+                        if (!lText) continue;
+                    } else {
+                        var apM = lText.match(penAfterPhoneQtyRegex);
+                        if (apM) {
+                            item.qty = apM[2];
+                            lText = apM[1].trim();
+                        }
+                    }
+                }
+            }
+
+            if (l === 0 && !item.serial && serialLineRegex.test(lText)) {
+                item.serial = lText.replace(/[\.\-\)\:\s]/g, '');
+                continue;
+            }
+
+            nonMeta.push(lText);
+        }
+
+        if (!item.qty && nonMeta.length > 1) {
+            var lastL = nonMeta[nonMeta.length - 1];
+            if (/^[০-৯0-9]{1,4}$/.test(lastL)) {
+                item.qty = lastL;
+                nonMeta.pop();
+            }
+        }
+
+        if (!nonMeta.length) return null;
+
+        var rawName = nonMeta[0];
+        var cleanName = rawName.replace(serialPrefixRegex, '').trim();
+        if (!item.serial) {
+            var mPref = rawName.match(serialPrefixRegex);
+            if (mPref) item.serial = mPref[0].replace(/[\.\-\)\:\s]/g, '');
+        }
+
+        item.name = stripNum ? cleanName : rawName;
+        if (!item.name) return null;
+
+        var rest = nonMeta.slice(1);
+        var finalLines = [item.name];
+
+        if (combineAddrPhone && rest.length >= 2) {
+            if (rest.length >= 3) {
+                finalLines.push(rest[0]);
+                var tail = rest.slice(1);
+                var addrParts = [];
+                var phoneParts = [];
+                for (var t = 0; t < tail.length; t++) {
+                    if (isPenPhoneOnlyLine(tail[t])) {
+                        phoneParts.push(stripPenPhoneLabel(tail[t]));
+                    } else {
+                        addrParts.push(tail[t]);
+                    }
+                }
+                if (addrParts.length > 0 && phoneParts.length > 0) {
+                    finalLines.push(addrParts.join(', ') + ' | ' + phoneParts.join(', '));
+                } else if (addrParts.length > 0) {
+                    finalLines.push(addrParts.join(', '));
+                } else if (phoneParts.length > 0) {
+                    finalLines.push(phoneParts.join(', '));
+                }
+            } else {
+                // Exactly 2 detail lines
+                if (!penFatherRegex.test(rest[0]) && isPenPhoneOnlyLine(rest[1])) {
+                    finalLines.push(rest[0] + ' | ' + stripPenPhoneLabel(rest[1]));
+                } else {
+                    finalLines.push(rest[0]);
+                    finalLines.push(rest[1]);
+                }
+            }
+        } else {
+            for (var r = 0; r < rest.length; r++) {
+                finalLines.push(rest[r]);
+            }
+        }
+
+        item.lines = finalLines;
+        item.details = finalLines.slice(1).join('\n');
+        return item;
+    }
+
+    function parsePenBlocks(rawText, stripNum, combineAddrPhone) {
+        if (!rawText) return [];
+        var normalized = rawText.replace(/\r\n|\r/g, '\n').trim();
+        if (!normalized) return [];
+
+        var rawLines = normalized.split('\n');
+        var tabLineCount = 0;
+        var nonEmptyCount = 0;
+        for (var tl = 0; tl < rawLines.length; tl++) {
+            var trimmed = rawLines[tl].trim();
+            if (!trimmed) continue;
+            nonEmptyCount++;
+            if (trimmed.indexOf('\t') !== -1) tabLineCount++;
+        }
+
+        var result = [];
+        // Support spreadsheet/Excel tab-separated rows
+        if (nonEmptyCount >= 1 && tabLineCount === nonEmptyCount && tabLineCount >= 1) {
+            for (var ti = 0; ti < rawLines.length; ti++) {
+                var row = rawLines[ti].trim();
+                if (!row) continue;
+                var cols = row.split('\t').map(function(c) { return c.trim(); }).filter(Boolean);
+                var entryT = buildPenEntryFromLines(cols, stripNum, combineAddrPhone, row);
+                if (entryT) result.push(entryT);
+            }
+            return result;
+        }
+
+        var blocks = [];
+        var curLines = [];
+
+        for (var i = 0; i < rawLines.length; i++) {
+            var line = rawLines[i].trim();
+            if (!line) {
+                if (curLines.length > 0) {
+                    blocks.push(curLines);
+                    curLines = [];
+                }
+            } else {
+                var isSerial = serialLineRegex.test(line) && line.replace(/\D/g, '').length < 6;
+                var isSerialWithName = penSerialWithNameRegex.test(line);
+                if (curLines.length >= 2 && isSerialWithName) {
+                    blocks.push(curLines);
+                    curLines = [line];
+                } else if (curLines.length >= 2 && isSerial) {
+                    var hasPunct = /[\.\-\)\:]/.test(line);
+                    var curHasSerial = serialLineRegex.test(curLines[0]);
+                    var nextLine = (i + 1 < rawLines.length) ? rawLines[i + 1].trim() : '';
+                    var nextIsSerial = nextLine && serialLineRegex.test(nextLine);
+                    var nextLooksLikeName = nextLine && !nextIsSerial && !penQtyLineRegex.test(nextLine);
+
+                    if (!hasPunct && nextIsSerial) {
+                        // Trailing bare qty (e.g. "20") right before next serial ("২")
+                        curLines.push(line);
+                    } else if (curHasSerial && nextLooksLikeName) {
+                        blocks.push(curLines);
+                        curLines = [line];
+                    } else if (hasPunct && nextLooksLikeName) {
+                        blocks.push(curLines);
+                        curLines = [line];
+                    } else {
+                        curLines.push(line);
+                    }
+                } else {
+                    curLines.push(line);
+                }
+            }
+        }
+        if (curLines.length > 0) blocks.push(curLines);
+
+        for (var b = 0; b < blocks.length; b++) {
+            var entry = buildPenEntryFromLines(blocks[b], stripNum, combineAddrPhone, blocks[b].join('\n'));
+            if (entry) result.push(entry);
+        }
+
+        return result;
+    }
+
+    function parsePenInput() {
+        var rawInput = document.getElementById('rawTextInputPen');
+        var chkStrip = document.getElementById('chkStripNumberPen');
+        var chkCombine = document.getElementById('chkCombineAddressPhonePen');
+        var raw = rawInput ? rawInput.value.trim() : '';
+        var stripNum = chkStrip ? chkStrip.checked : true;
+        var combineAddrPhone = chkCombine ? chkCombine.checked : true;
+
+        parsedPenEntries = parsePenBlocks(raw, stripNum, combineAddrPhone);
+        renderPenPreview();
+    }
+
+    function renderPenPreview() {
+        var previewList = document.getElementById('previewListPen');
+        var countBadge = document.getElementById('entriesCountBadgePen');
+        if (!previewList) return;
+        previewList.innerHTML = '';
+
+        if (countBadge) {
+            var rem = Math.max(0, parsedPenEntries.length - currentPenStartIndex);
+            if (currentPenStartIndex > 0) {
+                countBadge.textContent = 'Remaining: ' + rem + ' / ' + parsedPenEntries.length + ' Entries';
+            } else {
+                countBadge.textContent = parsedPenEntries.length + ' Entries';
+            }
+        }
+
+        if (!parsedPenEntries.length) {
+            previewList.innerHTML = '<div class="empty-text">No entries parsed. Paste pen list above or click "Sample".</div>';
+            return;
+        }
+
+        var fragment = document.createDocumentFragment();
+        parsedPenEntries.forEach(function(entry, idx) {
+            var itemEl = document.createElement('div');
+            itemEl.className = 'preview-item';
+            if (idx < currentPenStartIndex) {
+                itemEl.classList.add('filled');
+            }
+
+            var topRow = document.createElement('div');
+            topRow.className = 'preview-header-row';
+
+            var nameEl = document.createElement('div');
+            nameEl.className = 'preview-name';
+            nameEl.textContent = entry.name || '(Empty Name)';
+
+            var badgeEl = document.createElement('div');
+            badgeEl.className = 'preview-badge';
+            if (idx < currentPenStartIndex) {
+                badgeEl.textContent = 'Filled #' + (idx + 1);
+                badgeEl.classList.add('badge-filled');
+            } else {
+                badgeEl.textContent = (entry.qty ? (entry.qty + ' পিস ') : '') + '#' + (idx + 1);
+                badgeEl.classList.add('badge-next');
+            }
+
+            topRow.appendChild(nameEl);
+            topRow.appendChild(badgeEl);
+            itemEl.appendChild(topRow);
+
+            if (entry.details) {
+                var detEl = document.createElement('div');
+                detEl.className = 'preview-details';
+                detEl.textContent = entry.details.replace(/\r|\n/g, ' • ');
+                itemEl.appendChild(detEl);
+            }
+
+            fragment.appendChild(itemEl);
+        });
+
+        previewList.appendChild(fragment);
+    }
+
+    function updatePenStatusUI(cardCount, summaryText, isLocked) {
+        var statusText = document.getElementById('penSlotStatusText');
+        var countBadge = document.getElementById('penSlotCountBadge');
+        var btnReset = document.getElementById('btnResetSamplePen');
+
+        var hasLock = !!(penSampleProfile || penBoxProfile || isLocked);
+        if (btnReset) {
+            btnReset.style.display = hasLock ? 'inline-flex' : 'none';
+        }
+        if (countBadge) {
+            if (typeof cardCount === 'number' && cardCount > 0) {
+                countBadge.textContent = cardCount + ' Cards';
+            } else if (penBoxProfile) {
+                countBadge.textContent = penBoxProfile.widthMm + '×' + penBoxProfile.heightMm + 'mm';
+            } else if (penSampleProfile) {
+                countBadge.textContent = 'Card 1 Locked';
+            } else {
+                countBadge.textContent = 'Auto';
+            }
+            if (hasLock) countBadge.classList.add('locked');
+            else countBadge.classList.remove('locked');
+        }
+        if (statusText) {
+            if (summaryText) {
+                statusText.textContent = summaryText;
+            } else if (penSampleProfile && penBoxProfile) {
+                statusText.textContent = 'Locked: ' + (penSampleProfile.fontName || 'Card 1') + ' • Box ' + penBoxProfile.widthMm + '×' + penBoxProfile.heightMm + 'mm';
+            } else if (penSampleProfile) {
+                statusText.textContent = 'Locked Card 1: ' + (penSampleProfile.fontName || 'Font') + (penSampleProfile.nameColorHex ? (' • ' + penSampleProfile.nameColorHex) : '');
+            } else if (penBoxProfile) {
+                statusText.textContent = 'Locked Box: ' + penBoxProfile.widthMm + ' × ' + penBoxProfile.heightMm + ' mm';
+            } else {
+                statusText.textContent = 'Auto: ১ম কার্ডের কালার ও মাপ অনুযায়ী বসবে';
+            }
+        }
+    }
+
+    function buildPenPayload() {
+        var selectScope = document.getElementById('selectScopePen');
+        var selectOrder = document.getElementById('selectFillOrderPen');
+        var chkAutoFit = document.getElementById('chkAutoFitPen');
+        var inputW = document.getElementById('inputTargetWidthPen');
+        var inputH = document.getElementById('inputTargetHeightPen');
+        var chkExpand = document.getElementById('chkExpandShortPen');
+        var inputMinName = document.getElementById('inputMinNameHScalePen');
+        var inputMaxName = document.getElementById('inputMaxNameHScalePen');
+        var inputMinFather = document.getElementById('inputMinFatherHScalePen');
+        var inputMaxFather = document.getElementById('inputMaxFatherHScalePen');
+        var inputMinLast = document.getElementById('inputMinLastHScalePen');
+        var inputMinSize = document.getElementById('inputMinFontSizePen');
+        var chkKeepCard1 = document.getElementById('chkKeepCard1StylePen');
+        var chkBold = document.getElementById('chkMakeBoldPen');
+        var chkCombine = document.getElementById('chkCombineAddressPhonePen');
+        var chkStrip = document.getElementById('chkStripNumberPen');
+        var chkFillQty = document.getElementById('chkFillQtyPen');
+        var selectQtyFmt = document.getElementById('selectQtyFormatPen');
+        var chkSkipFirst = document.getElementById('chkSkipFirstCardPen');
+        var chkSkipFilled = document.getElementById('chkSkipFilledPen');
+        var chkOverrideColor = document.getElementById('chkOverrideColorPen');
+
+        var rawW = inputW ? inputW.value.trim() : 'Auto';
+        var parsedW = /^auto$/i.test(rawW) ? 0 : (parseFloat(rawW) || 0);
+        var rawH = inputH ? inputH.value.trim() : 'Auto';
+        var parsedH = /^auto$/i.test(rawH) ? 0 : (parseFloat(rawH) || 0);
+
+        return {
+            entries: parsedPenEntries,
+            startIndex: currentPenStartIndex,
+            scope: selectScope ? selectScope.value : 'artboard',
+            order: selectOrder ? selectOrder.value : 'column',
+            autoFit: chkAutoFit ? chkAutoFit.checked : true,
+            targetWidthMm: parsedW,
+            targetHeightMm: parsedH,
+            expandShort: chkExpand ? chkExpand.checked : true,
+            minNameHScale: inputMinName ? (parseFloat(inputMinName.value) || 45) : 45,
+            maxNameHScale: inputMaxName ? (parseFloat(inputMaxName.value) || 130) : 130,
+            minFatherHScale: inputMinFather ? (parseFloat(inputMinFather.value) || 45) : 45,
+            maxFatherHScale: inputMaxFather ? (parseFloat(inputMaxFather.value) || 115) : 115,
+            minLastHScale: inputMinLast ? (parseFloat(inputMinLast.value) || 35) : 35,
+            minFontSize: inputMinSize ? (parseFloat(inputMinSize.value) || 4.0) : 4.0,
+            keepCard1Style: chkKeepCard1 ? chkKeepCard1.checked : true,
+            makeBold: chkBold ? chkBold.checked : true,
+            combineAddressPhone: chkCombine ? chkCombine.checked : true,
+            stripNumber: chkStrip ? chkStrip.checked : true,
+            fillQty: chkFillQty ? chkFillQty.checked : true,
+            qtyFormat: selectQtyFmt ? selectQtyFmt.value : 'auto',
+            skipFirstCard: chkSkipFirst ? chkSkipFirst.checked : false,
+            skipFilledCards: chkSkipFilled ? chkSkipFilled.checked : true,
+            overrideColor: chkOverrideColor ? chkOverrideColor.checked : false,
+            nameColor: currentPenColor,
+            nameCmyk: currentPenCmyk,
+            sampleProfile: penSampleProfile,
+            boxProfile: penBoxProfile
+        };
+    }
+
+    function executeScanPenCards(silent) {
+        var payload = buildPenPayload();
+        var payloadStr = encodeURIComponent(JSON.stringify({
+            scope: payload.scope,
+            order: payload.order,
+            targetWidthMm: payload.targetWidthMm,
+            targetHeightMm: payload.targetHeightMm,
+            sampleProfile: penSampleProfile,
+            boxProfile: penBoxProfile
+        }));
+        evalHostScript('scanPenCards(decodeURIComponent("' + payloadStr + '"))', function(resStr) {
+            try {
+                var res = JSON.parse(resStr);
+                if (res.status === 'success') {
+                    updatePenStatusUI(res.count || 0, res.summary || '', !!(penSampleProfile || penBoxProfile));
+                    if (!silent) {
+                        showToast(res.message || ('Detected ' + res.count + ' Pen cards'), res.count > 0 ? 'success' : 'info');
+                    }
+                } else if (!silent) {
+                    showToast(res.message || 'Could not scan Pen cards', 'error');
+                }
+            } catch(e) {
+                if (!silent) showToast('Failed to scan Pen cards', 'error');
+            }
+        });
+    }
+
+    function executePickPenSample() {
+        evalHostScript('pickPenSample()', function(resStr) {
+            try {
+                var res = JSON.parse(resStr);
+                if (res.status === 'success' && res.sample) {
+                    penSampleProfile = res.sample;
+                    var inW = document.getElementById('inputTargetWidthPen');
+                    var inH = document.getElementById('inputTargetHeightPen');
+                    if (res.sample.boxWidthMm > 0 && inW && (!inW.value || /^auto$/i.test(inW.value.trim()))) {
+                        inW.value = res.sample.boxWidthMm;
+                    }
+                    if (res.sample.boxHeightMm > 0 && inH && (!inH.value || /^auto$/i.test(inH.value.trim()))) {
+                        inH.value = res.sample.boxHeightMm;
+                    }
+                    updatePenStatusUI(null, res.summary || '', true);
+                    showToast(res.message || 'Locked Card 1 style!', 'success');
+                    executeScanPenCards(true);
+                } else {
+                    showToast(res.message || 'Select 1st Pen card or text frame on canvas first', 'error');
+                }
+            } catch(e) {
+                showToast('Failed to pick 1st Pen card', 'error');
+            }
+        });
+    }
+
+    function executePickPenBox() {
+        evalHostScript('pickPenBox()', function(resStr) {
+            try {
+                var res = JSON.parse(resStr);
+                if (res.status === 'success' && res.box) {
+                    penBoxProfile = res.box;
+                    var inW = document.getElementById('inputTargetWidthPen');
+                    var inH = document.getElementById('inputTargetHeightPen');
+                    if (inW && res.box.widthMm > 0) inW.value = res.box.widthMm;
+                    if (inH && res.box.heightMm > 0) inH.value = res.box.heightMm;
+                    updatePenStatusUI(null, 'Box Locked: ' + res.box.widthMm + ' × ' + res.box.heightMm + ' mm', true);
+                    showToast(res.message || ('Locked Box: ' + res.box.widthMm + ' × ' + res.box.heightMm + ' mm'), 'success');
+                    executeScanPenCards(true);
+                } else {
+                    showToast(res.message || 'Select target rectangle (e.g. 25x5mm) on canvas first', 'error');
+                }
+            } catch(e) {
+                showToast('Failed to pick box size', 'error');
+            }
+        });
+    }
+
+    function executeAutoFillPen() {
+        var btnRun = document.getElementById('btnAutoFillPen');
+        var rawInput = document.getElementById('rawTextInputPen');
+        var chkAutoRemove = document.getElementById('chkAutoRemoveFilledPen');
+        var inputStartIdx = document.getElementById('inputStartIndexPen');
+
+        try {
+            if (!parsedPenEntries.length && rawInput && rawInput.value.trim()) {
+                parsePenInput();
+            }
+            if (!parsedPenEntries.length) {
+                showToast('কলমের নামের লিস্ট আগে পেস্ট করুন', 'error');
+                return;
+            }
+
+            var autoRemove = chkAutoRemove ? chkAutoRemove.checked : true;
+            var payload = buildPenPayload();
+
+            if (btnRun) {
+                btnRun.disabled = true;
+                setBtnLabel(btnRun, 'Populating Pen Cards...');
+            }
+
+            var payloadStr = encodeURIComponent(JSON.stringify(payload));
+            evalHostScript('populatePenCards(decodeURIComponent("' + payloadStr + '"))', function(resStr) {
+                if (btnRun) {
+                    btnRun.disabled = false;
+                    setBtnLabel(btnRun, 'Auto Fill Pen Cards');
+                }
+                try {
+                    var res = JSON.parse(resStr);
+                    if (res.status === 'success') {
+                        updatePenStatusUI(res.totalCards || 0, res.summary || '', !!(penSampleProfile || penBoxProfile));
+                        var placed = res.filledCount || 0;
+                        var consumedEnd = (res.consumedEndIndex !== undefined) ? res.consumedEndIndex : (currentPenStartIndex + placed);
+                        if (autoRemove) {
+                            var remaining = parsedPenEntries.slice(consumedEnd);
+                            if (rawInput) {
+                                rawInput.value = remaining.map(function(e) { return e.rawText || e.name; }).join('\n\n');
+                            }
+                            currentPenStartIndex = 0;
+                            if (inputStartIdx) inputStartIdx.value = 1;
+                            parsePenInput();
+                            showToast((res.message || ('Populated ' + placed + ' pen card(s)!')) + ' Remaining: ' + remaining.length, 'success');
+                        } else {
+                            currentPenStartIndex = res.nextStartIndex || 0;
+                            if (inputStartIdx) inputStartIdx.value = currentPenStartIndex + 1;
+                            renderPenPreview();
+                            showToast(res.message || ('Populated ' + placed + ' pen card(s)!'), 'success');
+                        }
+                    } else {
+                        showToast(res.message || 'Failed to populate Pen cards', 'error');
+                    }
+                } catch(e) {
+                    showToast('Pen cards populated!', 'info');
+                }
+            });
+        } catch(err) {
+            if (btnRun) {
+                btnRun.disabled = false;
+                setBtnLabel(btnRun, 'Auto Fill Pen Cards');
+            }
+            showToast('Error: ' + err.message, 'error');
+        }
+    }
+
+    function executeFormatExistingPen() {
+        var btnFmt = document.getElementById('btnFormatExistingPen');
+        try {
+            var payload = buildPenPayload();
+            payload.entries = [];
+            if (btnFmt) {
+                btnFmt.disabled = true;
+                setBtnLabel(btnFmt, 'Formatting Canvas Cards...');
+            }
+            var payloadStr = encodeURIComponent(JSON.stringify(payload));
+            evalHostScript('formatExistingPenCards(decodeURIComponent("' + payloadStr + '"))', function(resStr) {
+                if (btnFmt) {
+                    btnFmt.disabled = false;
+                    setBtnLabel(btnFmt, '✨ Style & Fit Existing Canvas Cards');
+                }
+                try {
+                    var res = JSON.parse(resStr);
+                    if (res.status === 'success') {
+                        updatePenStatusUI(res.totalCards || 0, res.summary || '', !!(penSampleProfile || penBoxProfile));
+                        showToast(res.message || ('Styled & fitted ' + (res.filledCount || 0) + ' Pen card(s)!'), 'success');
+                    } else {
+                        showToast(res.message || 'Failed to format canvas Pen cards', 'error');
+                    }
+                } catch(e) {
+                    showToast('Canvas Pen cards formatted!', 'info');
+                }
+            });
+        } catch(err) {
+            if (btnFmt) {
+                btnFmt.disabled = false;
+                setBtnLabel(btnFmt, '✨ Style & Fit Existing Canvas Cards');
+            }
+            showToast('Error: ' + err.message, 'error');
+        }
+    }
+
+    // ==========================================
+    // Helper Actions
     // ==========================================
     function loadFromCanvasSelection(targetTextarea, callback) {
         evalHostScript('getSelectedCanvasText()', function(resStr) {
@@ -1663,42 +2256,6 @@
                 }
             } catch (e) {
                 showToast('Failed to parse selection', 'error');
-            }
-        });
-    }
-
-    function executePlaceCanvasText() {
-        var btnPlace = document.getElementById('btnPlaceCanvasText');
-        var selectCardSort = document.getElementById('selectCardSort');
-        var selectTextSort = document.getElementById('selectTextSort');
-
-        var payload = {
-            cardOrder: selectCardSort ? selectCardSort.value : "column",
-            textOrder: selectTextSort ? selectTextSort.value : "column",
-            offsetX: 45,
-            offsetY: -15,
-            groupWithCard: true,
-            bringToFront: true
-        };
-
-        if (btnPlace) {
-            btnPlace.disabled = true;
-            setBtnLabel(btnPlace, 'Moving Text into Cards...');
-        }
-
-        var payloadStr = encodeURIComponent(JSON.stringify(payload));
-        var scriptCall = 'placeTextBlocksIntoCards(decodeURIComponent("' + payloadStr + '"))';
-        evalHostScript(scriptCall, function(resStr) {
-            if (btnPlace) {
-                btnPlace.disabled = false;
-                setBtnLabel(btnPlace, 'Move & Place Text into Cards');
-            }
-            try {
-                var res = JSON.parse(resStr);
-                if (res.status === 'success') showToast(res.message, 'success');
-                else showToast(res.message || 'Failed to place text', 'error');
-            } catch(e) {
-                showToast('Text placed successfully!', 'info');
             }
         });
     }
@@ -1904,6 +2461,122 @@
         // Initialize with default colors
         updateK(currentKeyringColor, currentKeyringCmyk);
         updateD(currentDiaryColor, currentDiaryCmyk);
+
+        // Pen Custom Name Color Controls
+        var colorPickerP = document.getElementById('colorPickerPen');
+        var colorHexP = document.getElementById('colorHexPen');
+        var btnPickP = document.getElementById('btnPickColorPen');
+        var labelP = document.getElementById('labelColorNamePen');
+
+        function updateP(hex, cmyk) {
+            currentPenColor = normalizeHex(hex);
+            if (cmyk && cmyk.length >= 4) {
+                currentPenCmyk = [
+                    Math.max(0, Math.min(100, Math.round(cmyk[0]))),
+                    Math.max(0, Math.min(100, Math.round(cmyk[1]))),
+                    Math.max(0, Math.min(100, Math.round(cmyk[2]))),
+                    Math.max(0, Math.min(100, Math.round(cmyk[3])))
+                ];
+            } else {
+                var rgb = hexToRgb(currentPenColor);
+                currentPenCmyk = rgbToCmyk(rgb.r, rgb.g, rgb.b);
+            }
+
+            if (colorPickerP) colorPickerP.value = currentPenColor;
+            if (colorHexP) colorHexP.value = currentPenColor;
+            if (labelP) labelP.textContent = currentPenColor;
+
+            var inC = document.getElementById('inputColorC_Pen');
+            var inM = document.getElementById('inputColorM_Pen');
+            var inY = document.getElementById('inputColorY_Pen');
+            var inK = document.getElementById('inputColorK_Pen');
+            if (inC) inC.value = currentPenCmyk[0];
+            if (inM) inM.value = currentPenCmyk[1];
+            if (inY) inY.value = currentPenCmyk[2];
+            if (inK) inK.value = currentPenCmyk[3];
+
+            var penSwatches = document.querySelectorAll('.pen-color-swatch');
+            penSwatches.forEach(function(sw) {
+                var sHex = normalizeHex(sw.getAttribute('data-color') || '');
+                if (sHex === currentPenColor) sw.classList.add('active');
+                else sw.classList.remove('active');
+            });
+        }
+
+        if (colorPickerP) {
+            colorPickerP.addEventListener('input', function() { updateP(this.value.toUpperCase()); });
+            colorPickerP.addEventListener('change', function() { updateP(this.value.toUpperCase()); });
+        }
+        if (colorHexP) {
+            colorHexP.addEventListener('input', function() {
+                var val = this.value.trim();
+                if (val.length === 4 || val.length === 7) updateP(normalizeHex(val));
+            });
+            colorHexP.addEventListener('change', function() { updateP(normalizeHex(this.value)); });
+        }
+        if (btnPickP) {
+            btnPickP.addEventListener('click', function() {
+                evalHostScript('getSelectedCanvasColor()', function(resStr) {
+                    try {
+                        var res = JSON.parse(resStr);
+                        if (res.status === 'success') {
+                            if (res.cmyk && res.cmyk.length >= 4) {
+                                var rgb = cmykToRgb(res.cmyk[0], res.cmyk[1], res.cmyk[2], res.cmyk[3]);
+                                var hex = rgbToHex(rgb.r, rgb.g, rgb.b);
+                                updateP(res.hex || hex, res.cmyk);
+                            } else if (res.hex) {
+                                updateP(normalizeHex(res.hex));
+                            }
+                            var chkOv = document.getElementById('chkOverrideColorPen');
+                            if (chkOv) chkOv.checked = true;
+                            showToast('Sampled Pen name color: ' + currentPenColor, 'success');
+                        } else {
+                            showToast(res.message || 'Please select an object on canvas', 'error');
+                        }
+                    } catch(e) {
+                        showToast('Failed to get canvas color', 'error');
+                    }
+                });
+            });
+        }
+
+        ['inputColorC_Pen', 'inputColorM_Pen', 'inputColorY_Pen', 'inputColorK_Pen'].forEach(function(id) {
+            var el = document.getElementById(id);
+            if (el) {
+                el.addEventListener('input', function() {
+                    var inC = document.getElementById('inputColorC_Pen');
+                    var inM = document.getElementById('inputColorM_Pen');
+                    var inY = document.getElementById('inputColorY_Pen');
+                    var inK = document.getElementById('inputColorK_Pen');
+                    var c = parseInt(inC ? inC.value : 0, 10) || 0;
+                    var m = parseInt(inM ? inM.value : 0, 10) || 0;
+                    var y = parseInt(inY ? inY.value : 0, 10) || 0;
+                    var k = parseInt(inK ? inK.value : 0, 10) || 0;
+                    currentPenCmyk = [c, m, y, k];
+                    var rgb = cmykToRgb(c, m, y, k);
+                    var hex = rgbToHex(rgb.r, rgb.g, rgb.b);
+                    currentPenColor = hex;
+                    if (colorPickerP) colorPickerP.value = hex;
+                    if (colorHexP) colorHexP.value = hex;
+                    if (labelP) labelP.textContent = hex;
+                });
+            }
+        });
+
+        var penSwatches = document.querySelectorAll('.pen-color-swatch');
+        penSwatches.forEach(function(sw) {
+            sw.addEventListener('click', function() {
+                var hex = this.getAttribute('data-color') || '#A22F10';
+                var cleanHex = normalizeHex(hex);
+                var cmyk = PRESET_PALETTE[cleanHex.toUpperCase()] || null;
+                updateP(cleanHex, cmyk);
+                var chkOv = document.getElementById('chkOverrideColorPen');
+                if (chkOv) chkOv.checked = true;
+                showToast('Pen override color set to ' + cleanHex, 'info');
+            });
+        });
+
+        updateP(currentPenColor, currentPenCmyk);
     }
 
     // ==========================================
@@ -2273,10 +2946,119 @@
             btnRunDup.addEventListener('click', executeDuplicateTemplates);
         }
 
-        // Canvas Move Listener
-        var btnPlaceCanvas = document.getElementById('btnPlaceCanvasText');
-        if (btnPlaceCanvas) {
-            btnPlaceCanvas.addEventListener('click', executePlaceCanvasText);
+        // Pen Listeners
+        var rawTextInputP = document.getElementById('rawTextInputPen');
+        if (rawTextInputP) {
+            rawTextInputP.addEventListener('input', debounce(parsePenInput, 180));
+        }
+
+        var chkStripNumP = document.getElementById('chkStripNumberPen');
+        if (chkStripNumP) chkStripNumP.addEventListener('change', parsePenInput);
+
+        var chkCombineP = document.getElementById('chkCombineAddressPhonePen');
+        if (chkCombineP) chkCombineP.addEventListener('change', parsePenInput);
+
+        var btnPasteP = document.getElementById('btnPastePen');
+        if (btnPasteP) {
+            btnPasteP.addEventListener('click', function() {
+                getSystemClipboardText(function(clipText) {
+                    if (clipText && clipText.trim()) {
+                        if (rawTextInputP) rawTextInputP.value = clipText;
+                        parsePenInput();
+                        showToast('Pasted Pen list from clipboard!', 'success');
+                    } else {
+                        showToast('Clipboard is empty (ক্লিপবোর্ড খালি)', 'error');
+                    }
+                });
+            });
+        }
+
+        var btnSampleP = document.getElementById('btnLoadSamplePen');
+        if (btnSampleP) {
+            btnSampleP.addEventListener('click', function() {
+                if (rawTextInputP) rawTextInputP.value = samplePenData;
+                parsePenInput();
+                showToast('Sample Pen data loaded!', 'info');
+            });
+        }
+
+        var btnClearP = document.getElementById('btnClearPen');
+        if (btnClearP) {
+            btnClearP.addEventListener('click', function() {
+                if (rawTextInputP) rawTextInputP.value = '';
+                parsedPenEntries = [];
+                currentPenStartIndex = 0;
+                var inIdx = document.getElementById('inputStartIndexPen');
+                if (inIdx) inIdx.value = 1;
+                renderPenPreview();
+                showToast('Cleared Pen input', 'info');
+            });
+        }
+
+        var btnLoadSelP = document.getElementById('btnLoadSelectionPen');
+        if (btnLoadSelP) {
+            btnLoadSelP.addEventListener('click', function() {
+                loadFromCanvasSelection(rawTextInputP, function() {
+                    parsePenInput();
+                });
+            });
+        }
+
+        var btnPickSampleP = document.getElementById('btnPickSamplePen');
+        if (btnPickSampleP) {
+            btnPickSampleP.addEventListener('click', executePickPenSample);
+        }
+
+        var btnPickBoxP = document.getElementById('btnPickBoxPen');
+        if (btnPickBoxP) {
+            btnPickBoxP.addEventListener('click', executePickPenBox);
+        }
+
+        var btnScanP = document.getElementById('btnScanPenCards');
+        if (btnScanP) {
+            btnScanP.addEventListener('click', function() { executeScanPenCards(false); });
+        }
+
+        var btnResetSampleP = document.getElementById('btnResetSamplePen');
+        if (btnResetSampleP) {
+            btnResetSampleP.addEventListener('click', function() {
+                penSampleProfile = null;
+                penBoxProfile = null;
+                var inW = document.getElementById('inputTargetWidthPen');
+                var inH = document.getElementById('inputTargetHeightPen');
+                if (inW) inW.value = 'Auto';
+                if (inH) inH.value = 'Auto';
+                updatePenStatusUI(0, '', false);
+                showToast('Locked card / box reference cleared — Auto mode active', 'info');
+            });
+        }
+
+        var inputStartIdxP = document.getElementById('inputStartIndexPen');
+        if (inputStartIdxP) {
+            inputStartIdxP.addEventListener('input', function() {
+                currentPenStartIndex = Math.max(0, (parseInt(this.value, 10) || 1) - 1);
+                renderPenPreview();
+            });
+        }
+
+        var btnResetIdxP = document.getElementById('btnResetIndexPen');
+        if (btnResetIdxP) {
+            btnResetIdxP.addEventListener('click', function() {
+                currentPenStartIndex = 0;
+                if (inputStartIdxP) inputStartIdxP.value = 1;
+                renderPenPreview();
+                showToast('Reset to #1', 'info');
+            });
+        }
+
+        var btnAutoFillP = document.getElementById('btnAutoFillPen');
+        if (btnAutoFillP) {
+            btnAutoFillP.addEventListener('click', executeAutoFillPen);
+        }
+
+        var btnFormatExistingP = document.getElementById('btnFormatExistingPen');
+        if (btnFormatExistingP) {
+            btnFormatExistingP.addEventListener('click', executeFormatExistingPen);
         }
 
         // Safe Width Pickers

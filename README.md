@@ -7,7 +7,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Adobe Illustrator](https://img.shields.io/badge/Adobe%20Illustrator-CC%202015.3%20(v20)%20--%202026%2B-orange.svg)](https://www.adobe.com/products/illustrator.html)
 [![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Windows-blue.svg)](https://github.com/yahiabinzaman/Illustrator-info-Auto-Filler-Pro-v2.0-)
-[![Version](https://img.shields.io/badge/Version-3.3.0%20Pro-007acc.svg)](https://github.com/yahiabinzaman/Illustrator-info-Auto-Filler-Pro-v2.0-)
+[![Version](https://img.shields.io/badge/Version-3.4.0%20Pro-007acc.svg)](https://github.com/yahiabinzaman/Illustrator-info-Auto-Filler-Pro-v2.0-)
 [![Author](https://img.shields.io/badge/Developed%20by-Yahia%20Bin%20Zaman-007acc.svg)](https://github.com/yahiabinzaman)
 
 **Auto Filler Pro** (ColorLab Edition) হলো Adobe Illustrator-এর জন্য একটি আধুনিক, দ্রুত এবং সম্পূর্ণ স্বয়ংক্রিয় CEP এক্সটেনশন। কিরিং (Keyring), ডায়েরি (Diary), আইডি কার্ড, নেম-ট্যাগ এবং প্রিন্ট টেমপ্লেটে শত শত বাংলা/ইংরেজি নাম, বায়োডাটা, পিস সংখ্যা (Quantity), বাণী ও ফরম নম্বর কয়েক সেকেন্ডের মধ্যে নির্ভুলভাবে বসিয়ে দেয়।
@@ -18,7 +18,7 @@ Developed with ❤️ by **[Yahia Bin Zaman](https://github.com/yahiabinzaman)**
 
 ## ⚡ ১-লাইনে অটো ইনস্টল (1-Line Quick Install)
 
-কোনো ফোল্ডার খোঁজা বা ম্যানুয়ালি কপি করার ঝামেলা ছাড়াই নিচের কমান্ডটি রান করলে **Auto Filler Pro v3.3** (এবং Bornomala ফন্ট) স্বয়ংক্রিয়ভাবে ইনস্টল হয়ে যাবে:
+কোনো ফোল্ডার খোঁজা বা ম্যানুয়ালি কপি করার ঝামেলা ছাড়াই নিচের কমান্ডটি রান করলে **Auto Filler Pro v3.4** (এবং Bornomala ফন্ট) স্বয়ংক্রিয়ভাবে ইনস্টল হয়ে যাবে:
 
 ### 🍎 macOS (Terminal):
 ```bash
@@ -66,8 +66,10 @@ irm https://raw.githubusercontent.com/yahiabinzaman/Illustrator-info-Auto-Filler
 - সিঙ্গেল মাস্টার কার্ড সিলেক্ট করে মোট কপি সংখ্যা, কলাম ও গ্যাপ দিয়ে স্বয়ংক্রিয়ভাবে একাধিক আর্টবোর্ড ও গ্রিড তৈরি।
 - ক্লিপড আর্টওয়ার্ক বাউন্ডস ডিটেকশনের মাধ্যমে `0 pt` গ্যাপেও নিখুঁত ফ্লাশ অ্যালাইনমেন্ট।
 
-### ↔️ ৫. Canvas Move (Direct Placement)
-- ক্যানভাসে থাকা ফ্লোটিং টেক্সট ফ্রেমগুলোকে সিলেক্ট করা খালি কার্ডের ভেতর Column-wise বা Row-by-Row অনুযায়ী সরাসরি বসিয়ে দেয়।
+### 🖊️ ৫. Pen Strip Auto-Filler (`কলমের নাম ও সংখ্যা`)
+- **১ম কার্ড ও নির্দিষ্ট mm বক্স রেফারেন্স:** প্রথম কলম কার্ডের সেট করা **Name Color, Bold, Font Size** এবং অনুভূমিক জায়গা (যেমন `25 × 5 mm` বক্স) `🎯 Pick 1st Card` বা `📐 Pick Box (mm)` দিয়ে লক করে বাকি সব কার্ডে হুবহু একই মাপ ও স্টাইলে বসায়।
+- **স্মার্ট লাইন-বাই-লাইন স্কেলিং (`কমবে / বাড়বে`):** লম্বা `Address | Phone` লাইনকে স্বয়ংক্রিয়ভাবে সংকুচিত করে নির্দিষ্ট mm এর মধ্যে রাখে, এবং Name ও পিতার লাইনকে প্রয়োজন অনুযায়ী ছোট বা বড় (Expand Short Lines) করে সুন্দরভাবে পুরো জায়গায় ফিট করে।
+- **পাশের সংখ্যা ও এক-ক্লিক ফরম্যাট:** কার্ডের পাশের পিস সংখ্যা (`20`, `10`, `30`) ১ম কার্ডের ডিজিট স্টাইল (English/বাংলা) বজায় রেখে স্বয়ংক্রিয়ভাবে বসায় এবং আগে থেকে ক্যানভাসে থাকা আনফরম্যাটেড কার্ডও `Style & Fit Existing Canvas Cards` দিয়ে এক ক্লিকে ফিট করে।
 
 ### 🔤 ৬. বাংলা ইউনিকোড, বিজয় ও বোর্নমালা (Bornomala) সাপোর্ট
 - ইউনিকোড ও বিজয় (SutonnyMJ / Bornomala) ফন্টের সাথে স্মার্ট কম্প্যাটিবিলিটি।
@@ -122,4 +124,4 @@ Auto Filler Pro/
 
 - **Developed by:** [Yahia Bin Zaman](https://github.com/yahiabinzaman) / **ColorLab**
 - **Repository:** [Illustrator-info-Auto-Filler-Pro-v2.0-](https://github.com/yahiabinzaman/Illustrator-info-Auto-Filler-Pro-v2.0-)
-- **Version:** `3.3.0 Pro`
+- **Version:** `3.4.0 Pro`

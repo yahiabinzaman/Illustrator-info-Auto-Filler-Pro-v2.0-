@@ -8,7 +8,7 @@ set -e
 
 echo ""
 echo -e "\033[1;36m==========================================================\033[0m"
-echo -e "\033[1;32m Auto Filler Pro v3.0 - Installer (macOS)                 \033[0m"
+echo -e "\033[1;32m Auto Filler Pro v3.4 - Installer (macOS)                 \033[0m"
 echo -e "\033[1;33m ColorLab Automation Suite | Yahia Bin Zaman              \033[0m"
 echo -e "\033[1;36m==========================================================\033[0m"
 echo ""
@@ -78,7 +78,7 @@ fi
 
 echo ""
 echo -e "\033[1;32m==========================================================\033[0m"
-echo -e "\033[1;32m [SUCCESS] Auto Filler Pro v3.0 installed!                \033[0m"
+echo -e "\033[1;32m [SUCCESS] Auto Filler Pro v3.4 installed!                \033[0m"
 echo -e "\033[1;37m Extension: $TARGET_DIR\033[0m"
 echo -e "\033[1;37m Scripts:   $USER_SCRIPTS\033[0m"
 echo -e "\033[1;33m Restart Adobe Illustrator and open:\033[0m"
@@ -86,4 +86,4 @@ echo -e "\033[1;37m Window > Extensions > Auto Filler Pro\033[0m"
 echo -e "\033[1;32m==========================================================\033[0m"
 echo ""
 
-osascript -e 'display notification "Auto Filler Pro v3.0 installed! Restart Illustrator to use." with title "Auto Filler Pro"' 2>/dev/null || true
+osascript -e 'display notification "Auto Filler Pro v3.4 installed! Restart Illustrator to use." with title "Auto Filler Pro"' 2>/dev/null || true

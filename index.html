@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Auto Filler Pro — ColorLab</title>
-    <link rel="stylesheet" href="css/style.css?v=3.3.0">
+    <link rel="stylesheet" href="css/style.css?v=3.4.0">
     <script>
     function switchTab(tabId) {
         if (!tabId) return;
@@ -54,7 +54,7 @@
             <div class="brand-title">
                 <span>Auto Filler Pro</span>
                 <span class="brand-sub">ColorLab</span>
-                <span class="version-badge">v3.3</span>
+                <span class="version-badge">v3.4.0</span>
             </div>
         </div>
         <div class="header-actions">
@@ -74,7 +74,7 @@
         <button type="button" class="tab-btn" data-tab="tab-diary" onclick="switchTab('tab-diary')">Diary / ID</button>
         <button type="button" class="tab-btn" data-tab="tab-note-bani" onclick="switchTab('tab-note-bani')">Note Bani</button>
         <button type="button" class="tab-btn" data-tab="tab-duplicate" onclick="switchTab('tab-duplicate')">Duplicator</button>
-        <button type="button" class="tab-btn" data-tab="tab-canvas-move" onclick="switchTab('tab-canvas-move')">Canvas Move</button>
+        <button type="button" class="tab-btn" data-tab="tab-pen" onclick="switchTab('tab-pen')">Pen</button>
     </nav>
 
     <!-- Main Scrollable Content -->
@@ -159,6 +159,29 @@ Example:
                     </label>
                 </div>
 
+                <!-- Safe Margin Auto-Fit (Always visible for Keyrings) -->
+                <div class="control-group safefit-box">
+                    <label class="checkbox-label checkbox-highlight" style="margin-bottom: 4px;">
+                        <input type="checkbox" id="chkAutoFitKeyring" checked>
+                        <span>Safe Margin Auto-Fit (ডানে জায়গা খালি রাখবে)</span>
+                    </label>
+                    <div class="flex-row gap-6" style="margin-bottom: 4px;">
+                        <span style="font-size: 10px; color: #98989d;">Card W:</span>
+                        <input type="number" id="inputCardWidthKeyring" min="10" max="500" step="0.1" value="61.9" placeholder="Auto" style="width: 48px; text-align: center;" title="Physical cut width of keyring card in mm (e.g. 61.9). Prevents grouped numbers or bleed from shifting Safe Margin. Leave blank for Auto.">
+                        <span style="font-size: 10px; color: #636366;">mm</span>
+                        <span style="font-size: 10px; color: #98989d; margin-left: auto;">Margin:</span>
+                        <input type="number" id="inputSafeRightMarginKeyring" min="0" max="50" step="0.5" value="8.5" style="width: 44px; text-align: center;" title="Minimum empty margin on card right edge (mm)">
+                        <span style="font-size: 10px; color: #636366;">mm</span>
+                    </div>
+                    <div class="flex-row gap-6">
+                        <span style="font-size: 10px; color: #636366;">Max Text W:</span>
+                        <input type="number" id="inputSafeWidthKeyring" min="10" max="500" step="0.5" value="" placeholder="Auto" style="width: 48px; text-align: center;" title="Optional manual Max Width (mm). Leave blank for auto (Card Right minus Safe Margin).">
+                        <span style="font-size: 10px; color: #636366;">mm</span>
+                        <button type="button" id="btnPickSafeWidthKeyring" class="btn btn-sm" style="margin-left: auto;" title="Pick Max Width from canvas selection">🎯 Pick</button>
+                    </div>
+                    <input type="hidden" id="inputMinHScaleKeyring" value="35">
+                </div>
+
                 <!-- Optional Advanced Controls -->
                 <details class="advanced-panel">
                     <summary>
@@ -218,20 +241,6 @@ Example:
                                     <button type="button" id="btnResetIndexKeyring" class="btn btn-sm" style="flex: 1;" title="Reset to #1">Reset</button>
                                 </div>
                             </div>
-                        </div>
-
-                        <div class="control-group safefit-box">
-                            <label class="checkbox-label checkbox-highlight" style="margin-bottom: 4px;">
-                                <input type="checkbox" id="chkAutoFitKeyring">
-                                <span>Safe Margin Auto-Fit (প্রয়োজন হলে)</span>
-                            </label>
-                            <div class="flex-row gap-6">
-                                <span style="font-size: 10px; color: #98989d;">Max Width:</span>
-                                <input type="number" id="inputSafeWidthKeyring" min="10" max="500" step="0.5" value="45" style="width: 52px; text-align: center;">
-                                <span style="font-size: 10px; color: #636366;">mm</span>
-                                <button type="button" id="btnPickSafeWidthKeyring" class="btn btn-sm" style="margin-left: auto;">🎯 Pick</button>
-                            </div>
-                            <input type="hidden" id="inputMinHScaleKeyring" value="60">
                         </div>
                     </div>
                 </details>
@@ -720,45 +729,257 @@ Example:
             </button>
         </div>
 
-        <!-- TAB 4: Canvas Move -->
-        <div id="tab-canvas-move" class="tab-pane">
+        <!-- TAB 5: Pen Strip Auto-Filler -->
+        <div id="tab-pen" class="tab-pane">
+            <!-- Data List -->
             <div class="section-box">
                 <div class="section-header">
-                    <span class="section-title">Canvas Direct Placement</span>
+                    <span class="section-title">Pen Data List (নাম ও সংখ্যা)</span>
+                    <div class="flex-row gap-4">
+                        <button type="button" id="btnPastePen" class="btn btn-sm btn-accent" title="Paste pen entries from clipboard">📋 Paste</button>
+                        <button type="button" id="btnLoadSamplePen" class="btn btn-sm">Sample</button>
+                        <button type="button" id="btnClearPen" class="btn btn-sm">Clear</button>
+                    </div>
                 </div>
-                <p style="font-size: 10.5px; color: #98989d; line-height: 1.4;">
-                    Select blank template cards on canvas and floating text frames, then move them directly into position.
-                </p>
 
-                <div class="grid-2">
-                    <div class="control-group">
-                        <label for="selectCardSort">Card Direction</label>
-                        <select id="selectCardSort">
-                            <option value="column" selected>Column-wise</option>
-                            <option value="zigzag">Row by Row</option>
-                        </select>
-                    </div>
-                    <div class="control-group">
-                        <label for="selectTextSort">Text Direction</label>
-                        <select id="selectTextSort">
-                            <option value="column" selected>Column-wise</option>
-                            <option value="zigzag">Row by Row</option>
-                        </select>
-                    </div>
+                <textarea id="rawTextInputPen" placeholder="কলমের নামের লিস্ট এখানে পেস্ট করুন...
+উদাহরণ:
+১. হা: মাও: মুহা: শাহ আলম (শুয়াইব)
+পিতা: মুহা: কিতাব আলী
+ভাটিয়া মড়লপাড়া, করিমগঞ্জ, কিশোরগঞ্জ
+০১৮৪২২৫২৫৯১৯
+সংখ্যা: ২০
+
+২. মাওলানা মুহা: মারুফ আহমেদ
+পিতা: মুহা: আলাউদ্দিন প্রামানিক
+কামারপাড়া, বাগাতিপাড়া, নাটোর | ০১৩১৯১৫২৪৮২
+৩০"></textarea>
+
+                <button type="button" id="btnLoadSelectionPen" class="btn btn-sm" style="width: 100%;">
+                    Load from Selected Canvas TextFrame
+                </button>
+
+                <div class="flex-row gap-4">
+                    <button type="button" id="btnPickSamplePen" class="btn btn-sm btn-accent" style="flex: 1;" title="Select 1st formatted Pen card on canvas to lock exact color, font &amp; horizontal space">
+                        🎯 Pick 1st Card
+                    </button>
+                    <button type="button" id="btnPickBoxPen" class="btn btn-sm" style="flex: 1;" title="Select target area rectangle (e.g. 25x5mm) on canvas">
+                        📐 Pick Box (mm)
+                    </button>
+                    <button type="button" id="btnScanPenCards" class="btn btn-sm" title="Scan Pen cards on sheet">
+                        🔍 Scan
+                    </button>
+                    <button type="button" id="btnResetSamplePen" class="btn btn-sm" style="display: none;" title="Clear locked 1st card / box reference">
+                        ✕
+                    </button>
+                </div>
+
+                <div class="slot-status-bar">
+                    <span id="penSlotStatusText">Auto: ১ম কার্ডের কালার ও মাপ অনুযায়ী বসবে</span>
+                    <span id="penSlotCountBadge" class="slot-pill">Auto</span>
                 </div>
             </div>
 
-            <button type="button" id="btnPlaceCanvasText" class="btn btn-primary" style="width: 100%;">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <polyline points="5 9 2 12 5 15"></polyline>
-                    <polyline points="9 5 12 2 15 5"></polyline>
-                    <polyline points="15 19 12 22 9 19"></polyline>
-                    <polyline points="19 9 22 12 19 15"></polyline>
-                    <line x1="2" y1="12" x2="22" y2="12"></line>
-                    <line x1="12" y1="2" x2="12" y2="22"></line>
+            <!-- Settings & Horizontal Fit -->
+            <div class="section-box">
+                <div class="section-header">
+                    <span class="section-title">Pen Layout &amp; Smart Fit</span>
+                </div>
+
+                <div class="grid-2">
+                    <div class="control-group">
+                        <label for="selectScopePen">Target Scope</label>
+                        <select id="selectScopePen">
+                            <option value="artboard" selected>Active Artboard (বর্তমান আর্টবোর্ড)</option>
+                            <option value="selection">Selected Cards (সিলেক্টেড কার্ড)</option>
+                            <option value="all_artboards">All Artboards (সব আর্টবোর্ড)</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label for="selectFillOrderPen">Fill Direction</label>
+                        <select id="selectFillOrderPen">
+                            <option value="column" selected>Column-wise (উপর → নিচ)</option>
+                            <option value="zigzag">Row by Row (বাম → ডান)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Target mm Box & Line-by-Line Scale Engine -->
+                <div class="control-group safefit-box">
+                    <label class="checkbox-label checkbox-highlight" style="margin-bottom: 4px;">
+                        <input type="checkbox" id="chkAutoFitPen" checked>
+                        <span>১ম কার্ড / নির্দিষ্ট mm বক্স অনুযায়ী ফিট করো</span>
+                    </label>
+                    <div class="grid-2" style="margin-bottom: 4px;">
+                        <div class="flex-row gap-4">
+                            <span style="font-size: 10px; color: #98989d; white-space: nowrap;">Width:</span>
+                            <input type="text" id="inputTargetWidthPen" value="Auto" placeholder="Auto" style="text-align: center; font-weight: 600;" title="Exact horizontal width in mm (e.g. 25). Leave Auto to match 1st card or inner box.">
+                            <span style="font-size: 10px; color: #636366;">mm</span>
+                        </div>
+                        <div class="flex-row gap-4">
+                            <span style="font-size: 10px; color: #98989d; white-space: nowrap;">Height:</span>
+                            <input type="text" id="inputTargetHeightPen" value="Auto" placeholder="Auto" style="text-align: center; font-weight: 600;" title="Optional max vertical height in mm (e.g. 5). Leave Auto to match 1st card.">
+                            <span style="font-size: 10px; color: #636366;">mm</span>
+                        </div>
+                    </div>
+
+                    <label class="checkbox-label" style="margin-bottom: 5px;">
+                        <input type="checkbox" id="chkExpandShortPen" checked>
+                        <span>ছোট নাম ও পিতার লাইন প্রয়োজনে চওড়া করো (Expand Short)</span>
+                    </label>
+
+                    <div class="grid-3">
+                        <div class="control-group">
+                            <label for="inputMaxNameHScalePen" title="Name Horizontal Scale Range (Min - Max %)">Name Max %</label>
+                            <input type="number" id="inputMaxNameHScalePen" min="100" max="200" value="130" style="text-align: center;">
+                        </div>
+                        <div class="control-group">
+                            <label for="inputMaxFatherHScalePen" title="Father Horizontal Scale Range (Max %)">Father Max %</label>
+                            <input type="number" id="inputMaxFatherHScalePen" min="100" max="200" value="115" style="text-align: center;">
+                        </div>
+                        <div class="control-group">
+                            <label for="inputMinLastHScalePen" title="Minimum horizontal scale for long Address + Phone line">Last Min %</label>
+                            <input type="number" id="inputMinLastHScalePen" min="25" max="95" value="35" style="text-align: center;">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Core Pen Checkboxes -->
+                <div class="checkbox-list" style="margin-top: 2px;">
+                    <label class="checkbox-label checkbox-highlight">
+                        <input type="checkbox" id="chkKeepCard1StylePen" checked>
+                        <span>১ম কার্ডের কালার, ফন্ট ও সাইজ সবগুলোতে বসাও</span>
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="chkMakeBoldPen" checked>
+                        <span>নাম বোল্ড রাখো (Apply Bold on Name)</span>
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="chkCombineAddressPhonePen" checked>
+                        <span>ঠিকানা ও মোবাইল এক লাইনে বসাও (Address | Phone)</span>
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="chkStripNumberPen" checked>
+                        <span>নামের আগে ১, ২ ইত্যাদি ক্রমিক বাদ দাও</span>
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="chkFillQtyPen" checked>
+                        <span>পাশের সংখ্যা / পিস বসাও (Fill Side Number)</span>
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="chkSkipFirstCardPen">
+                        <span>১ম কার্ডটি অপরিবর্তিত রাখো (Skip 1st Reference Card)</span>
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="chkSkipFilledPen" checked>
+                        <span>অলরেডি বসা কার্ড স্কিপ করো (Skip Already Placed)</span>
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="chkAutoRemoveFilledPen" checked>
+                        <span>বসে যাওয়া নাম টেক্সটবক্স থেকে রিমুভ করো</span>
+                    </label>
+                </div>
+
+                <!-- Optional Advanced Controls -->
+                <details class="advanced-panel">
+                    <summary>
+                        <span>⚙️ ঐচ্ছিক অ্যাডভান্সড সেটিংস (কালার / সংখ্যা / স্কেল লিমিট)</span>
+                        <span>▾</span>
+                    </summary>
+                    <div class="flex-col gap-7">
+                        <div class="grid-2">
+                            <div class="control-group">
+                                <label for="selectQtyFormatPen">Side Number Format</label>
+                                <select id="selectQtyFormatPen">
+                                    <option value="auto" selected>Auto (১ম কার্ড অনুযায়ী)</option>
+                                    <option value="en">English (20, 10, 30)</option>
+                                    <option value="bn">বাংলা (২০, ১০, ৩০)</option>
+                                </select>
+                            </div>
+                            <div class="control-group">
+                                <label for="inputStartIndexPen">Start Entry #</label>
+                                <div class="flex-row gap-4">
+                                    <input type="number" id="inputStartIndexPen" value="1" min="1" style="width: 52px; text-align: center;">
+                                    <button type="button" id="btnResetIndexPen" class="btn btn-sm" style="flex: 1;" title="Reset to #1">Reset</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="grid-3">
+                            <div class="control-group">
+                                <label for="inputMinNameHScalePen">Name Min %</label>
+                                <input type="number" id="inputMinNameHScalePen" min="25" max="95" value="45" style="text-align: center;">
+                            </div>
+                            <div class="control-group">
+                                <label for="inputMinFatherHScalePen">Father Min %</label>
+                                <input type="number" id="inputMinFatherHScalePen" min="25" max="95" value="45" style="text-align: center;">
+                            </div>
+                            <div class="control-group">
+                                <label for="inputMinFontSizePen">Min Size (pt)</label>
+                                <input type="number" id="inputMinFontSizePen" min="3" max="10" step="0.5" value="4.0" style="text-align: center;">
+                            </div>
+                        </div>
+
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="chkOverrideColorPen">
+                            <span>১ম কার্ডের বদলে নিচের কাস্টম Name Color ব্যবহার করো</span>
+                        </label>
+
+                        <div class="control-group">
+                            <div class="flex-between">
+                                <label>Custom Name Color (ঐচ্ছিক)</label>
+                                <span id="labelColorNamePen" style="font-size: 10px; color: #98989d; font-family: monospace;">#A22F10</span>
+                            </div>
+                            <div class="color-picker-wrapper">
+                                <input type="color" id="colorPickerPen" value="#A22F10" class="color-input-native" title="Choose custom name color">
+                                <input type="text" id="colorHexPen" value="#A22F10" style="width: 78px; text-transform: uppercase; font-family: monospace; font-size: 10.5px; text-align: center;">
+                                <button type="button" id="btnPickColorPen" class="btn btn-sm" style="flex: 1;" title="Sample color from selected canvas text/object">
+                                    Pick from Canvas
+                                </button>
+                            </div>
+                            <div class="color-swatch-bar">
+                                <span style="font-size: 9.5px; color: #636366;">Presets:</span>
+                                <div class="pen-color-swatch active" data-color="#A22F10" style="background:#A22F10;" title="Crimson Red"></div>
+                                <div class="pen-color-swatch" data-color="#9C1A1A" style="background:#9C1A1A;" title="Maroon"></div>
+                                <div class="pen-color-swatch" data-color="#006F9A" style="background:#006F9A;" title="Deep Teal"></div>
+                                <div class="pen-color-swatch" data-color="#000000" style="background:#000000;" title="Solid Black"></div>
+                                <div class="pen-color-swatch" data-color="#1E5AA8" style="background:#1E5AA8;" title="Royal Blue"></div>
+                                <div class="pen-color-swatch" data-color="#1B6E3F" style="background:#1B6E3F;" title="Islamic Green"></div>
+                            </div>
+                            <div class="cmyk-control-bar">
+                                <span style="color: #98989d; font-weight: 600;">CMYK:</span>
+                                <label>C: <input type="number" id="inputColorC_Pen" min="0" max="100" value="20">%</label>
+                                <label>M: <input type="number" id="inputColorM_Pen" min="0" max="100" value="90">%</label>
+                                <label>Y: <input type="number" id="inputColorY_Pen" min="0" max="100" value="100">%</label>
+                                <label>K: <input type="number" id="inputColorK_Pen" min="0" max="100" value="15">%</label>
+                            </div>
+                        </div>
+                    </div>
+                </details>
+            </div>
+
+            <!-- Action Buttons -->
+            <button type="button" id="btnAutoFillPen" class="btn btn-primary" style="width: 100%;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
                 </svg>
-                <span class="btn-label">Move &amp; Place Text into Cards</span>
+                <span class="btn-label">Auto Fill Pen Cards</span>
             </button>
+
+            <button type="button" id="btnFormatExistingPen" class="btn btn-outline-action" style="width: 100%;" title="Format and fit already-entered text on canvas cards to match Card 1 &amp; target mm box without re-pasting">
+                <span class="btn-label">✨ Style &amp; Fit Existing Canvas Cards</span>
+            </button>
+
+            <!-- Preview Section -->
+            <div class="section-box">
+                <div class="section-header">
+                    <span class="section-title">Parsed Pen Entries</span>
+                    <span id="entriesCountBadgePen" class="badge">0 Entries</span>
+                </div>
+                <div id="previewListPen" class="preview-container">
+                    <div class="empty-text">No entries parsed. Paste pen list above or click "Sample".</div>
+                </div>
+            </div>
         </div>
 
     </main>
@@ -789,7 +1010,7 @@ Example:
 
     <!-- Scripts -->
     <script src="js/CSInterface.js"></script>
-    <script src="js/main.js?v=3.3.0"></script>
+    <script src="js/main.js?v=3.4.0"></script>
     <script>
     function openAuthorProfile(e) {
         if (e) { e.preventDefault(); e.stopPropagation(); }

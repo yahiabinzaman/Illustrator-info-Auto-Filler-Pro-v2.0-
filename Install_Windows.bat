@@ -1,13 +1,13 @@
 @echo off
 setlocal EnableExtensions EnableDelayedExpansion
 :: ==============================================================================
-:: Universal Windows One-Click Installer for Auto Filler Pro v3.3
+:: Universal Windows One-Click Installer for Auto Filler Pro v3.4
 :: Supports Adobe Illustrator CC 2015.3 (v20) through CC 2026+ (CSXS 4 - 24)
 :: Works with or without Administrator rights (zero PowerShell policy blocks)
 :: Developed by Yahia Bin Zaman | ColorLab
 :: ==============================================================================
 
-title Installing Auto Filler Pro v3.3 for Adobe Illustrator...
+title Installing Auto Filler Pro v3.4 for Adobe Illustrator...
 color 0b
 
 set "SRC_DIR=%~dp0"
@@ -27,7 +27,7 @@ if %errorlevel%==0 set "IS_ADMIN=1"
 
 echo.
 echo ==========================================================
-echo  Auto Filler Pro v3.3 - Windows Universal Installer
+echo  Auto Filler Pro v3.4 - Windows Universal Installer
 echo  Supports Illustrator CC 2015.3 (v20) - 2026+
 echo  ColorLab Automation Suite ^| Yahia Bin Zaman
 echo ==========================================================
@@ -148,7 +148,7 @@ if exist "%TARGET_USER%\Set_Bornomala_Default.jsx" (
 
 echo.
 echo ==========================================================
-echo  [SUCCESS] Auto Filler Pro v3.3 installed cleanly!
+echo  [SUCCESS] Auto Filler Pro v3.4 installed cleanly!
 echo  User CEP : %TARGET_USER%
 if "%IS_ADMIN%"=="1" echo  Sys CEP  : %TARGET_SYS%
 echo  Scripts  : %USER_SCRIPTS%

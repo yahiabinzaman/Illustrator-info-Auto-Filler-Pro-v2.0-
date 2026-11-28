@@ -45,7 +45,7 @@
 
     copyFolderRecursive(scriptFolder, targetExtFolder);
 
-    var msg = "Success! Auto Filler Pro v3.3 has been installed!\n\n" +
+    var msg = "Success! Auto Filler Pro v3.4 has been installed!\n\n" +
         "Extension Panel Location:\n" +
         "   Window > Extensions > Auto Filler Pro\n\n" +
         "(Please restart Adobe Illustrator once to refresh the menus.)";
